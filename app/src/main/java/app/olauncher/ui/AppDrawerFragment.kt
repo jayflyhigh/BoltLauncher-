@@ -43,7 +43,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var inAppSearch: app.olauncher.helper.InAppSearch
     private var activeSearch: app.olauncher.helper.InAppSearch.Target? = null
-    private var searchTargetsLoad: kotlinx.coroutines.Job? = null
+    private var searchEditor: androidx.appcompat.app.AlertDialog? = null
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
     private lateinit var linearLayoutManager: LinearLayoutManager
@@ -218,6 +218,7 @@ class AppDrawerFragment : BaseFragment() {
                 setDockExpanded(true)
             }
         }
+        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         binding.dockBolt.setOnClickListener {
             setContactsMode(false)
             setThunderMode(true)
@@ -228,6 +229,15 @@ class AppDrawerFragment : BaseFragment() {
             findNavController().navigate(if (isHomePage)
                 R.id.action_mainFragment_to_settingsFragment
                 else R.id.action_appListFragment_to_settingsFragment2)
+        }
+        binding.dockSettings.setOnLongClickListener {
+            cancelAutoLaunch()
+            try {
+                startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS))
+            } catch (_: android.content.ActivityNotFoundException) {
+                requireContext().showToast("System settings are unavailable")
+            }
+            true
         }
         binding.dock.post {
             if (_binding == null) return@post
@@ -615,7 +625,7 @@ class AppDrawerFragment : BaseFragment() {
         activeSearch = null
         adapter.searchPackage = null
         binding.dockSearch.contentDescription = "Search"
-        binding.dockSearch.setOnLongClickListener(null)
+        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
     }
 
     private fun activateAppSearch(target: app.olauncher.helper.InAppSearch.Target, query: String = "") {
@@ -632,14 +642,17 @@ class AppDrawerFragment : BaseFragment() {
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             textAlign = android.graphics.Paint.Align.CENTER
         }
-        android.graphics.Canvas(bitmap).drawText(target.app.appLabel.take(1).uppercase(java.util.Locale.ROOT), size / 2f,
+        val code = inAppSearch.alias(target)
+        val textWidth = paint.measureText(code)
+        if (textWidth > size * .86f) paint.textSize *= size * .86f / textWidth
+        android.graphics.Canvas(bitmap).drawText(code, size / 2f,
             size / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
         binding.dockSearch.setPadding(0, 0, 0, 0)
         binding.dockSearch.setImageBitmap(bitmap)
         binding.dockSearch.imageTintList = null
         binding.dockSearch.background = app.olauncher.helper.InAppSearch.background(target.color, resources.displayMetrics.density)
         binding.dockSearch.contentDescription = "Search in ${target.app.appLabel}, alias ${inAppSearch.alias(target)}"
-        binding.dockSearch.setOnLongClickListener { editSearchAlias(target); true }
+        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(target); true }
         binding.search.queryHint = "Search in ${target.app.appLabel}....."
         binding.search.setQuery(query, false)
         adapter.filterApps(query)
@@ -647,35 +660,39 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
     }
 
-    private fun editSearchAlias(target: app.olauncher.helper.InAppSearch.Target) {
-        val field = android.widget.EditText(requireContext()).apply {
-            setSingleLine(true)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            setText(inAppSearch.alias(target))
-            selectAll()
-        }
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("${target.app.appLabel} alias code").setView(field)
-            .setPositiveButton("Save", null).setNegativeButton(android.R.string.cancel, null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val value = app.olauncher.helper.AppSearchAlias.normalize(field.text.toString())
-                if (inAppSearch.saveAlias(target, value)) dialog.dismiss()
-                else field.error = "Use a unique code with letters or numbers"
+    private fun showAppSearchEditor(initial: app.olauncher.helper.InAppSearch.Target? = activeSearch) {
+        if (searchEditor?.isShowing == true) return
+        cancelAutoLaunch()
+        binding.search.hideKeyboard()
+        val apps = adapter.appsList.filterIsInstance<AppModel.App>()
+            .filter { it.user == Process.myUserHandle() }.distinctBy { it.appPackage }
+            .sortedBy { it.appLabel.lowercase(java.util.Locale.ROOT) }
+        searchEditor = AppSearchEditor.show(requireContext(), apps, inAppSearch, initial) {
+            val current = activeSearch
+            if (current != null) {
+                val updated = inAppSearch.targets[current.app.appPackage]
+                if (updated != null) activateAppSearch(updated, binding.search.query.toString())
+                else resetHomeSearch()
             }
-            field.requestFocus()
-            dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+            adapter.notifyItemRangeChanged(0, adapter.itemCount)
+            adapter.filterApps(binding.search.query.toString())
         }
-        dialog.setOnDismissListener { if (_binding != null && dockExpanded) binding.search.showKeyboard() }
-        dialog.show()
     }
 
     private fun launchAppSearch(): Boolean {
         val target = activeSearch ?: return false
         val query = binding.search.query.toString().trim()
         if (query.isBlank()) return true
-        try { inAppSearch.launch(target, query) }
-        catch (_: Exception) { requireContext().showToast("This app could not open search") }
+        try {
+            if (!inAppSearch.launch(target, query)) {
+                clearAppSearch()
+                setThunderMode(false)
+                binding.search.queryHint = "Search apps"
+                adapter.filterApps(query)
+                adapter.notifyItemRangeChanged(0, adapter.itemCount)
+                requireContext().showToast("Search is unavailable in ${target.app.appLabel}. Hold search to edit its URL.")
+            }
+        } catch (_: Exception) { requireContext().showToast("This app could not open search") }
         return true
     }
 
@@ -707,10 +724,9 @@ class AppDrawerFragment : BaseFragment() {
                 try {
                     cancelAutoLaunch()
                     if (activeSearch == null && !contactsMode && flag == Constants.FLAG_LAUNCH_APP && newText.contains(' ')) {
-                        val confirmed = app.olauncher.helper.AppSearchAlias.confirmed(newText)
-                        val target = confirmed?.first?.let { inAppSearch.find(it) }
-                        if (target != null) {
-                            activateAppSearch(target, confirmed?.second.orEmpty())
+                        val confirmed = inAppSearch.confirmed(newText)
+                        if (confirmed != null) {
+                            activateAppSearch(confirmed.first, confirmed.second)
                             return true
                         }
                     }
@@ -843,9 +859,9 @@ class AppDrawerFragment : BaseFragment() {
                 viewModel.getAppList()
             },
             searchTarget = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage] else null },
-            searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             searchClick = { activateAppSearch(it) },
-            searchHold = { editSearchAlias(it) },
+            searchHold = { showAppSearchEditor(it) },
+            searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
@@ -937,11 +953,8 @@ class AppDrawerFragment : BaseFragment() {
 
         adapter.setAppList(combined)
         adapter.filterApps(binding.search.query.toString())
-        searchTargetsLoad?.cancel()
-        searchTargetsLoad = viewLifecycleOwner.lifecycleScope.launch {
-            withContext(Dispatchers.IO) { inAppSearch.load(combined) }
-            if (_binding != null) adapter.notifyItemRangeChanged(0, adapter.itemCount)
-        }
+        inAppSearch.load(combined)
+        adapter.notifyItemRangeChanged(0, adapter.itemCount)
     }
 
     private fun initClickListeners() {
@@ -1010,7 +1023,8 @@ class AppDrawerFragment : BaseFragment() {
     override fun onDestroyView() {
         cancelAutoLaunch()
         contactsLoad?.cancel()
-        searchTargetsLoad?.cancel()
+        searchEditor?.dismiss()
+        searchEditor = null
         dockAnimator?.cancel()
         dockAnimator = null
         commandKeys.forEach { it.animate().cancel() }

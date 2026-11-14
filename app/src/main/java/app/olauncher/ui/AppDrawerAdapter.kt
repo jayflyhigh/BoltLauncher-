@@ -44,9 +44,9 @@ class AppDrawerAdapter(
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
     private val searchTarget: (AppModel) -> app.olauncher.helper.InAppSearch.Target? = { null },
-    private val searchAlias: (AppModel) -> String? = { null },
     private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
+    private val searchAlias: (AppModel) -> String? = { null },
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
@@ -300,12 +300,16 @@ class AppDrawerAdapter(
             hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
-                searchBadge.text = appModel.appLabel.take(1).uppercase(java.util.Locale.ROOT)
+                searchBadge.text = target.code
                 searchBadge.background = app.olauncher.helper.InAppSearch.background(target.color, root.resources.displayMetrics.density)
                 searchBadge.setTextColor(app.olauncher.helper.InAppSearch.foreground(target.color))
-                searchBadge.contentDescription = "Search in ${appModel.appLabel}. Hold to change alias"
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(searchBadge, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                searchBadge.contentDescription = "Search in ${appModel.appLabel}, alias ${target.code}"
                 searchBadge.setOnClickListener { searchClick(target) }
                 searchBadge.setOnLongClickListener { searchHold(target); true }
+            } else {
+                searchBadge.setOnClickListener(null)
+                searchBadge.setOnLongClickListener(null)
             }
             applyThunderStyle(thunderMode)
             appHideLayout.visibility = View.GONE
