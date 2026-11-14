@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
         registerShortcutCallback()
         setupOrientation()
 
-        window.addFlags(FLAG_LAYOUT_NO_LIMITS)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             profileReceiver = object : BroadcastReceiver() {
@@ -348,6 +348,9 @@ class MainActivity : AppCompatActivity() {
         messageDialog?.dismiss()
         if (navController.currentDestination?.id != R.id.mainFragment)
             navController.popBackStack(R.id.mainFragment, false)
+        val host = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
+        (host?.childFragmentManager?.primaryNavigationFragment as? app.olauncher.ui.AppDrawerFragment)
+            ?.resetHomeSearch()
     }
 
     private fun setPlainWallpaper() {

@@ -44,6 +44,9 @@ class AppDrawerFragment : BaseFragment() {
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
 
+    private val isHomePage: Boolean
+        get() = findNavController().currentDestination?.id == R.id.mainFragment
+
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
 
@@ -63,6 +66,7 @@ class AppDrawerFragment : BaseFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
+        dockExpanded = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -82,6 +86,14 @@ class AppDrawerFragment : BaseFragment() {
         initClickListeners()
         initDock()
         applyDockInsets()
+        binding.recyclerView.visibility = if (isHomePage) View.INVISIBLE else View.VISIBLE
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (dockExpanded) resetHomeSearch()
+                    else if (!isHomePage) closeDrawer()
+                }
+            })
     }
 
     private fun applyDockInsets() {
@@ -94,7 +106,8 @@ class AppDrawerFragment : BaseFragment() {
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             // Reserve the system area beneath the dock in both gesture and button navigation.
-            view.setPadding(initialLeft + bars.left, initialTop, initialRight + bars.right,
+            val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            view.setPadding(initialLeft + bars.left, maxOf(initialTop, status.top), initialRight + bars.right,
                 initialBottom + maxOf(bars.bottom, keyboard.bottom))
             insets
         }
@@ -103,8 +116,11 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun initDock() {
         binding.dockHome.setOnClickListener {
-            binding.search.hideKeyboard()
-            findNavController().popBackStack(R.id.mainFragment, false)
+            if (isHomePage) resetHomeSearch()
+            else {
+                binding.search.hideKeyboard()
+                findNavController().popBackStack(R.id.mainFragment, false)
+            }
         }
         binding.dockSearch.setOnClickListener { setDockExpanded(!dockExpanded) }
         binding.dockBolt.setOnClickListener { setDockExpanded(true) }
@@ -114,15 +130,30 @@ class AppDrawerFragment : BaseFragment() {
             catch (_: android.content.ActivityNotFoundException) { }
         }
         binding.dockSettings.setOnClickListener {
-            findNavController().navigate(R.id.action_appListFragment_to_settingsFragment2)
+            findNavController().navigate(if (isHomePage)
+                R.id.action_mainFragment_to_settingsFragment
+                else R.id.action_appListFragment_to_settingsFragment2)
+        }
+        binding.dock.post {
+            if (_binding == null) return@post
+            val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
+            params.marginStart = binding.dockHome.right + (16 * resources.displayMetrics.density).toInt()
+            binding.search.layoutParams = params
         }
         searchTextView?.setTextColor(android.graphics.Color.WHITE)
         searchTextView?.setHintTextColor(0xFFBDBDBD.toInt())
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
 
-    private fun setDockExpanded(expanded: Boolean) {
+    fun resetHomeSearch() {
+        if (_binding == null) return
+        binding.search.setQuery("", false)
+        setDockExpanded(false, animate = false)
+    }
+
+    private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
         dockExpanded = expanded
+        binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
         dockAnimator?.cancel()
         val start = (binding.dockSearch.tag as? Float) ?: 0f
         val target = if (expanded) 1f else 0f
@@ -132,13 +163,13 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.clearFocus()
         }
         dockAnimator = android.animation.ValueAnimator.ofFloat(start, target).apply {
-            duration = (220 * kotlin.math.abs(target - start)).toLong()
+            duration = if (animate) (220 * kotlin.math.abs(target - start)).toLong() else 0L
             interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
             addUpdateListener {
                 val progress = it.animatedValue as Float
                 val b = _binding ?: return@addUpdateListener
                 b.dockSearch.tag = progress
-                b.dockSearch.translationX = -b.dockSearch.width * progress
+                b.dockSearch.translationX = (b.dockHome.x - b.dockSearch.left) * progress
                 b.dockSearch.translationZ = 8f
                 b.dockHome.alpha = 1f - progress
                 b.dockHome.isEnabled = !expanded
@@ -292,7 +323,9 @@ class AppDrawerFragment : BaseFragment() {
                     binding.search.hideKeyboard()
                     prefs.firstHide = false
                     viewModel.showDialog.postValue(Constants.Dialog.HIDDEN)
-                    findNavController().navigate(R.id.action_appListFragment_to_settingsFragment2)
+                    findNavController().navigate(if (isHomePage)
+                R.id.action_mainFragment_to_settingsFragment
+                else R.id.action_appListFragment_to_settingsFragment2)
                 }
                 viewModel.getAppList()
                 viewModel.getHiddenApps()
@@ -420,7 +453,13 @@ class AppDrawerFragment : BaseFragment() {
 
     // Pops only the drawer. A plain popBackStack() from a late overscroll frame could pop the
     // home screen too, leaving a drawer that auto-launch and back can't close (#766)
-    private fun closeDrawer() = findNavController().popBackStack(R.id.appListFragment, true)
+    private fun closeDrawer(): Boolean {
+        if (isHomePage) {
+            resetHomeSearch()
+            return false
+        }
+        return findNavController().popBackStack(R.id.appListFragment, true)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -430,6 +469,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onStop() {
         binding.search.hideKeyboard()
+        if (isHomePage) resetHomeSearch()
         super.onStop()
     }
 
