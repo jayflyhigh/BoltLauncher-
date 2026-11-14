@@ -180,6 +180,12 @@ class AppDrawerFragment : BaseFragment() {
                     return true
                 }
 
+                override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
+                    if (!isHomePage || !contactsMode || dockExpanded) return false
+                    resetHomeSearch()
+                    return true
+                }
+
                 override fun onScroll(
                     start: android.view.MotionEvent?,
                     current: android.view.MotionEvent,
@@ -198,7 +204,7 @@ class AppDrawerFragment : BaseFragment() {
             })
         detector.setIsLongpressEnabled(false)
         binding.root.setOnTouchListener { _, event ->
-            if (isHomePage && !dockExpanded && !contactsMode) detector.onTouchEvent(event) else false
+            if (isHomePage && !dockExpanded) detector.onTouchEvent(event) else false
         }
     }
 
