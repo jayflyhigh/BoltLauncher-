@@ -36,6 +36,13 @@
         android:importantForAccessibility="no"
         android:visibility="gone" />
 
+    <androidx.appcompat.widget.AppCompatTextView android:id="@+id/searchBadge"
+        android:layout_width="48dp" android:layout_height="48dp"
+        android:layout_gravity="end|center_vertical" android:layout_marginEnd="10dp"
+        android:gravity="center" android:textSize="20sp" android:textStyle="bold"
+        android:paddingHorizontal="3dp" android:maxLines="1" android:ellipsize="end"
+        android:focusable="true" android:clickable="true" android:visibility="gone" />
+
     <ImageView
         android:id="@+id/otherProfileIndicator"
         android:layout_width="5dp"

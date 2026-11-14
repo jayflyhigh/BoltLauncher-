@@ -43,6 +43,9 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
+    private val searchTarget: (AppModel) -> app.olauncher.helper.InAppSearch.Target? = { null },
+    private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
+    private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val searchAlias: (AppModel) -> String? = { null },
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
@@ -174,7 +177,7 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode
+                    thunderMode, searchTarget(appModel), searchClick, searchHold
                 )
             }
         } catch (e: Exception) {
@@ -261,13 +264,14 @@ class AppDrawerAdapter(
     private class ViewHolder(private val binding: AdapterAppDrawerBinding) :
         RecyclerView.ViewHolder(binding.root) {
         private var iconJob: Job? = null
+        private var hasSearchBadge = false
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
             root.setBackgroundResource(R.drawable.dock_shell)
             appTitle.setTextColor(android.graphics.Color.WHITE)
-            resultBolt.isVisible = enabled
-            val endPadding = ((if (enabled) 68 else 24) * root.resources.displayMetrics.density).toInt()
+            resultBolt.isVisible = enabled && !hasSearchBadge
+            val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
             appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
@@ -289,7 +293,24 @@ class AppDrawerAdapter(
             iconScope: CoroutineScope,
             iconCache: LruCache<IconKey, Drawable.ConstantState>,
             thunderMode: Boolean,
+            target: app.olauncher.helper.InAppSearch.Target?,
+            searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit,
+            searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
         ) = with(binding) {
+            hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
+            searchBadge.isVisible = hasSearchBadge
+            if (target != null) {
+                searchBadge.text = target.code
+                searchBadge.background = app.olauncher.helper.InAppSearch.background(target.color, root.resources.displayMetrics.density)
+                searchBadge.setTextColor(app.olauncher.helper.InAppSearch.foreground(target.color))
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(searchBadge, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                searchBadge.contentDescription = "Search in ${appModel.appLabel}, alias ${target.code}"
+                searchBadge.setOnClickListener { searchClick(target) }
+                searchBadge.setOnLongClickListener { searchHold(target); true }
+            } else {
+                searchBadge.setOnClickListener(null)
+                searchBadge.setOnLongClickListener(null)
+            }
             applyThunderStyle(thunderMode)
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE

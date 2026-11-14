@@ -1,141 +1,88 @@
 package app.olauncher.helper
 
-import android.app.SearchManager
-import android.content.ActivityNotFoundException
-import android.content.ComponentName
-import android.content.pm.PackageManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import app.olauncher.data.AppModel
-import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 
-/** Requires a search contract or a supported search URL handled by the installed app. */
+/** User-configured search commands, always restricted to the chosen app. */
 class InAppSearch(private val context: Context) {
-    data class Route(val intent: Intent, val link: Boolean)
-    data class Target(val app: AppModel, val routes: List<Route>, val color: Int)
+    data class Target(val app: AppModel.App, val template: String, val color: Int, val code: String)
     private val prefs = context.getSharedPreferences("in_app_search", Context.MODE_PRIVATE)
-    @Volatile var targets: Map<String, Target> = emptyMap()
+    var targets: Map<String, Target> = emptyMap()
         private set
 
+    private fun configurations(): List<JSONObject> = try {
+        val array = JSONArray(prefs.getString("custom_commands", "[]"))
+        (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+    } catch (_: Exception) { emptyList() }
+
     fun load(apps: List<AppModel>) {
-        targets = apps.filterIsInstance<AppModel.App>()
-            .filter { it.user == android.os.Process.myUserHandle() }
-            .sortedBy { it.appPackage }.mapNotNull { app ->
-                discover(app)?.let { app.appPackage to it }
-            }.toMap()
-        ensureAliases()
+        val installed = apps.filterIsInstance<AppModel.App>()
+            .filter { it.user == android.os.Process.myUserHandle() }.associateBy { it.appPackage }
+        targets = configurations().mapNotNull { config ->
+            val app = installed[config.optString("package")] ?: return@mapNotNull null
+            val url = config.optString("url")
+            val code = config.optString("alias")
+            if (!SearchCommandUrl.valid(url) || code.isBlank()) return@mapNotNull null
+            app.appPackage to Target(app, url, config.optInt("color", Color.DKGRAY), code)
+        }.toMap()
     }
 
-    private fun discover(app: AppModel.App): Target? {
-        try {
-            if (prefs.getLong("failed:${app.appPackage}", -1) == appVersion(app.appPackage)) return null
-            val manager = context.getSystemService(Context.SEARCH_SERVICE) as SearchManager
-            val routes = mutableListOf<Route>()
-            // Prefer a query-bearing app link over a generic ACTION_SEARCH handler.
-            InAppSearchLinks.url(app.appPackage, "test")?.let { url ->
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    .addCategory(Intent.CATEGORY_BROWSABLE).setPackage(app.appPackage)
-                val activity = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-                    .firstOrNull { usable(it.activityInfo, app.appPackage) }?.activityInfo
-                if (activity != null) {
-                    intent.component = ComponentName(activity.packageName, activity.name)
-                    routes.add(Route(intent, true))
-                }
-            }
-            val search = Intent(Intent.ACTION_SEARCH).setPackage(app.appPackage)
-            context.packageManager.queryIntentActivities(search, 0).forEach { result ->
-                val activity = result.activityInfo
-                val component = ComponentName(activity.packageName, activity.name)
-                // Resolving ACTION_SEARCH alone does not establish that QUERY is supported.
-                if (usable(activity, app.appPackage) &&
-                    manager.getSearchableInfo(component)?.searchActivity == component) {
-                    routes.add(Route(Intent(search).setComponent(component), false))
-                }
-            }
-            if (routes.isEmpty()) return null
-            return Target(app, routes, iconColor(app.appPackage))
-        } catch (_: Exception) { return null }
+    fun alias(target: Target) = target.code
+    fun find(code: String) = targets.values.firstOrNull { it.code.equals(code, true) }
+    fun confirmed(text: String): Pair<Target, String>? {
+        val result = SearchCommandUrl.confirmed(text, targets.values.map { it.code }) ?: return null
+        return find(result.first)?.let { it to result.second }
     }
 
-    private fun ensureAliases() {
-        val used = targets.keys.mapNotNull { prefs.getString(it, null) }.toMutableSet()
-        val editor = prefs.edit()
-        targets.forEach { (pkg, target) ->
-            if (!prefs.contains(pkg)) {
-                val base = target.app.appLabel.lowercase(Locale.ROOT).filter { it in 'a'..'z' || it in '0'..'9' }.take(2).ifBlank { "app" }
-                var alias = base
-                var suffix = 2
-                while (alias in used) alias = base + suffix++
-                used.add(alias)
-                editor.putString(pkg, alias)
-            }
+    fun save(app: AppModel.App, template: String, color: Int, code: String): Target {
+        require(SearchCommandUrl.valid(template)) { "Enter a valid search URL" }
+        val others = configurations().filter { it.optString("package") != app.appPackage }.map { it.optString("alias") }
+        require(SearchCommandUrl.validAlias(code, others)) { "Enter a unique, non-empty alias" }
+        require(resolve(app.appPackage, SearchCommandUrl.build(template, "test")) != null) {
+            "This app cannot open that URL. Check its search URL or URL scheme."
         }
-        editor.apply()
+        val target = Target(app, template.trim(), color, code.trim())
+        val configs = configurations().filter { it.optString("package") != app.appPackage }.toMutableList()
+        configs.add(JSONObject().put("package", app.appPackage).put("url", target.template).put("color", color).put("alias", target.code))
+        prefs.edit().putString("custom_commands", JSONArray(configs).toString()).apply()
+        targets = targets + (app.appPackage to target)
+        return target
     }
 
-    fun alias(target: Target): String = prefs.getString(target.app.appPackage, "") ?: ""
-    fun find(alias: String): Target? = targets.values.firstOrNull { alias(it).equals(alias, true) }
-    fun saveAlias(target: Target, value: String): Boolean {
-        if (!AppSearchAlias.valid(value, targets.values.filter {
-                it.app.appPackage != target.app.appPackage
-            }.map { alias(it) })) return false
-        prefs.edit().putString(target.app.appPackage, value).apply()
-        return true
+    fun remove(packageName: String) {
+        val configs = configurations().filter { it.optString("package") != packageName }
+        prefs.edit().putString("custom_commands", JSONArray(configs).toString()).apply()
+        targets = targets - packageName
     }
-    private fun appVersion(pkg: String): Long = context.packageManager.getPackageInfo(pkg, 0).lastUpdateTime
 
-    private fun usable(info: android.content.pm.ActivityInfo, pkg: String): Boolean =
-        info.packageName == pkg && info.exported && info.enabled && info.applicationInfo.enabled &&
-            (info.permission == null || context.checkSelfPermission(info.permission) == PackageManager.PERMISSION_GRANTED)
+    private fun resolve(pkg: String, url: String): Intent? {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(pkg)
+        val activity = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            .firstOrNull {
+                val info = it.activityInfo
+                info.packageName == pkg && info.exported && info.enabled && info.applicationInfo.enabled &&
+                    (info.permission == null || context.checkSelfPermission(info.permission) == PackageManager.PERMISSION_GRANTED)
+            }?.activityInfo ?: return null
+        return intent.setComponent(ComponentName(activity.packageName, activity.name))
+    }
 
-    /** Try each validated route. Never replace a failed search with an ordinary app launch. */
-    fun launch(target: Target, query: String): Boolean {
-        for (route in target.routes) {
-            try {
-                val intent = Intent(route.intent)
-                if (route.link) intent.data = Uri.parse(InAppSearchLinks.url(target.app.appPackage, query) ?: continue)
-                else intent.putExtra(SearchManager.QUERY, query)
-                val component = intent.component ?: continue
-                if (!usable(context.packageManager.getActivityInfo(component, 0), target.app.appPackage)) continue
-                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                return true
-            } catch (_: ActivityNotFoundException) {
-                // The app may have been disabled, uninstalled or updated after discovery.
-            } catch (_: SecurityException) {
-                // An inaccessible search activity must not leave a dead code behind.
-            } catch (_: PackageManager.NameNotFoundException) {
-                // Continue to an alternate route if an activity changed.
-            }
+    fun launch(target: Target, query: String): Boolean = try {
+        val intent = resolve(target.app.appPackage, SearchCommandUrl.build(target.template, query))
+        if (intent == null) false else {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
         }
-        try {
-            prefs.edit().putLong("failed:${target.app.appPackage}", appVersion(target.app.appPackage)).apply()
-        } catch (_: PackageManager.NameNotFoundException) { }
-        targets = targets - target.app.appPackage
-        return false
-    }
-    private fun iconColor(pkg: String): Int {
-        val bitmap = Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888)
-        val icon = context.packageManager.getApplicationIcon(pkg)
-        icon.setBounds(0, 0, 24, 24)
-        icon.draw(Canvas(bitmap))
-        val counts = mutableMapOf<Int, Int>()
-        for (x in 0 until 24) for (y in 0 until 24) {
-            val c = bitmap.getPixel(x, y)
-            val hsv = FloatArray(3)
-            Color.colorToHSV(c, hsv)
-            if (Color.alpha(c) > 128 && hsv[1] > .25f && hsv[2] > .2f) {
-                val key = Color.rgb(Color.red(c) / 32 * 32, Color.green(c) / 32 * 32, Color.blue(c) / 32 * 32)
-                counts[key] = (counts[key] ?: 0) + 1
-            }
-        }
-        bitmap.recycle()
-        return counts.maxByOrNull { it.value }?.key ?: Color.rgb(80, 85, 95)
-    }
+    } catch (_: android.content.ActivityNotFoundException) { false }
+      catch (_: SecurityException) { false }
+
     companion object {
         fun background(color: Int, density: Float) = GradientDrawable().apply {
             setColor(color)
