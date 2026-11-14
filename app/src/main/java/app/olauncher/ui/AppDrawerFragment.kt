@@ -1,5 +1,9 @@
 package app.olauncher.ui
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
@@ -45,6 +49,28 @@ class AppDrawerFragment : BaseFragment() {
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
+    private enum class ContactCommand(val icon: Int, val hint: String) {
+        CALL(R.drawable.contact_call, "Call....."),
+        MESSAGE(R.drawable.contact_message, "Message....."),
+        WHATSAPP(R.drawable.contact_whatsapp, "WhatsApp message....."),
+        ADD(R.drawable.contact_add, "Add a contact......."),
+        SEARCH(R.drawable.dock_search, "Search contacts")
+    }
+    private var contactCommand: ContactCommand? = null
+    private var commandKeys = emptyList<android.widget.ImageButton>()
+    private var commandProgress = 0f
+    private var contactLaunchQuery: String? = null
+    private var contactDialogVisible = false
+    private var contactsMode = false
+    private lateinit var contactsAdapter: ContactSearchAdapter
+    private var contactsLoad: kotlinx.coroutines.Job? = null
+    private val contactsPermission = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && contactsMode && _binding != null) loadContacts()
+        else if (!granted && _binding != null) requireContext().showToast("Allow contacts access to search contacts")
+    }
+
     private var thunderMode = false
     private var pendingAutoLaunch: Runnable? = null
     private var lastAutoLaunchedQuery: String? = null
@@ -68,6 +94,10 @@ class AppDrawerFragment : BaseFragment() {
         savedInstanceState: Bundle?,
     ): View {
         dockExpanded = false
+        contactsMode = false
+        contactCommand = null
+        commandKeys = emptyList()
+        commandProgress = 0f
         thunderMode = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
@@ -104,10 +134,22 @@ class AppDrawerFragment : BaseFragment() {
         val initialTop = root.paddingTop
         val initialRight = root.paddingRight
         val initialBottom = root.paddingBottom
+        var keyboardWasVisible = false
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            // IME consumes the first Back press; return the selected key when it closes.
+            if (keyboardWasVisible && !keyboardVisible && contactsMode && dockExpanded &&
+                contactCommand != null && !contactDialogVisible) {
+                root.post {
+                    if (_binding != null && contactsMode && dockExpanded && !contactDialogVisible &&
+                        viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                        animateContactSearch(false)
+                    }
+                }
+            }
+            keyboardWasVisible = keyboardVisible
             // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
             val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
@@ -144,7 +186,7 @@ class AppDrawerFragment : BaseFragment() {
                     distanceX: Float,
                     distanceY: Float,
                 ): Boolean {
-                    if (start == null || notificationsOpened || !isHomePage || dockExpanded) return false
+                    if (start == null || notificationsOpened || !isHomePage || dockExpanded || contactsMode) return false
                     val dy = current.y - start.y
                     val dx = current.x - start.x
                     if (dy > threshold && dy > kotlin.math.abs(dx)) {
@@ -156,7 +198,7 @@ class AppDrawerFragment : BaseFragment() {
             })
         detector.setIsLongpressEnabled(false)
         binding.root.setOnTouchListener { _, event ->
-            if (isHomePage && !dockExpanded) detector.onTouchEvent(event) else false
+            if (isHomePage && !dockExpanded && !contactsMode) detector.onTouchEvent(event) else false
         }
     }
 
@@ -171,19 +213,17 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockSearch.setOnClickListener {
             if (dockExpanded) resetHomeSearch()
             else {
+                setContactsMode(false)
                 setThunderMode(false)
                 setDockExpanded(true)
             }
         }
         binding.dockBolt.setOnClickListener {
+            setContactsMode(false)
             setThunderMode(true)
             setDockExpanded(true)
         }
-        binding.dockContacts.setOnClickListener {
-            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
-                android.provider.ContactsContract.Contacts.CONTENT_URI)) }
-            catch (_: android.content.ActivityNotFoundException) { }
-        }
+        binding.dockContacts.setOnClickListener { showContactCommands() }
         binding.dockSettings.setOnClickListener {
             findNavController().navigate(if (isHomePage)
                 R.id.action_mainFragment_to_settingsFragment
@@ -199,6 +239,219 @@ class AppDrawerFragment : BaseFragment() {
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
 
+    private fun ensureCommandKeys() {
+        if (commandKeys.isNotEmpty()) return
+        val originals = listOf(binding.dockHome, binding.dockSearch, binding.dockBolt,
+            binding.dockContacts, binding.dockSettings)
+        val icons = listOf(R.drawable.dock_search) + ContactCommand.entries.filter { it != ContactCommand.SEARCH }.map { it.icon }
+        commandKeys = originals.mapIndexed { index, original ->
+            android.widget.ImageButton(requireContext()).apply {
+                setBackgroundResource(R.drawable.dock_key)
+                setImageResource(icons[index])
+                imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+                setPadding(original.paddingLeft, original.paddingTop, original.paddingRight, original.paddingBottom)
+                contentDescription = if (index == 0) "Search contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
+                visibility = View.GONE
+                binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(original.width, original.height).apply {
+                    leftMargin = (binding.dockKeys.x + original.left - binding.dock.paddingLeft).toInt()
+                    topMargin = (binding.dockKeys.y + original.top - binding.dock.paddingTop).toInt()
+                })
+                setOnClickListener {
+                    if (contactCommand != null) animateContactSearch(false)
+                    else if (index == 0) selectContactCommand(ContactCommand.SEARCH)
+                    else selectContactCommand(ContactCommand.entries[index - 1])
+                }
+            }
+        }
+    }
+
+    private fun showContactCommands() {
+        ensureCommandKeys()
+        cancelAutoLaunch()
+        setContactsMode(true)
+        setThunderMode(false)
+        contactCommand = null
+        dockExpanded = false
+        binding.search.visibility = View.INVISIBLE
+        binding.recyclerView.visibility = View.INVISIBLE
+        binding.search.setQuery("", false)
+        binding.dockKeys.visibility = View.INVISIBLE
+        commandProgress = 0f
+        commandKeys.forEachIndexed { index, key ->
+            key.visibility = View.VISIBLE
+            key.isEnabled = false
+            key.alpha = if (index == 0) 1f else 0f
+            key.translationX = if (index == 0)
+                binding.dockContacts.x - binding.dockHome.x else 28f * resources.displayMetrics.density
+            key.animate().translationX(0f).alpha(1f).setDuration(220L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .withEndAction { key.isEnabled = true }.start()
+        }
+    }
+
+    private fun selectContactCommand(command: ContactCommand) {
+        if (command == ContactCommand.ADD) {
+            addContact()
+            return
+        }
+        contactCommand = command
+        contactLaunchQuery = null
+        binding.search.queryHint = command.hint
+        searchTextView?.inputType = android.text.InputType.TYPE_CLASS_TEXT
+        binding.search.setQuery("", false)
+        binding.recyclerView.visibility = if (command == ContactCommand.ADD) View.INVISIBLE else View.VISIBLE
+        animateContactSearch(true)
+        if (command != ContactCommand.ADD) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(requireContext(),
+                    android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) loadContacts()
+            else contactsPermission.launch(android.Manifest.permission.READ_CONTACTS)
+        }
+    }
+
+    private fun animateContactSearch(expanded: Boolean) {
+        val selected = contactCommand ?: return
+        cancelAutoLaunch()
+        dockAnimator?.cancel()
+        dockExpanded = expanded
+        if (!expanded) {
+            binding.search.hideKeyboard()
+            binding.search.clearFocus()
+        }
+        val selectedIndex = if (selected == ContactCommand.SEARCH) 0 else selected.ordinal + 1
+        binding.search.visibility = View.VISIBLE
+        commandKeys.forEach { it.animate().cancel(); it.isEnabled = false }
+        dockAnimator = android.animation.ValueAnimator.ofFloat(commandProgress, if (expanded) 1f else 0f).apply {
+            duration = 220L
+            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
+            addUpdateListener {
+                val b = _binding ?: return@addUpdateListener
+                val progress = it.animatedValue as Float
+                commandProgress = progress
+                commandKeys.forEachIndexed { index, key ->
+                    key.alpha = if (index == selectedIndex) 1f else 1f - progress
+                    key.translationX = if (index == selectedIndex)
+                        (commandKeys[0].left - key.left) * progress else 0f
+                    key.translationZ = if (index == selectedIndex) 12f else 0f
+                }
+                b.search.alpha = progress
+                b.search.translationX = -b.search.width * (1f - progress)
+                b.search.clipBounds = android.graphics.Rect((b.search.width * (1f - progress)).toInt(), 0,
+                    b.search.width, b.search.height)
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (_binding == null) return
+                    commandKeys.forEachIndexed { index, key -> key.isEnabled = !expanded || index == selectedIndex }
+                    if (expanded) binding.search.showKeyboard()
+                    else {
+                        contactCommand = null
+                        contactLaunchQuery = null
+                        binding.search.setQuery("", false)
+                        binding.search.visibility = View.INVISIBLE
+                        binding.recyclerView.visibility = View.INVISIBLE
+                    }
+                }
+            })
+            start()
+        }
+    }
+
+    private fun scheduleContactLaunch(query: String) {
+        cancelAutoLaunch()
+        val command = contactCommand ?: return
+        if (!dockExpanded || command in listOf(ContactCommand.ADD, ContactCommand.SEARCH) || query.isBlank() ||
+            contactsAdapter.itemCount != 1 || query == contactLaunchQuery) return
+        val task = object : Runnable {
+            override fun run() {
+                val b = _binding ?: return
+                if (!contactsMode || !dockExpanded || contactCommand != command ||
+                    b.search.query.toString() != query || contactsAdapter.itemCount != 1 ||
+                    !viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return
+                if (isSearchComposing()) { b.root.postDelayed(this, 500L); return }
+                pendingAutoLaunch = null
+                contactLaunchQuery = query
+                contactsAdapter.openFirst()
+            }
+        }
+        pendingAutoLaunch = task
+        binding.root.postDelayed(task, 500L)
+    }
+
+    private fun runContactCommand(contact: ContactSearchAdapter.Contact) {
+        cancelAutoLaunch()
+        contactLaunchQuery = binding.search.query.toString()
+        val command = contactCommand ?: return
+        if (command == ContactCommand.SEARCH) {
+            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri)) }
+            catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No contacts app available") }
+            return
+        }
+        if (contact.numbers.isEmpty()) { requireContext().showToast("This contact has no phone number"); return }
+        fun launchNumber(number: String) {
+            val intent = when (command) {
+                ContactCommand.CALL -> android.content.Intent(android.content.Intent.ACTION_DIAL,
+                    android.net.Uri.fromParts("tel", number, null))
+                ContactCommand.MESSAGE -> android.content.Intent(android.content.Intent.ACTION_SENDTO,
+                    android.net.Uri.fromParts("smsto", number, null))
+                ContactCommand.WHATSAPP -> android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse("https://wa.me/" + number.filter { it.isDigit() })).setPackage("com.whatsapp")
+                ContactCommand.ADD, ContactCommand.SEARCH -> return
+            }
+            try { startActivity(intent) }
+            catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No app available for this command") }
+        }
+        if (contact.numbers.size == 1) launchNumber(contact.numbers.first())
+        else {
+            contactDialogVisible = true
+            androidx.appcompat.app.AlertDialog.Builder(requireContext()).setTitle(contact.name)
+                .setItems(contact.numbers.toTypedArray()) { _, index -> launchNumber(contact.numbers[index]) }
+                .setNegativeButton(android.R.string.cancel, null)
+                .setOnDismissListener { contactDialogVisible = false }.show()
+        }
+    }
+
+    private fun addContact() {
+        cancelAutoLaunch()
+        val intent = android.content.Intent(android.content.Intent.ACTION_INSERT).apply {
+            type = android.provider.ContactsContract.Contacts.CONTENT_TYPE
+        }
+        try { startActivity(intent) }
+        catch (_: android.content.ActivityNotFoundException) {
+            requireContext().showToast("No contacts app available")
+        }
+    }
+
+    private fun setContactsMode(enabled: Boolean) {
+        contactsMode = enabled
+        cancelAutoLaunch()
+        binding.recyclerView.adapter = if (enabled) contactsAdapter else adapter
+        binding.search.queryHint = if (enabled) "Search contacts" else "Search apps"
+        if (enabled) filterContacts(binding.search.query.toString())
+        else adapter.filterApps(binding.search.query.toString())
+    }
+
+    private fun filterContacts(query: String) {
+        if (query != contactLaunchQuery) contactLaunchQuery = null
+        contactsAdapter.filter(query)
+        linearLayoutManager.reverseLayout = query.isNotBlank()
+        linearLayoutManager.stackFromEnd = false
+        binding.recyclerView.scrollToPosition(0)
+        binding.recyclerView.animateSearchResults(query, force = true)
+        scheduleContactLaunch(query)
+    }
+
+    private fun loadContacts() {
+        contactsLoad?.cancel()
+        val context = requireContext().applicationContext
+        contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
+            val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
+            if (_binding != null && contactsMode) {
+                contactsAdapter.contacts = contacts
+                filterContacts(binding.search.query.toString())
+            }
+        }
+    }
+
     private fun setThunderMode(enabled: Boolean) {
         cancelAutoLaunch()
         thunderMode = enabled
@@ -207,7 +460,7 @@ class AppDrawerFragment : BaseFragment() {
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
         binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
-        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else R.drawable.dock_search)
+        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else if (contactsMode) R.drawable.dock_contacts else R.drawable.dock_search)
         binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
         searchTextView?.apply {
             setTextColor(foreground)
@@ -258,6 +511,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     fun collapseSearch(): Boolean {
+        if (_binding != null && contactsMode) {
+            if (contactCommand != null) animateContactSearch(false) else resetHomeSearch()
+            return true
+        }
         if (!dockExpanded || _binding == null) return false
         cancelAutoLaunch()
         val insets = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
@@ -271,6 +528,13 @@ class AppDrawerFragment : BaseFragment() {
 
     fun resetHomeSearch(animate: Boolean = true) {
         if (_binding == null) return
+        dockAnimator?.cancel()
+        commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
+        binding.dockKeys.visibility = View.VISIBLE
+        contactCommand = null
+        commandProgress = 0f
+        contactLaunchQuery = null
+        setContactsMode(false)
         setThunderMode(false)
         binding.search.setQuery("", false)
         setDockExpanded(false, animate = animate)
@@ -338,7 +602,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
-                if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
+                if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
+                else if (contactsMode) contactsAdapter.openFirst()
+                else if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
                 return true
             }
 
@@ -346,7 +612,9 @@ class AppDrawerFragment : BaseFragment() {
                 try {
                     cancelAutoLaunch()
                     if (newText != lastAutoLaunchedQuery) lastAutoLaunchedQuery = null
-                    adapter.filterApps(newText)
+                    if (contactsMode) {
+                        if (contactCommand != ContactCommand.ADD) filterContacts(newText)
+                    } else adapter.filterApps(newText)
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
                     return true
@@ -386,6 +654,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initAdapter() {
+        contactsAdapter = ContactSearchAdapter { contact -> runContactCommand(contact) }
         adapter = AppDrawerAdapter(
             flag,
             prefs.appLabelAlignment,
@@ -471,6 +740,7 @@ class AppDrawerFragment : BaseFragment() {
             },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
+                    if (contactsMode) return@AppDrawerAdapter
                     linearLayoutManager.reverseLayout = query.isNotBlank()
                     linearLayoutManager.stackFromEnd = false
                     binding.recyclerView.scrollToPosition(0)
@@ -626,6 +896,9 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onDestroyView() {
         cancelAutoLaunch()
+        contactsLoad?.cancel()
+        commandKeys.forEach { it.animate().cancel() }
+        commandKeys = emptyList()
         binding.recyclerView.adapter = null
         super.onDestroyView()
         dockAnimator?.cancel()
