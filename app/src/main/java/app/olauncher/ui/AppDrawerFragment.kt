@@ -53,7 +53,8 @@ class AppDrawerFragment : BaseFragment() {
         CALL(R.drawable.contact_call, "Call....."),
         MESSAGE(R.drawable.contact_message, "Message....."),
         WHATSAPP(R.drawable.contact_whatsapp, "WhatsApp message....."),
-        ADD(R.drawable.contact_add, "Add a contact.......")
+        ADD(R.drawable.contact_add, "Add a contact......."),
+        SEARCH(R.drawable.dock_search, "Search contacts")
     }
     private var contactCommand: ContactCommand? = null
     private var commandKeys = emptyList<android.widget.ImageButton>()
@@ -242,14 +243,14 @@ class AppDrawerFragment : BaseFragment() {
         if (commandKeys.isNotEmpty()) return
         val originals = listOf(binding.dockHome, binding.dockSearch, binding.dockBolt,
             binding.dockContacts, binding.dockSettings)
-        val icons = listOf(R.drawable.dock_contacts) + ContactCommand.entries.map { it.icon }
+        val icons = listOf(R.drawable.dock_search) + ContactCommand.entries.filter { it != ContactCommand.SEARCH }.map { it.icon }
         commandKeys = originals.mapIndexed { index, original ->
             android.widget.ImageButton(requireContext()).apply {
                 setBackgroundResource(R.drawable.dock_key)
                 setImageResource(icons[index])
                 imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
                 setPadding(original.paddingLeft, original.paddingTop, original.paddingRight, original.paddingBottom)
-                contentDescription = if (index == 0) "Contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
+                contentDescription = if (index == 0) "Search contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
                 visibility = View.GONE
                 binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(original.width, original.height).apply {
                     leftMargin = (binding.dockKeys.x + original.left - binding.dock.paddingLeft).toInt()
@@ -257,7 +258,7 @@ class AppDrawerFragment : BaseFragment() {
                 })
                 setOnClickListener {
                     if (contactCommand != null) animateContactSearch(false)
-                    else if (index == 0) resetHomeSearch()
+                    else if (index == 0) selectContactCommand(ContactCommand.SEARCH)
                     else selectContactCommand(ContactCommand.entries[index - 1])
                 }
             }
@@ -316,7 +317,7 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.hideKeyboard()
             binding.search.clearFocus()
         }
-        val selectedIndex = selected.ordinal + 1
+        val selectedIndex = if (selected == ContactCommand.SEARCH) 0 else selected.ordinal + 1
         binding.search.visibility = View.VISIBLE
         commandKeys.forEach { it.animate().cancel(); it.isEnabled = false }
         dockAnimator = android.animation.ValueAnimator.ofFloat(commandProgress, if (expanded) 1f else 0f).apply {
@@ -358,7 +359,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun scheduleContactLaunch(query: String) {
         cancelAutoLaunch()
         val command = contactCommand ?: return
-        if (!dockExpanded || command == ContactCommand.ADD || query.isBlank() ||
+        if (!dockExpanded || command in listOf(ContactCommand.ADD, ContactCommand.SEARCH) || query.isBlank() ||
             contactsAdapter.itemCount != 1 || query == contactLaunchQuery) return
         val task = object : Runnable {
             override fun run() {
@@ -380,6 +381,11 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         contactLaunchQuery = binding.search.query.toString()
         val command = contactCommand ?: return
+        if (command == ContactCommand.SEARCH) {
+            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri)) }
+            catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No contacts app available") }
+            return
+        }
         if (contact.numbers.isEmpty()) { requireContext().showToast("This contact has no phone number"); return }
         fun launchNumber(number: String) {
             val intent = when (command) {
@@ -389,7 +395,7 @@ class AppDrawerFragment : BaseFragment() {
                     android.net.Uri.fromParts("smsto", number, null))
                 ContactCommand.WHATSAPP -> android.content.Intent(android.content.Intent.ACTION_VIEW,
                     android.net.Uri.parse("https://wa.me/" + number.filter { it.isDigit() })).setPackage("com.whatsapp")
-                ContactCommand.ADD -> return
+                ContactCommand.ADD, ContactCommand.SEARCH -> return
             }
             try { startActivity(intent) }
             catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No app available for this command") }
