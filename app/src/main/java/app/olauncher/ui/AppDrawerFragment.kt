@@ -134,22 +134,10 @@ class AppDrawerFragment : BaseFragment() {
         val initialTop = root.paddingTop
         val initialRight = root.paddingRight
         val initialBottom = root.paddingBottom
-        var keyboardWasVisible = false
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
-            // IME consumes the first Back press; return the selected key when it closes.
-            if (keyboardWasVisible && !keyboardVisible && contactsMode && dockExpanded &&
-                contactCommand != null && !contactDialogVisible) {
-                root.post {
-                    if (_binding != null && contactsMode && dockExpanded && !contactDialogVisible &&
-                        viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
-                        animateContactSearch(false)
-                    }
-                }
-            }
-            keyboardWasVisible = keyboardVisible
             // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
             val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
@@ -521,7 +509,16 @@ class AppDrawerFragment : BaseFragment() {
 
     fun collapseSearch(): Boolean {
         if (_binding != null && contactsMode) {
-            if (contactCommand != null) animateContactSearch(false) else resetHomeSearch()
+            val keyboardVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
+                ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            if (dockExpanded && keyboardVisible) {
+                // Keep the command, query, and results available for scrolling.
+                binding.search.hideKeyboard()
+            } else if (contactCommand != null) {
+                animateContactSearch(false)
+            } else {
+                resetHomeSearch()
+            }
             return true
         }
         if (!dockExpanded || _binding == null) return false
