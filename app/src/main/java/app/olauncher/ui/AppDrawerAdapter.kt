@@ -43,12 +43,13 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
-    private val resultsChanged: (Boolean) -> Unit = {},
+    private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
 ) : ListAdapter<AppModel, RecyclerView.ViewHolder>(DIFF_CALLBACK), Filterable {
 
     companion object {
+        private const val THUNDER_STYLE = "thunder_style"
         const val VIEW_TYPE_APP = 0
         const val VIEW_TYPE_PRIVATE_HEADER = 1
 
@@ -84,10 +85,35 @@ class AppDrawerAdapter(
         super.onDetachedFromRecyclerView(recyclerView)
     }
 
-    private var autoLaunch = false
-    private var isBangSearch = false
-    private var autoLaunchedQuery: String? = null
-    var allowAutoLaunch = false
+    private var requestedQuery = ""
+    var committedQuery: String? = null
+        private set
+    private var thunderMode = false
+
+    fun filterApps(query: String) {
+        requestedQuery = query
+        committedQuery = null
+        appFilter.filter(query)
+    }
+
+    fun setThunderMode(enabled: Boolean) {
+        if (thunderMode == enabled) return
+        thunderMode = enabled
+        notifyItemRangeChanged(0, itemCount, THUNDER_STYLE)
+    }
+
+    override fun onBindViewHolder(
+        holder: RecyclerView.ViewHolder,
+        position: Int,
+        payloads: MutableList<Any>,
+    ) {
+        if (holder is ViewHolder && payloads.isNotEmpty() && payloads.all { it == THUNDER_STYLE }) {
+            holder.applyThunderStyle(thunderMode)
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
+
     private val appFilter = createAppFilter()
     private val myUserHandle = android.os.Process.myUserHandle()
 
@@ -145,7 +171,8 @@ class AppDrawerAdapter(
                     appHideListener,
                     appRenameListener,
                     iconScope,
-                    iconCache
+                    iconCache,
+                    thunderMode
                 )
             }
         } catch (e: Exception) {
@@ -158,9 +185,6 @@ class AppDrawerAdapter(
     private fun createAppFilter(): Filter {
         return object : Filter() {
             override fun performFiltering(charSearch: CharSequence?): FilterResults {
-                isBangSearch = charSearch?.startsWith("!") ?: false
-                autoLaunch = allowAutoLaunch && (charSearch?.startsWith(" ")?.not() ?: true)
-
                 val query = charSearch?.toString()?.trim().orEmpty()
                 val appFilteredList = if (query.isBlank()) appsList.toMutableList()
                 else appsList.filter { app ->
@@ -181,37 +205,19 @@ class AppDrawerAdapter(
 
             @Suppress("UNCHECKED_CAST")
             override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
+                val query = constraint?.toString().orEmpty()
+                if (query != requestedQuery) return
                 results?.values?.let {
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
-                    submitList(appFilteredList) {
-                        resultsChanged(!constraint.isNullOrBlank())
-                        autoLaunch(constraint?.toString())
+                    submitList(items) {
+                        if (query == requestedQuery) {
+                            committedQuery = query
+                            resultsChanged(query)
+                        }
                     }
                 }
             }
-        }
-    }
-
-    private fun autoLaunch(query: String?) {
-        // App list refreshes re-run the current query, so launch only once until it changes
-        if (query == autoLaunchedQuery) return
-        autoLaunchedQuery = null
-        try {
-            if (itemCount == 1
-                && autoLaunch
-                && isBangSearch.not()
-                && flag == Constants.FLAG_LAUNCH_APP
-                && appFilteredList.isNotEmpty()
-                && appFilteredList[0] !is AppModel.PrivateSpaceHeader
-                // Skip the empty bottom-padding item, left alone when the app list is empty
-                && appFilteredList[0].appPackage.isNotEmpty()
-            ) {
-                autoLaunchedQuery = query
-                appClickListener(appFilteredList[0])
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 
@@ -222,7 +228,7 @@ class AppDrawerAdapter(
     }
 
     fun launchFirstInList() {
-        val first = appFilteredList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
+        val first = currentList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
         if (first != null) appClickListener(first)
     }
 
@@ -247,6 +253,11 @@ class AppDrawerAdapter(
         private var iconJob: Job? = null
         private var renameWatcher: TextWatcher? = null
 
+        fun applyThunderStyle(enabled: Boolean) = with(binding) {
+            root.setBackgroundResource(if (enabled) R.drawable.dock_result_yellow else R.drawable.dock_shell)
+            appTitle.setTextColor(if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+        }
+
         fun cancelIconLoad() {
             iconJob?.cancel()
             iconJob = null
@@ -264,7 +275,9 @@ class AppDrawerAdapter(
             appRenameListener: (AppModel, String) -> Unit,
             iconScope: CoroutineScope,
             iconCache: LruCache<IconKey, Drawable.ConstantState>,
+            thunderMode: Boolean,
         ) = with(binding) {
+            applyThunderStyle(thunderMode)
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE

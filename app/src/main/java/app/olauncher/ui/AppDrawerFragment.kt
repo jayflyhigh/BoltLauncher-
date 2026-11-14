@@ -45,6 +45,9 @@ class AppDrawerFragment : BaseFragment() {
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
+    private var thunderMode = false
+    private var pendingAutoLaunch: Runnable? = null
+    private var lastAutoLaunchedQuery: String? = null
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
 
@@ -65,6 +68,7 @@ class AppDrawerFragment : BaseFragment() {
         savedInstanceState: Bundle?,
     ): View {
         dockExpanded = false
+        thunderMode = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -131,8 +135,17 @@ class AppDrawerFragment : BaseFragment() {
                 findNavController().popBackStack(R.id.mainFragment, false)
             }
         }
-        binding.dockSearch.setOnClickListener { setDockExpanded(!dockExpanded) }
-        binding.dockBolt.setOnClickListener { setDockExpanded(true) }
+        binding.dockSearch.setOnClickListener {
+            if (dockExpanded) resetHomeSearch()
+            else {
+                setThunderMode(false)
+                setDockExpanded(true)
+            }
+        }
+        binding.dockBolt.setOnClickListener {
+            setThunderMode(true)
+            setDockExpanded(true)
+        }
         binding.dockContacts.setOnClickListener {
             try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
                 android.provider.ContactsContract.Contacts.CONTENT_URI)) }
@@ -149,13 +162,71 @@ class AppDrawerFragment : BaseFragment() {
             params.marginStart = binding.dockHome.right + (6 * resources.displayMetrics.density).toInt()
             binding.search.layoutParams = params
         }
-        searchTextView?.setTextColor(android.graphics.Color.WHITE)
-        searchTextView?.setHintTextColor(0xFFBDBDBD.toInt())
+        setThunderMode(false)
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+    }
+
+    private fun setThunderMode(enabled: Boolean) {
+        cancelAutoLaunch()
+        thunderMode = enabled
+        lastAutoLaunchedQuery = null
+        adapter.setThunderMode(enabled)
+        val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+        binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
+        binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
+        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else R.drawable.dock_search)
+        binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
+        searchTextView?.apply {
+            setTextColor(foreground)
+            setHintTextColor(if (enabled) android.graphics.Color.BLACK else 0xFFBDBDBD.toInt())
+            // The theme supplies a stateful cursor on Android 7–9 as well.
+            isActivated = enabled
+            isCursorVisible = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                textCursorDrawable = androidx.appcompat.content.res.AppCompatResources.getDrawable(
+                    context, R.drawable.bolt_search_cursor)?.apply {
+                        state = if (enabled) intArrayOf(android.R.attr.state_activated) else intArrayOf()
+                    }
+            }
+            refreshDrawableState()
+        }
+    }
+
+    private fun cancelAutoLaunch() {
+        pendingAutoLaunch?.let { _binding?.root?.removeCallbacks(it) }
+        pendingAutoLaunch = null
+    }
+
+    private fun scheduleAutoLaunch(query: String) {
+        cancelAutoLaunch()
+        if (!thunderMode || !dockExpanded || query.isBlank() ||
+            query == lastAutoLaunchedQuery || flag != Constants.FLAG_LAUNCH_APP) return
+        val task = object : Runnable {
+            override fun run() {
+                val b = _binding ?: return
+                if (!thunderMode || !dockExpanded || b.search.query.toString() != query ||
+                    adapter.committedQuery != query ||
+                    !viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                    pendingAutoLaunch = null
+                    return
+                }
+                if (isSearchComposing()) {
+                    b.root.postDelayed(this, 500L)
+                    return
+                }
+                pendingAutoLaunch = null
+                lastAutoLaunchedQuery = query
+                // Search uses reverseLayout: position zero is the bottom, best matching app.
+                adapter.launchFirstInList()
+            }
+        }
+        pendingAutoLaunch = task
+        binding.root.postDelayed(task, 500L)
     }
 
     fun collapseSearch(): Boolean {
         if (!dockExpanded || _binding == null) return false
+        cancelAutoLaunch()
         val insets = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
         if (insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true) {
             binding.search.hideKeyboard()
@@ -167,6 +238,7 @@ class AppDrawerFragment : BaseFragment() {
 
     fun resetHomeSearch(animate: Boolean = true) {
         if (_binding == null) return
+        setThunderMode(false)
         binding.search.setQuery("", false)
         setDockExpanded(false, animate = animate)
     }
@@ -232,14 +304,16 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                adapter.launchFirstInList()
+                cancelAutoLaunch()
+                if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
                 return true
             }
 
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
-                    adapter.allowAutoLaunch = false
-                    adapter.filter.filter(newText)
+                    cancelAutoLaunch()
+                    if (newText != lastAutoLaunchedQuery) lastAutoLaunchedQuery = null
+                    adapter.filterApps(newText)
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
                     return true
@@ -283,6 +357,7 @@ class AppDrawerFragment : BaseFragment() {
             flag,
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
+                cancelAutoLaunch()
                 viewModel.selectedApp(appModel, flag)
                 if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
                     findNavController().popBackStack(R.id.mainFragment, false)
@@ -361,11 +436,14 @@ class AppDrawerFragment : BaseFragment() {
                 prefs.setAppRenameLabel(identifier, renameLabel)
                 viewModel.getAppList()
             },
-            resultsChanged = { searching ->
-                linearLayoutManager.reverseLayout = searching
-                linearLayoutManager.stackFromEnd = false
-                binding.recyclerView.scrollToPosition(0)
-                binding.recyclerView.animateSearchResults(binding.search.query.toString())
+            resultsChanged = { query ->
+                if (_binding != null && query == binding.search.query.toString()) {
+                    linearLayoutManager.reverseLayout = query.isNotBlank()
+                    linearLayoutManager.stackFromEnd = false
+                    binding.recyclerView.scrollToPosition(0)
+                    binding.recyclerView.animateSearchResults(query)
+                    scheduleAutoLaunch(query)
+                }
             },
             privateSpaceToggleListener = {
                 viewModel.togglePrivateSpaceLock()
@@ -394,6 +472,12 @@ class AppDrawerFragment : BaseFragment() {
         binding.recyclerView.adapter = adapter
         binding.recyclerView.addOnScrollListener(getRecyclerViewOnScrollListener())
         binding.recyclerView.itemAnimator = null
+        binding.recyclerView.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(rv: RecyclerView, event: android.view.MotionEvent): Boolean {
+                if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) cancelAutoLaunch()
+                return false
+            }
+        })
         if (requireContext().isEinkDisplay())
             binding.recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
     }
@@ -441,7 +525,7 @@ class AppDrawerFragment : BaseFragment() {
         }
 
         adapter.setAppList(combined)
-        adapter.filter.filter(binding.search.query)
+        adapter.filterApps(binding.search.query.toString())
     }
 
     private fun initClickListeners() {
@@ -468,7 +552,11 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun getRecyclerViewOnScrollListener(): RecyclerView.OnScrollListener =
-        object : RecyclerView.OnScrollListener() {}
+        object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState != RecyclerView.SCROLL_STATE_IDLE) cancelAutoLaunch()
+            }
+        }
 
     private fun checkMessageAndExit() {
         if (!closeDrawer()) return
@@ -497,12 +585,15 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onStop() {
+        cancelAutoLaunch()
         binding.search.hideKeyboard()
         if (isHomePage) resetHomeSearch(animate = false)
         super.onStop()
     }
 
     override fun onDestroyView() {
+        cancelAutoLaunch()
+        binding.recyclerView.adapter = null
         super.onDestroyView()
         dockAnimator?.cancel()
         dockAnimator = null
