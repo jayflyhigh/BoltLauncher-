@@ -229,6 +229,15 @@ class AppDrawerFragment : BaseFragment() {
                 R.id.action_mainFragment_to_settingsFragment
                 else R.id.action_appListFragment_to_settingsFragment2)
         }
+        binding.dockSettings.setOnLongClickListener {
+            cancelAutoLaunch()
+            try {
+                startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS))
+            } catch (_: android.content.ActivityNotFoundException) {
+                requireContext().showToast("System settings are unavailable")
+            }
+            true
+        }
         binding.dock.post {
             if (_binding == null) return@post
             val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
