@@ -1,7 +1,7 @@
 name: Build debug APK
 on:
   push:
-    branches: [New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling]
+    branches: [New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,7 +15,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - run: chmod +x gradlew && ./gradlew assembleDebug --console=plain
+      - run: chmod +x gradlew && ./gradlew assembleDebug testDebugUnitTest --console=plain
       - uses: actions/upload-artifact@v4
         with:
           name: Bolt-Bottom-Search-Bar-Debug

@@ -1,0 +1,5 @@
+<resources>
+    <style name="BoltSearchTheme">
+        <item name="android:textCursorDrawable">@drawable/bolt_search_cursor</item>
+    </style>
+</resources>
