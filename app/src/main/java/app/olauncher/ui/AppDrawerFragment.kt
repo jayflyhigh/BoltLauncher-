@@ -104,6 +104,14 @@ class AppDrawerFragment : BaseFragment() {
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
+            val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
+            if (dockParams.bottomMargin != bottomMargin) {
+                dockParams.bottomMargin = bottomMargin
+                binding.dock.layoutParams = dockParams
+            }
             // Reserve the system area beneath the dock in both gesture and button navigation.
             val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             view.setPadding(initialLeft + bars.left, maxOf(initialTop, status.top), initialRight + bars.right,
