@@ -38,15 +38,7 @@ object AppSearchEditor {
             text = "Use {query} or %s where the search text goes. If neither is present, the search text is appended to the URL."
             textSize = 12f
         })
-        label("3. Code background color")
-        val colorButton = Button(context).apply { isAllCaps = false }
-        fun refreshColor() {
-            colorButton.text = "Color wheel / ${String.format("#%06X", color and 0xFFFFFF)}"
-            colorButton.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
-            colorButton.setTextColor(InAppSearch.foreground(color))
-        }
-        refreshColor(); panel.addView(colorButton)
-        label("4. Alias code")
+        label("3. Alias code")
         val alias = EditText(context).apply {
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
@@ -54,6 +46,14 @@ object AppSearchEditor {
             setText(initial?.code.orEmpty())
         }
         panel.addView(alias)
+        label("4. Code background color")
+        val colorButton = Button(context).apply { isAllCaps = false }
+        fun refreshColor() {
+            colorButton.text = "Color wheel / ${String.format("#%06X", color and 0xFFFFFF)}"
+            colorButton.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+            colorButton.setTextColor(InAppSearch.foreground(color))
+        }
+        refreshColor(); panel.addView(colorButton)
         val error = TextView(context).apply { setTextColor(Color.rgb(255, 110, 100)); visibility = View.GONE }
         panel.addView(error)
         appButton.setOnClickListener {
@@ -69,7 +69,7 @@ object AppSearchEditor {
             nested.add(picker); picker.show()
         }
         colorButton.setOnClickListener {
-            nested.add(showColor(context, color) { color = it; refreshColor() })
+            nested.add(showColor(context, color, alias.text.toString().trim()) { color = it; refreshColor() })
         }
         val remove = Button(context).apply { text = "Remove command for selected app"; isAllCaps = false }
         panel.addView(remove)
@@ -100,9 +100,28 @@ object AppSearchEditor {
         return dialog
     }
 
-    private fun showColor(context: Context, initial: Int, apply: (Int) -> Unit): AlertDialog {
+    private fun showColor(context: Context, initial: Int, code: String, apply: (Int) -> Unit): AlertDialog {
         val density = context.resources.displayMetrics.density
         val panel = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding((20*density).toInt(), 0, (20*density).toInt(), 0) }
+        val preview = androidx.appcompat.widget.AppCompatTextView(context).apply {
+            text = code.ifBlank { "Alias" }
+            gravity = android.view.Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding((3*density).toInt(), 0, (3*density).toInt(), 0)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            contentDescription = "Preview of alias icon: ${code.ifBlank { "Alias" }}"
+            androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(this, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+        }
+        panel.addView(preview, LinearLayout.LayoutParams((48*density).toInt(), (48*density).toInt()).apply {
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            topMargin = (8*density).toInt()
+            bottomMargin = (8*density).toInt()
+        })
+        fun updatePreview(color: Int) {
+            preview.background = InAppSearch.background(color, density)
+            preview.setTextColor(InAppSearch.foreground(color))
+        }
         val wheel = SearchColorWheel(context)
         panel.addView(wheel, LinearLayout.LayoutParams(-1, (220*density).toInt()))
         panel.addView(TextView(context).apply { text = "Brightness" })
@@ -114,6 +133,7 @@ object AppSearchEditor {
         var updating = false
         fun display(color: Int, syncWheel: Boolean = true) {
             updating = true; selected = color
+            updatePreview(color)
             hex.setText(String.format("#%06X", color and 0xFFFFFF)); hex.error = null
             if (syncWheel) wheel.setColor(color)
             val hsv = FloatArray(3); Color.colorToHSV(color, hsv)
@@ -133,7 +153,7 @@ object AppSearchEditor {
                 if (updating) return
                 val value = s.toString().trim().removePrefix("#")
                 if (value.matches(Regex("[0-9a-fA-F]{6}"))) {
-                    selected = Color.parseColor("#$value"); updating = true
+                    selected = Color.parseColor("#$value"); updatePreview(selected); updating = true
                     wheel.setColor(selected); val hsv = FloatArray(3); Color.colorToHSV(selected, hsv)
                     brightness.progress = (hsv[2]*100).toInt(); updating = false; hex.error = null
                 }
@@ -141,7 +161,7 @@ object AppSearchEditor {
             override fun afterTextChanged(s: Editable?) {}
         })
         display(initial)
-        val dialog = AlertDialog.Builder(context).setTitle("Code background color").setView(panel)
+        val dialog = AlertDialog.Builder(context).setTitle("Code background color").setView(ScrollView(context).apply { addView(panel) })
             .setPositiveButton("Use color", null).setNegativeButton(android.R.string.cancel, null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
