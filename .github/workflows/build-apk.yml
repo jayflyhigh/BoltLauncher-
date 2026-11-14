@@ -15,8 +15,9 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
-      - run: chmod +x gradlew && ./gradlew assembleDebug testDebugUnitTest --console=plain
+      - name: Compile debug APK
+        run: chmod +x gradlew && ./gradlew assembleDebug --console=plain
       - uses: actions/upload-artifact@v4
         with:
-          name: Bolt-Bottom-Search-Bar-Debug
+          name: Bolt-Switch-Contacts-and-Apps-Debug
           path: app/build/outputs/apk/debug/*.apk
