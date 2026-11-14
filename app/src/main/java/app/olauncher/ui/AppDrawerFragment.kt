@@ -80,6 +80,8 @@ class AppDrawerFragment : BaseFragment() {
     private var lastAutoLaunchedQuery: String? = null
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
+    // The dock key that was tapped; it animates into the leftmost slot while search is open.
+    private var expandedDockKey: View? = null
 
     private var flag = Constants.FLAG_LAUNCH_APP
     private var canRename = false
@@ -205,6 +207,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun initDock() {
         binding.dockPlaceholder.isEnabled = true
         binding.dockPlaceholder.setOnClickListener {
+            expandedDockKey = binding.dockPlaceholder
             clearAppSearch()
             adapter.searchCommandsOnly = true
             setContactsMode(false)
@@ -217,6 +220,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockSearch.setOnClickListener {
             if (dockExpanded) resetHomeSearch()
             else {
+                expandedDockKey = binding.dockSearch
                 clearAppSearch()
                 setContactsMode(false)
                 setThunderMode(false)
@@ -225,6 +229,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         binding.dockBolt.setOnClickListener {
+            expandedDockKey = binding.dockBolt
             clearAppSearch()
             setContactsMode(false)
             setThunderMode(true)
@@ -487,9 +492,13 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
         val iconPadding = (13 * resources.displayMetrics.density).toInt()
         binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
-        binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
-        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else if (contactsMode) R.drawable.dock_contacts else if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
-        binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
+        binding.dockSearch.setBackgroundResource(R.drawable.dock_key)
+        if (activeSearch == null) {
+            binding.dockSearch.setImageResource(if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
+            binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+        }
+        // Keep the actual thunder key visible as it moves into the leftmost slot.
+        binding.dockBolt.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
         searchTextView?.apply {
             setTextColor(foreground)
             setHintTextColor(if (enabled) android.graphics.Color.BLACK else 0xFFBDBDBD.toInt())
@@ -599,12 +608,13 @@ class AppDrawerFragment : BaseFragment() {
                 val progress = it.animatedValue as Float
                 val b = _binding ?: return@addUpdateListener
                 b.dockSearch.tag = progress
-                b.dockSearch.translationX = 0f
-                b.dockSearch.translationZ = 8f
-                b.dockPlaceholder.alpha = 1f - progress
-                b.dockPlaceholder.isEnabled = !expanded
-                listOf(b.dockBolt, b.dockContacts, b.dockSettings).forEach { key ->
-                    key.alpha = 1f - progress
+                val selectedKey = expandedDockKey ?: b.dockSearch
+                val leftmost = b.dockSearch.left
+                listOf(b.dockSearch, b.dockContacts, b.dockBolt, b.dockPlaceholder, b.dockSettings).forEach { key ->
+                    val isSelected = key === selectedKey
+                    key.translationX = if (isSelected) (leftmost - key.left) * progress else 0f
+                    key.translationZ = if (isSelected) 8f else 0f
+                    key.alpha = if (isSelected) 1f else 1f - progress
                     key.isEnabled = !expanded
                 }
                 b.search.alpha = progress
@@ -621,7 +631,10 @@ class AppDrawerFragment : BaseFragment() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     if (cancelled || _binding == null || dockExpanded != expanded) return
                     if (expanded) binding.search.showKeyboard()
-                    else binding.search.visibility = View.INVISIBLE
+                    else {
+                        binding.search.visibility = View.INVISIBLE
+                        expandedDockKey = null
+                    }
                 }
             })
             start()
@@ -640,6 +653,7 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         setContactsMode(false)
         setThunderMode(false)
+        expandedDockKey = binding.dockSearch
         activeSearch = target
         adapter.searchPackage = target.app.appPackage
         val size = (52 * resources.displayMetrics.density).toInt()
