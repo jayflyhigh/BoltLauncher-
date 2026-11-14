@@ -104,18 +104,15 @@ suspend fun getAppsList(
                             user = profile
                         )
 
-                        // if the current app is not OLauncher
-                        if (app.applicationInfo.packageName != BuildConfig.APPLICATION_ID) {
-                            // is this a hidden app?
-                            if (hiddenApps.contains(app.applicationInfo.packageName + "|" + profile.toString())) {
-                                if (includeHiddenApps) {
-                                    appList.add(appModel)
-                                }
-                            } else {
-                                // this is a regular app
-                                if (includeRegularApps) {
-                                    appList.add(appModel)
-                                }
+                        // is this a hidden app?
+                        if (hiddenApps.contains(app.applicationInfo.packageName + "|" + profile.toString())) {
+                            if (includeHiddenApps) {
+                                appList.add(appModel)
+                            }
+                        } else {
+                            // this is a regular app
+                            if (includeRegularApps) {
+                                appList.add(appModel)
                             }
                         }
                     } catch (e: Exception) {
@@ -250,7 +247,6 @@ suspend fun getPrivateSpaceApps(
             val collator = Collator.getInstance()
 
             for (app in launcherApps.getActivityList(null, privateSpaceHandle)) {
-                if (app.applicationInfo.packageName == BuildConfig.APPLICATION_ID) continue
                 val appLabelShown = prefs.getAppRenameLabel(app.applicationInfo.packageName)
                     .ifBlank { app.label.toString() }
                 appList.add(
