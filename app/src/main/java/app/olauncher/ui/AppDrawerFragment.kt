@@ -87,6 +87,7 @@ class AppDrawerFragment : BaseFragment() {
         initObservers()
         initClickListeners()
         initDock()
+        initHomeSwipe()
         applyDockInsets()
         binding.recyclerView.visibility = if (isHomePage) View.INVISIBLE else View.VISIBLE
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
@@ -125,6 +126,38 @@ class AppDrawerFragment : BaseFragment() {
             insets
         }
         root.post { androidx.core.view.ViewCompat.requestApplyInsets(root) }
+    }
+
+    private fun initHomeSwipe() {
+        val threshold = 64f * resources.displayMetrics.density
+        var notificationsOpened = false
+        val detector = android.view.GestureDetector(requireContext(),
+            object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(event: android.view.MotionEvent): Boolean {
+                    notificationsOpened = false
+                    return true
+                }
+
+                override fun onScroll(
+                    start: android.view.MotionEvent?,
+                    current: android.view.MotionEvent,
+                    distanceX: Float,
+                    distanceY: Float,
+                ): Boolean {
+                    if (start == null || notificationsOpened || !isHomePage || dockExpanded) return false
+                    val dy = current.y - start.y
+                    val dx = current.x - start.x
+                    if (dy > threshold && dy > kotlin.math.abs(dx)) {
+                        notificationsOpened = true
+                        app.olauncher.helper.expandNotificationDrawer(requireContext())
+                    }
+                    return true
+                }
+            })
+        detector.setIsLongpressEnabled(false)
+        binding.root.setOnTouchListener { _, event ->
+            if (isHomePage && !dockExpanded) detector.onTouchEvent(event) else false
+        }
     }
 
     private fun initDock() {

@@ -25,6 +25,18 @@
         android:text="@string/app" />
 
     <ImageView
+        android:id="@+id/resultBolt"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/dock_yellow"
+        android:padding="8dp"
+        android:src="@drawable/dock_bolt"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <ImageView
         android:id="@+id/otherProfileIndicator"
         android:layout_width="5dp"
         android:layout_height="5dp"

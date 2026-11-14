@@ -254,8 +254,11 @@ class AppDrawerAdapter(
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
-            root.setBackgroundResource(if (enabled) R.drawable.dock_result_yellow else R.drawable.dock_shell)
-            appTitle.setTextColor(if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            root.setBackgroundResource(R.drawable.dock_shell)
+            appTitle.setTextColor(android.graphics.Color.WHITE)
+            resultBolt.isVisible = enabled
+            val endPadding = ((if (enabled) 68 else 24) * root.resources.displayMetrics.density).toInt()
+            appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
         fun cancelIconLoad() {
