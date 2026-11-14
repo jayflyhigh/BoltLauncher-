@@ -23,9 +23,9 @@ class DockResultsView @JvmOverloads constructor(
         lastQuery = query
         val generation = ++animationGeneration
         resetRows()
-        if (!isShown || context.isEinkDisplay() || context.isSystemAnimationsDisabled()) return
+        if (scrollState != SCROLL_STATE_IDLE || !isShown || context.isEinkDisplay() || context.isSystemAnimationsDisabled()) return
         doOnPreDraw {
-            if (generation != animationGeneration || !isShown) return@doOnPreDraw
+            if (generation != animationGeneration || scrollState != SCROLL_STATE_IDLE || !isShown) return@doOnPreDraw
             val rows = (0 until childCount).map { getChildAt(it) }.sortedByDescending { it.top }
             rows.forEachIndexed { index, row ->
                 row.alpha = 0f
@@ -39,6 +39,14 @@ class DockResultsView @JvmOverloads constructor(
                     .start()
             }
         }
+    }
+
+    override fun onScrollStateChanged(state: Int) {
+        if (state != SCROLL_STATE_IDLE) {
+            animationGeneration++
+            resetRows()
+        }
+        super.onScrollStateChanged(state)
     }
 
     private fun resetRows() {
