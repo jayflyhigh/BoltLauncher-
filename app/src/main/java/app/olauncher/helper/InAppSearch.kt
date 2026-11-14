@@ -24,7 +24,8 @@ class InAppSearch(private val context: Context) {
             "com.google.android.apps.maps" to "https://www.google.com/maps/search/?api=1&query=",
             "com.android.vending" to "market://search?q=",
             "com.reddit.frontpage" to "https://www.reddit.com/search/?q=",
-            "com.spotify.music" to "spotify:search:"
+            "com.spotify.music" to "spotify:search:",
+            "com.pinterest" to "https://www.pinterest.com/search/pins/?q="
         )
         targets = apps.filterIsInstance<AppModel.App>()
             .filter { it.user == android.os.Process.myUserHandle() }
