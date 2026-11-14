@@ -23,40 +23,63 @@ class InAppSearch(private val context: Context) {
         private set
 
     fun load(apps: List<AppModel>) {
-        val manager = context.getSystemService(Context.SEARCH_SERVICE) as SearchManager
         targets = apps.filterIsInstance<AppModel.App>()
             .filter { it.user == android.os.Process.myUserHandle() }
             .sortedBy { it.appPackage }.mapNotNull { app ->
-                try {
-                    // A failed route is retried after an app update, not on every list refresh.
-                    if (prefs.getLong("failed:${app.appPackage}", -1) == appVersion(app.appPackage))
-                        return@mapNotNull null
-                    val routes = mutableListOf<Route>()
-                    // Prefer a query-bearing app link over a generic ACTION_SEARCH handler.
-                    InAppSearchLinks.url(app.appPackage, "test")?.let { url ->
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            .addCategory(Intent.CATEGORY_BROWSABLE).setPackage(app.appPackage)
-                        val activity = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-                            .firstOrNull { usable(it.activityInfo, app.appPackage) }?.activityInfo
-                        if (activity != null) {
-                            intent.component = ComponentName(activity.packageName, activity.name)
-                            routes.add(Route(intent, true))
-                        }
-                    }
-                    val search = Intent(Intent.ACTION_SEARCH).setPackage(app.appPackage)
-                    context.packageManager.queryIntentActivities(search, 0).forEach { result ->
-                        val activity = result.activityInfo
-                        val component = ComponentName(activity.packageName, activity.name)
-                        // Resolving ACTION_SEARCH alone does not establish that QUERY is supported.
-                        if (usable(activity, app.appPackage) &&
-                            manager.getSearchableInfo(component)?.searchActivity == component) {
-                            routes.add(Route(Intent(search).setComponent(component), false))
-                        }
-                    }
-                    if (routes.isEmpty()) return@mapNotNull null
-                    app.appPackage to Target(app, routes, iconColor(app.appPackage))
-                } catch (_: Exception) { null }
+                discover(app)?.let { app.appPackage to it }
             }.toMap()
+        ensureAliases()
+    }
+
+    /** A user-requested check retries a previously failed app without launching it. */
+    fun probe(app: AppModel): Target? {
+        if (app !is AppModel.App || app.user != android.os.Process.myUserHandle()) return null
+        return discover(app, retry = true)
+    }
+
+    fun add(target: Target) {
+        val editor = prefs.edit().remove("failed:${target.app.appPackage}")
+        val savedAlias = prefs.getString(target.app.appPackage, null)
+        if (savedAlias != null && targets.values.any {
+                it.app.appPackage != target.app.appPackage && alias(it).equals(savedAlias, true)
+            }) editor.remove(target.app.appPackage)
+        editor.apply()
+        targets = targets + (target.app.appPackage to target)
+        ensureAliases()
+    }
+
+    private fun discover(app: AppModel.App, retry: Boolean = false): Target? {
+        try {
+            if (!retry && prefs.getLong("failed:${app.appPackage}", -1) == appVersion(app.appPackage)) return null
+            val manager = context.getSystemService(Context.SEARCH_SERVICE) as SearchManager
+            val routes = mutableListOf<Route>()
+            // Prefer a query-bearing app link over a generic ACTION_SEARCH handler.
+            InAppSearchLinks.url(app.appPackage, "test")?.let { url ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    .addCategory(Intent.CATEGORY_BROWSABLE).setPackage(app.appPackage)
+                val activity = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                    .firstOrNull { usable(it.activityInfo, app.appPackage) }?.activityInfo
+                if (activity != null) {
+                    intent.component = ComponentName(activity.packageName, activity.name)
+                    routes.add(Route(intent, true))
+                }
+            }
+            val search = Intent(Intent.ACTION_SEARCH).setPackage(app.appPackage)
+            context.packageManager.queryIntentActivities(search, 0).forEach { result ->
+                val activity = result.activityInfo
+                val component = ComponentName(activity.packageName, activity.name)
+                // Resolving ACTION_SEARCH alone does not establish that QUERY is supported.
+                if (usable(activity, app.appPackage) &&
+                    manager.getSearchableInfo(component)?.searchActivity == component) {
+                    routes.add(Route(Intent(search).setComponent(component), false))
+                }
+            }
+            if (routes.isEmpty()) return null
+            return Target(app, routes, iconColor(app.appPackage))
+        } catch (_: Exception) { return null }
+    }
+
+    private fun ensureAliases() {
         val used = targets.keys.mapNotNull { prefs.getString(it, null) }.toMutableSet()
         val editor = prefs.edit()
         targets.forEach { (pkg, target) ->

@@ -46,6 +46,8 @@ class AppDrawerAdapter(
     private val searchTarget: (AppModel) -> app.olauncher.helper.InAppSearch.Target? = { null },
     private val searchAlias: (AppModel) -> String? = { null },
     private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
+    private val searchProbe: (AppModel) -> Unit = {},
+    private val searchProbing: (AppModel) -> Boolean = { false },
     private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
@@ -177,7 +179,7 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode, searchTarget(appModel), searchClick, searchHold
+                    thunderMode, searchTarget(appModel), searchClick, searchHold, searchProbe, searchProbing(appModel)
                 )
             }
         } catch (e: Exception) {
@@ -296,8 +298,12 @@ class AppDrawerAdapter(
             target: app.olauncher.helper.InAppSearch.Target?,
             searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit,
             searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
+            searchProbe: (AppModel) -> Unit,
+            probing: Boolean,
         ) = with(binding) {
-            hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
+            hasSearchBadge = flag == Constants.FLAG_LAUNCH_APP && appModel is AppModel.App
+            searchBadge.isEnabled = !probing
+            searchBadge.alpha = if (probing) .6f else 1f
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
                 searchBadge.text = appModel.appLabel.take(1).uppercase(java.util.Locale.ROOT)
@@ -306,6 +312,14 @@ class AppDrawerAdapter(
                 searchBadge.contentDescription = "Search in ${appModel.appLabel}. Hold to change alias"
                 searchBadge.setOnClickListener { searchClick(target) }
                 searchBadge.setOnLongClickListener { searchHold(target); true }
+            } else {
+                searchBadge.text = if (probing) "…" else "+"
+                searchBadge.setTextColor(android.graphics.Color.WHITE)
+                searchBadge.setBackgroundResource(R.drawable.dock_key)
+                searchBadge.contentDescription = if (probing) "Checking search support for ${appModel.appLabel}"
+                    else "Check whether ${appModel.appLabel} supports search"
+                searchBadge.setOnClickListener { searchProbe(appModel) }
+                searchBadge.setOnLongClickListener(null)
             }
             applyThunderStyle(thunderMode)
             appHideLayout.visibility = View.GONE

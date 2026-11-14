@@ -43,6 +43,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var inAppSearch: app.olauncher.helper.InAppSearch
     private var activeSearch: app.olauncher.helper.InAppSearch.Target? = null
+    private val searchProbeJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
     private var searchTargetsLoad: kotlinx.coroutines.Job? = null
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
@@ -647,6 +648,34 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
     }
 
+    private fun checkAppSearch(app: AppModel) {
+        val key = app.appPackage
+        if (searchProbeJobs.containsKey(key)) return
+        cancelAutoLaunch()
+        val job = viewLifecycleOwner.lifecycleScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            try {
+                // Let the initial scan finish so it cannot overwrite a newly added badge.
+                searchTargetsLoad?.join()
+                val target = withContext(Dispatchers.IO) { inAppSearch.probe(app) }
+                if (_binding == null) return@launch
+                if (target != null) {
+                    inAppSearch.add(target)
+                    requireContext().showToast("Search added for ${app.appLabel}. Code: ${inAppSearch.alias(target)}")
+                } else {
+                    requireContext().showToast("No supported search route found for ${app.appLabel}")
+                }
+            } finally {
+                searchProbeJobs.remove(key)
+                if (_binding != null) {
+                    adapter.notifyItemRangeChanged(0, adapter.itemCount)
+                }
+            }
+        }
+        searchProbeJobs[key] = job
+        adapter.notifyItemRangeChanged(0, adapter.itemCount)
+        job.start()
+    }
+
     private fun editSearchAlias(target: app.olauncher.helper.InAppSearch.Target) {
         val field = android.widget.EditText(requireContext()).apply {
             setSingleLine(true)
@@ -854,6 +883,8 @@ class AppDrawerFragment : BaseFragment() {
             searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             searchClick = { activateAppSearch(it) },
             searchHold = { editSearchAlias(it) },
+            searchProbe = { checkAppSearch(it) },
+            searchProbing = { searchProbeJobs.containsKey(it.appPackage) },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
@@ -1019,6 +1050,8 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         contactsLoad?.cancel()
         searchTargetsLoad?.cancel()
+        searchProbeJobs.values.toList().forEach { it.cancel() }
+        searchProbeJobs.clear()
         dockAnimator?.cancel()
         dockAnimator = null
         commandKeys.forEach { it.animate().cancel() }
