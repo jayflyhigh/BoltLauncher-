@@ -227,6 +227,13 @@ class AppDrawerAdapter(
         submitList(appsList)
     }
 
+    fun launchOnlyResult(): Boolean {
+        val only = currentList.singleOrNull() ?: return false
+        if (only is AppModel.PrivateSpaceHeader || only.appPackage.isEmpty()) return false
+        appClickListener(only)
+        return true
+    }
+
     fun launchFirstInList() {
         val first = currentList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
         if (first != null) appClickListener(first)
@@ -254,8 +261,11 @@ class AppDrawerAdapter(
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
-            root.setBackgroundResource(if (enabled) R.drawable.dock_result_yellow else R.drawable.dock_shell)
-            appTitle.setTextColor(if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            root.setBackgroundResource(R.drawable.dock_shell)
+            appTitle.setTextColor(android.graphics.Color.WHITE)
+            resultBolt.isVisible = enabled
+            val endPadding = ((if (enabled) 68 else 24) * root.resources.displayMetrics.density).toInt()
+            appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
         fun cancelIconLoad() {
