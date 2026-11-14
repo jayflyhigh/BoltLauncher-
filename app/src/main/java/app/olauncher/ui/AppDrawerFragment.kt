@@ -349,6 +349,11 @@ class AppDrawerFragment : BaseFragment() {
                 prefs.setAppRenameLabel(identifier, renameLabel)
                 viewModel.getAppList()
             },
+            resultsChanged = { searching ->
+                linearLayoutManager.reverseLayout = searching
+                linearLayoutManager.stackFromEnd = false
+                binding.recyclerView.scrollToPosition(0)
+            },
             privateSpaceToggleListener = {
                 viewModel.togglePrivateSpaceLock()
             },
@@ -474,6 +479,10 @@ class AppDrawerFragment : BaseFragment() {
     override fun onStart() {
         super.onStart()
         cachedIsCjkKeyboard = null
+        val controller = androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.root)
+        controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (prefs.showStatusBar) controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        else controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
         if (dockExpanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
     }
 

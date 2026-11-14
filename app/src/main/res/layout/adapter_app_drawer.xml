@@ -3,20 +3,25 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:animateLayoutChanges="true">
+    android:layout_height="68dp"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="4dp"
+    android:background="@drawable/dock_shell">
 
-    <ImageView android:id="@+id/appIcon" android:layout_width="36dp" android:layout_height="36dp" android:layout_gravity="start|center_vertical" android:layout_marginStart="20dp" android:importantForAccessibility="no"/>
+    <ImageView android:id="@+id/appIcon" android:layout_width="36dp" android:layout_height="36dp" android:layout_gravity="start|center_vertical" android:layout_marginStart="16dp" android:importantForAccessibility="no"/>
 
     <TextView
         android:id="@+id/appTitle"
         style="@style/TextLarge"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="start|center_vertical"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:ellipsize="end"
         android:maxLines="1"
-        android:paddingStart="72dp"
+        android:paddingStart="76dp"
         android:paddingEnd="24dp"
-        android:paddingVertical="@dimen/app_padding_vertical"
         android:text="@string/app" />
 
     <ImageView

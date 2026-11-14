@@ -33,6 +33,7 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
+    private val resultsChanged: (Boolean) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
 ) : ListAdapter<AppModel, RecyclerView.ViewHolder>(DIFF_CALLBACK), Filterable {
@@ -134,10 +135,18 @@ class AppDrawerAdapter(
                 isBangSearch = charSearch?.startsWith("!") ?: false
                 autoLaunch = allowAutoLaunch && (charSearch?.startsWith(" ")?.not() ?: true)
 
-                val appFilteredList = (if (charSearch.isNullOrBlank()) appsList
+                val query = charSearch?.toString()?.trim().orEmpty()
+                val appFilteredList = if (query.isBlank()) appsList.toMutableList()
                 else appsList.filter { app ->
-                    app !is AppModel.PrivateSpaceHeader && appLabelMatches(app.appLabel, charSearch)
-                } as MutableList<AppModel>)
+                    app !is AppModel.PrivateSpaceHeader && appLabelMatches(app.appLabel, query)
+                }.sortedWith(compareBy<AppModel> {
+                    when {
+                        it.appLabel.equals(query, true) -> 0
+                        it.appLabel.startsWith(query, true) -> 1
+                        it.appLabel.split(Regex("\\s+")).any { word -> word.startsWith(query, true) } -> 2
+                        else -> 3
+                    }
+                }.thenBy { it.appLabel.lowercase(java.util.Locale.ROOT) }).toMutableList()
 
                 val filterResults = FilterResults()
                 filterResults.values = appFilteredList
@@ -150,6 +159,7 @@ class AppDrawerAdapter(
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
                     submitList(appFilteredList) {
+                        resultsChanged(!constraint.isNullOrBlank())
                         autoLaunch(constraint?.toString())
                     }
                 }
@@ -180,17 +190,6 @@ class AppDrawerAdapter(
     }
 
     fun setAppList(appsList: MutableList<AppModel>) {
-        // Add empty app for bottom padding in recyclerview and assign to list
-        appsList.add(
-            AppModel.App(
-                appLabel = "",
-                key = null,
-                appPackage = "",
-                activityClassName = "",
-                isNew = false,
-                user = android.os.Process.myUserHandle()
-            )
-        )
         this.appsList = appsList
         this.appFilteredList = appsList
         submitList(appsList)
@@ -250,7 +249,7 @@ class AppDrawerAdapter(
                 append(appModel.appLabel)
                 if (appModel.isNew) append(" ✦")
             }
-            appTitle.gravity = appLabelGravity
+            appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             otherProfileIndicator.isVisible = appModel.user != myUserHandle
 
             appTitle.setOnClickListener { clickListener(appModel) }
