@@ -674,8 +674,16 @@ class AppDrawerFragment : BaseFragment() {
         val target = activeSearch ?: return false
         val query = binding.search.query.toString().trim()
         if (query.isBlank()) return true
-        try { inAppSearch.launch(target, query) }
-        catch (_: Exception) { requireContext().showToast("This app could not open search") }
+        try {
+            if (!inAppSearch.launch(target, query)) {
+                clearAppSearch()
+                setThunderMode(false)
+                binding.search.queryHint = "Search apps"
+                adapter.filterApps(query)
+                adapter.notifyItemRangeChanged(0, adapter.itemCount)
+                requireContext().showToast("Search is unavailable in ${target.app.appLabel}. Its code has been removed.")
+            }
+        } catch (_: Exception) { requireContext().showToast("This app could not open search") }
         return true
     }
 
