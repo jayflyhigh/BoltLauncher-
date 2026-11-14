@@ -44,6 +44,12 @@ class AppDrawerFragment : BaseFragment() {
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
 
+    private val isHomePage: Boolean
+        get() = findNavController().currentDestination?.id == R.id.mainFragment
+
+    private var dockExpanded = false
+    private var dockAnimator: android.animation.ValueAnimator? = null
+
     private var flag = Constants.FLAG_LAUNCH_APP
     private var canRename = false
     private var currentAppList: List<AppModel>? = null
@@ -60,6 +66,7 @@ class AppDrawerFragment : BaseFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
+        dockExpanded = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -77,6 +84,132 @@ class AppDrawerFragment : BaseFragment() {
         initAdapter()
         initObservers()
         initClickListeners()
+        initDock()
+        applyDockInsets()
+        binding.recyclerView.visibility = if (isHomePage) View.INVISIBLE else View.VISIBLE
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (!collapseSearch() && !isHomePage) closeDrawer()
+                }
+            })
+    }
+
+    private fun applyDockInsets() {
+        val root = binding.root
+        val initialLeft = root.paddingLeft
+        val initialTop = root.paddingTop
+        val initialRight = root.paddingRight
+        val initialBottom = root.paddingBottom
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
+            val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
+            if (dockParams.bottomMargin != bottomMargin) {
+                dockParams.bottomMargin = bottomMargin
+                binding.dock.layoutParams = dockParams
+            }
+            // Reserve the system area beneath the dock in both gesture and button navigation.
+            val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            view.setPadding(initialLeft + bars.left, maxOf(initialTop, status.top), initialRight + bars.right,
+                initialBottom + maxOf(bars.bottom, keyboard.bottom))
+            insets
+        }
+        root.post { androidx.core.view.ViewCompat.requestApplyInsets(root) }
+    }
+
+    private fun initDock() {
+        binding.dockHome.setOnClickListener {
+            if (isHomePage) resetHomeSearch()
+            else {
+                binding.search.hideKeyboard()
+                findNavController().popBackStack(R.id.mainFragment, false)
+            }
+        }
+        binding.dockSearch.setOnClickListener { setDockExpanded(!dockExpanded) }
+        binding.dockBolt.setOnClickListener { setDockExpanded(true) }
+        binding.dockContacts.setOnClickListener {
+            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.provider.ContactsContract.Contacts.CONTENT_URI)) }
+            catch (_: android.content.ActivityNotFoundException) { }
+        }
+        binding.dockSettings.setOnClickListener {
+            findNavController().navigate(if (isHomePage)
+                R.id.action_mainFragment_to_settingsFragment
+                else R.id.action_appListFragment_to_settingsFragment2)
+        }
+        binding.dock.post {
+            if (_binding == null) return@post
+            val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
+            params.marginStart = binding.dockHome.right + (6 * resources.displayMetrics.density).toInt()
+            binding.search.layoutParams = params
+        }
+        searchTextView?.setTextColor(android.graphics.Color.WHITE)
+        searchTextView?.setHintTextColor(0xFFBDBDBD.toInt())
+        searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+    }
+
+    fun collapseSearch(): Boolean {
+        if (!dockExpanded || _binding == null) return false
+        val insets = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
+        if (insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true) {
+            binding.search.hideKeyboard()
+        } else {
+            resetHomeSearch()
+        }
+        return true
+    }
+
+    fun resetHomeSearch(animate: Boolean = true) {
+        if (_binding == null) return
+        binding.search.setQuery("", false)
+        setDockExpanded(false, animate = animate)
+    }
+
+    private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
+        dockExpanded = expanded
+        binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
+        dockAnimator?.cancel()
+        val start = (binding.dockSearch.tag as? Float) ?: 0f
+        val target = if (expanded) 1f else 0f
+        binding.search.visibility = View.VISIBLE
+        if (!expanded) {
+            binding.search.hideKeyboard()
+            binding.search.clearFocus()
+        }
+        dockAnimator = android.animation.ValueAnimator.ofFloat(start, target).apply {
+            duration = if (animate) (220 * kotlin.math.abs(target - start)).toLong() else 0L
+            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
+            addUpdateListener {
+                val progress = it.animatedValue as Float
+                val b = _binding ?: return@addUpdateListener
+                b.dockSearch.tag = progress
+                b.dockSearch.translationX = (b.dockHome.x - b.dockSearch.left) * progress
+                b.dockSearch.translationZ = 8f
+                b.dockHome.alpha = 1f - progress
+                b.dockHome.isEnabled = !expanded
+                listOf(b.dockBolt, b.dockContacts, b.dockSettings).forEach { key ->
+                    key.alpha = 1f - progress
+                    key.isEnabled = !expanded
+                }
+                b.search.alpha = progress
+                b.search.translationX = -b.search.width * (1f - progress)
+                b.search.clipBounds = android.graphics.Rect(
+                    (b.search.width * (1f - progress)).toInt(), 0,
+                    b.search.width, b.search.height)
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (_binding == null || dockExpanded != expanded) return
+                    if (expanded) binding.search.showKeyboard()
+                    else binding.search.visibility = View.INVISIBLE
+                }
+            })
+            start()
+        }
     }
 
     private fun initViews() {
@@ -95,18 +228,13 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                if (query?.startsWith("!") == true)
-                    requireContext().openUrl(Constants.URL_DUCK_SEARCH + query.replace(" ", "%20"))
-                else if (adapter.itemCount == 0)
-                    requireContext().openSearch(query?.trim())
-                else
-                    adapter.launchFirstInList()
+                adapter.launchFirstInList()
                 return true
             }
 
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
-                    adapter.allowAutoLaunch = !isSearchComposing()
+                    adapter.allowAutoLaunch = false
                     adapter.filter.filter(newText)
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
@@ -213,7 +341,9 @@ class AppDrawerFragment : BaseFragment() {
                     binding.search.hideKeyboard()
                     prefs.firstHide = false
                     viewModel.showDialog.postValue(Constants.Dialog.HIDDEN)
-                    findNavController().navigate(R.id.action_appListFragment_to_settingsFragment2)
+                    findNavController().navigate(if (isHomePage)
+                R.id.action_mainFragment_to_settingsFragment
+                else R.id.action_appListFragment_to_settingsFragment2)
                 }
                 viewModel.getAppList()
                 viewModel.getHiddenApps()
@@ -226,6 +356,11 @@ class AppDrawerFragment : BaseFragment() {
                 }
                 prefs.setAppRenameLabel(identifier, renameLabel)
                 viewModel.getAppList()
+            },
+            resultsChanged = { searching ->
+                linearLayoutManager.reverseLayout = searching
+                linearLayoutManager.stackFromEnd = false
+                binding.recyclerView.scrollToPosition(0)
             },
             privateSpaceToggleListener = {
                 viewModel.togglePrivateSpaceLock()
@@ -330,32 +465,8 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun getRecyclerViewOnScrollListener(): RecyclerView.OnScrollListener {
-        return object : RecyclerView.OnScrollListener() {
-
-            var onTop = false
-
-            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                super.onScrollStateChanged(recyclerView, newState)
-                when (newState) {
-
-                    RecyclerView.SCROLL_STATE_DRAGGING -> {
-                        onTop = !recyclerView.canScrollVertically(-1)
-                        if (onTop)
-                            binding.search.hideKeyboard()
-                    }
-
-                    RecyclerView.SCROLL_STATE_IDLE -> {
-                        if (!recyclerView.canScrollVertically(1))
-                            binding.search.hideKeyboard()
-                        else if (!recyclerView.canScrollVertically(-1))
-                            if (!onTop && isRemoving.not())
-                                binding.search.showKeyboard(prefs.autoShowKeyboard)
-                    }
-                }
-            }
-        }
-    }
+    private fun getRecyclerViewOnScrollListener(): RecyclerView.OnScrollListener =
+        object : RecyclerView.OnScrollListener() {}
 
     private fun checkMessageAndExit() {
         if (!closeDrawer()) return
@@ -365,21 +476,34 @@ class AppDrawerFragment : BaseFragment() {
 
     // Pops only the drawer. A plain popBackStack() from a late overscroll frame could pop the
     // home screen too, leaving a drawer that auto-launch and back can't close (#766)
-    private fun closeDrawer() = findNavController().popBackStack(R.id.appListFragment, true)
+    private fun closeDrawer(): Boolean {
+        if (isHomePage) {
+            resetHomeSearch()
+            return false
+        }
+        return findNavController().popBackStack(R.id.appListFragment, true)
+    }
 
     override fun onStart() {
         super.onStart()
         cachedIsCjkKeyboard = null
-        binding.search.showKeyboard(prefs.autoShowKeyboard)
+        val controller = androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.root)
+        controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (prefs.showStatusBar) controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        else controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        if (dockExpanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
     }
 
     override fun onStop() {
         binding.search.hideKeyboard()
+        if (isHomePage) resetHomeSearch(animate = false)
         super.onStop()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        dockAnimator?.cancel()
+        dockAnimator = null
         searchTextView = null
         _binding = null
     }

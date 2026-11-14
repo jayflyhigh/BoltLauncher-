@@ -33,6 +33,7 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
+    private val resultsChanged: (Boolean) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
 ) : ListAdapter<AppModel, RecyclerView.ViewHolder>(DIFF_CALLBACK), Filterable {
@@ -59,10 +60,10 @@ class AppDrawerAdapter(
         }
     }
 
-    private var autoLaunch = true
+    private var autoLaunch = false
     private var isBangSearch = false
     private var autoLaunchedQuery: String? = null
-    var allowAutoLaunch = true
+    var allowAutoLaunch = false
     private val appFilter = createAppFilter()
     private val myUserHandle = android.os.Process.myUserHandle()
 
@@ -134,10 +135,18 @@ class AppDrawerAdapter(
                 isBangSearch = charSearch?.startsWith("!") ?: false
                 autoLaunch = allowAutoLaunch && (charSearch?.startsWith(" ")?.not() ?: true)
 
-                val appFilteredList = (if (charSearch.isNullOrBlank()) appsList
+                val query = charSearch?.toString()?.trim().orEmpty()
+                val appFilteredList = if (query.isBlank()) appsList.toMutableList()
                 else appsList.filter { app ->
-                    app !is AppModel.PrivateSpaceHeader && appLabelMatches(app.appLabel, charSearch)
-                } as MutableList<AppModel>)
+                    app !is AppModel.PrivateSpaceHeader && appLabelMatches(app.appLabel, query)
+                }.sortedWith(compareBy<AppModel> {
+                    when {
+                        it.appLabel.equals(query, true) -> 0
+                        it.appLabel.startsWith(query, true) -> 1
+                        it.appLabel.split(Regex("\\s+")).any { word -> word.startsWith(query, true) } -> 2
+                        else -> 3
+                    }
+                }.thenBy { it.appLabel.lowercase(java.util.Locale.ROOT) }).toMutableList()
 
                 val filterResults = FilterResults()
                 filterResults.values = appFilteredList
@@ -150,6 +159,7 @@ class AppDrawerAdapter(
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
                     submitList(appFilteredList) {
+                        resultsChanged(!constraint.isNullOrBlank())
                         autoLaunch(constraint?.toString())
                     }
                 }
@@ -180,17 +190,6 @@ class AppDrawerAdapter(
     }
 
     fun setAppList(appsList: MutableList<AppModel>) {
-        // Add empty app for bottom padding in recyclerview and assign to list
-        appsList.add(
-            AppModel.App(
-                appLabel = "",
-                key = null,
-                appPackage = "",
-                activityClassName = "",
-                isNew = false,
-                user = android.os.Process.myUserHandle()
-            )
-        )
         this.appsList = appsList
         this.appFilteredList = appsList
         submitList(appsList)
@@ -234,12 +233,23 @@ class AppDrawerAdapter(
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE
 
+            appIcon.setImageDrawable(null)
+            appIcon.isVisible = appModel.appPackage.isNotEmpty()
+            if (appModel.appPackage.isNotEmpty()) {
+                val launcher = root.context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+                val icon = try {
+                    launcher.getActivityList(appModel.appPackage, appModel.user)
+                        .firstOrNull()?.getBadgedIcon(root.resources.displayMetrics.densityDpi)
+                } catch (_: Exception) { null }
+                appIcon.setImageDrawable(icon ?: root.context.packageManager.defaultActivityIcon)
+            }
+            appIcon.setOnClickListener { clickListener(appModel) }
             // Show indicators in title based on app type and state
             appTitle.text = buildString {
                 append(appModel.appLabel)
                 if (appModel.isNew) append(" ✦")
             }
-            appTitle.gravity = appLabelGravity
+            appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             otherProfileIndicator.isVisible = appModel.user != myUserHandle
 
             appTitle.setOnClickListener { clickListener(appModel) }
