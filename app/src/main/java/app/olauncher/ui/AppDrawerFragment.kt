@@ -233,7 +233,8 @@ class AppDrawerFragment : BaseFragment() {
     private fun scheduleAutoLaunch(query: String) {
         cancelAutoLaunch()
         if (!thunderMode || !dockExpanded || query.isBlank() ||
-            query == lastAutoLaunchedQuery || flag != Constants.FLAG_LAUNCH_APP) return
+            query == lastAutoLaunchedQuery || flag != Constants.FLAG_LAUNCH_APP ||
+            adapter.itemCount != 1) return
         val task = object : Runnable {
             override fun run() {
                 val b = _binding ?: return
@@ -248,9 +249,8 @@ class AppDrawerFragment : BaseFragment() {
                     return
                 }
                 pendingAutoLaunch = null
-                lastAutoLaunchedQuery = query
-                // Search uses reverseLayout: position zero is the bottom, best matching app.
-                adapter.launchFirstInList()
+                // Recheck the committed list after the typing pause, including result count.
+                if (adapter.launchOnlyResult()) lastAutoLaunchedQuery = query
             }
         }
         pendingAutoLaunch = task

@@ -227,6 +227,13 @@ class AppDrawerAdapter(
         submitList(appsList)
     }
 
+    fun launchOnlyResult(): Boolean {
+        val only = currentList.singleOrNull() ?: return false
+        if (only is AppModel.PrivateSpaceHeader || only.appPackage.isEmpty()) return false
+        appClickListener(only)
+        return true
+    }
+
     fun launchFirstInList() {
         val first = currentList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
         if (first != null) appClickListener(first)
