@@ -81,6 +81,24 @@ class AppDrawerFragment : BaseFragment() {
         initObservers()
         initClickListeners()
         initDock()
+        applyDockInsets()
+    }
+
+    private fun applyDockInsets() {
+        val root = binding.root
+        val initialLeft = root.paddingLeft
+        val initialTop = root.paddingTop
+        val initialRight = root.paddingRight
+        val initialBottom = root.paddingBottom
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            // Reserve the system area beneath the dock in both gesture and button navigation.
+            view.setPadding(initialLeft + bars.left, initialTop, initialRight + bars.right,
+                initialBottom + maxOf(bars.bottom, keyboard.bottom))
+            insets
+        }
+        root.post { androidx.core.view.ViewCompat.requestApplyInsets(root) }
     }
 
     private fun initDock() {
