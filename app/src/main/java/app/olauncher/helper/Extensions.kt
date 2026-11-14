@@ -54,7 +54,11 @@ fun View.showKeyboard(show: Boolean = true) {
     if (this.requestFocus())
         postDelayed({
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY)
+            // Showing the IME is idempotent; toggling it can hide an already-open
+            // keyboard when an alias activates or search expansion completes.
+            if (isAttachedToWindow && hasFocus()) {
+                imm.showSoftInput(findFocus() ?: this, InputMethodManager.SHOW_IMPLICIT)
+            }
         }, 100)
 }
 

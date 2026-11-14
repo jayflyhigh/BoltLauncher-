@@ -90,6 +90,7 @@ class AppDrawerAdapter(
     }
 
     @Volatile var searchPackage: String? = null
+    @Volatile var searchCommandsOnly = false
     private var requestedQuery = ""
     var committedQuery: String? = null
         private set
@@ -177,7 +178,7 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode, searchTarget(appModel), searchClick, searchHold
+                    thunderMode, searchTarget(appModel), searchClick, searchHold, searchCommandsOnly
                 )
             }
         } catch (e: Exception) {
@@ -191,7 +192,10 @@ class AppDrawerAdapter(
         return object : Filter() {
             override fun performFiltering(charSearch: CharSequence?): FilterResults {
                 val query = charSearch?.toString()?.trim().orEmpty()
-                val appFilteredList = if (searchPackage != null) appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == android.os.Process.myUserHandle() }.toMutableList()
+                val appFilteredList = if (searchCommandsOnly && searchPackage == null) appsList.filter { app ->
+                    app is AppModel.App && searchTarget(app) != null
+                }.distinctBy { it.appPackage }.sortedBy { it.appLabel.lowercase(java.util.Locale.ROOT) }.toMutableList()
+                else if (searchPackage != null) appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == android.os.Process.myUserHandle() }.toMutableList()
                 else if (query.isBlank()) appsList.toMutableList()
                 else appsList.filter { app ->
                     app !is AppModel.PrivateSpaceHeader && (appLabelMatches(app.appLabel, query) || searchAlias(app)?.startsWith(query, true) == true)
@@ -296,6 +300,7 @@ class AppDrawerAdapter(
             target: app.olauncher.helper.InAppSearch.Target?,
             searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit,
             searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
+            searchCommandsOnly: Boolean,
         ) = with(binding) {
             hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
@@ -305,7 +310,7 @@ class AppDrawerAdapter(
                 searchBadge.setTextColor(app.olauncher.helper.InAppSearch.foreground(target.color))
                 androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(searchBadge, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
                 searchBadge.contentDescription = "Search in ${appModel.appLabel}, alias ${target.code}"
-                searchBadge.setOnClickListener { searchClick(target) }
+                searchBadge.setOnClickListener { if (searchCommandsOnly) clickListener(appModel) else searchClick(target) }
                 searchBadge.setOnLongClickListener { searchHold(target); true }
             } else {
                 searchBadge.setOnClickListener(null)
@@ -343,6 +348,7 @@ class AppDrawerAdapter(
             appIcon.setOnClickListener { clickListener(appModel) }
             // Show indicators in title based on app type and state
             appTitle.text = buildString {
+                if (searchCommandsOnly) append("Search in ")
                 append(appModel.appLabel)
                 if (appModel.isNew) append(" ✦")
             }
@@ -350,6 +356,7 @@ class AppDrawerAdapter(
             otherProfileIndicator.isVisible = appModel.user != myUserHandle
 
             appTitle.setOnClickListener { clickListener(appModel) }
+            root.setOnClickListener(if (searchCommandsOnly) View.OnClickListener { clickListener(appModel) } else null)
 
             appTitle.setOnLongClickListener {
                 if (appModel.appPackage.isNotEmpty()) {

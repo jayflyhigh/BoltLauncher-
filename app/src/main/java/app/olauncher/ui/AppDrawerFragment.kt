@@ -203,16 +203,21 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initDock() {
-        binding.dockHome.setOnClickListener {
-            if (isHomePage) resetHomeSearch()
-            else {
-                binding.search.hideKeyboard()
-                findNavController().popBackStack(R.id.mainFragment, false)
-            }
+        binding.dockPlaceholder.isEnabled = true
+        binding.dockPlaceholder.setOnClickListener {
+            clearAppSearch()
+            adapter.searchCommandsOnly = true
+            setContactsMode(false)
+            setThunderMode(false)
+            binding.search.queryHint = "Search within apps"
+            binding.search.setQuery("", false)
+            adapter.filterApps("")
+            setDockExpanded(true)
         }
         binding.dockSearch.setOnClickListener {
             if (dockExpanded) resetHomeSearch()
             else {
+                clearAppSearch()
                 setContactsMode(false)
                 setThunderMode(false)
                 setDockExpanded(true)
@@ -220,6 +225,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         binding.dockBolt.setOnClickListener {
+            clearAppSearch()
             setContactsMode(false)
             setThunderMode(true)
             setDockExpanded(true)
@@ -242,7 +248,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dock.post {
             if (_binding == null) return@post
             val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
-            params.marginStart = binding.dockHome.right + (6 * resources.displayMetrics.density).toInt()
+            params.marginStart = binding.dockSearch.right + (6 * resources.displayMetrics.density).toInt()
             binding.search.layoutParams = params
         }
         setThunderMode(false)
@@ -251,8 +257,8 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun ensureCommandKeys() {
         if (commandKeys.isNotEmpty()) return
-        val originals = listOf(binding.dockHome, binding.dockSearch, binding.dockBolt,
-            binding.dockContacts, binding.dockSettings)
+        val originals = listOf(binding.dockSearch, binding.dockContacts, binding.dockBolt,
+            binding.dockPlaceholder, binding.dockSettings)
         val icons = listOf(R.drawable.dock_search) + ContactCommand.entries.filter { it != ContactCommand.SEARCH }.map { it.icon }
         commandKeys = originals.mapIndexed { index, original ->
             android.widget.ImageButton(requireContext()).apply {
@@ -279,6 +285,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun showContactCommands() {
+        clearAppSearch()
         ensureCommandKeys()
         cancelAutoLaunch()
         setContactsMode(true)
@@ -295,7 +302,7 @@ class AppDrawerFragment : BaseFragment() {
             key.isEnabled = false
             key.alpha = if (index == 0) 1f else 0f
             key.translationX = if (index == 0)
-                binding.dockContacts.x - binding.dockHome.x else 28f * resources.displayMetrics.density
+                binding.dockContacts.x - binding.dockSearch.x else 28f * resources.displayMetrics.density
             key.animate().translationX(0f).alpha(1f)
                 .setDuration(if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0L else 220L)
                 .setInterpolator(android.view.animation.DecelerateInterpolator())
@@ -481,7 +488,7 @@ class AppDrawerFragment : BaseFragment() {
         val iconPadding = (13 * resources.displayMetrics.density).toInt()
         binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
         binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
-        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else if (contactsMode) R.drawable.dock_contacts else R.drawable.dock_search)
+        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else if (contactsMode) R.drawable.dock_contacts else if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
         binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
         searchTextView?.apply {
             setTextColor(foreground)
@@ -592,10 +599,10 @@ class AppDrawerFragment : BaseFragment() {
                 val progress = it.animatedValue as Float
                 val b = _binding ?: return@addUpdateListener
                 b.dockSearch.tag = progress
-                b.dockSearch.translationX = (b.dockHome.x - b.dockSearch.left) * progress
+                b.dockSearch.translationX = 0f
                 b.dockSearch.translationZ = 8f
-                b.dockHome.alpha = 1f - progress
-                b.dockHome.isEnabled = !expanded
+                b.dockPlaceholder.alpha = 1f - progress
+                b.dockPlaceholder.isEnabled = !expanded
                 listOf(b.dockBolt, b.dockContacts, b.dockSettings).forEach { key ->
                     key.alpha = 1f - progress
                     key.isEnabled = !expanded
@@ -622,9 +629,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun clearAppSearch() {
+        adapter.searchCommandsOnly = false
         activeSearch = null
         adapter.searchPackage = null
-        binding.dockSearch.contentDescription = "Search"
+        binding.dockSearch.contentDescription = "Search apps"
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
     }
 
@@ -676,6 +684,18 @@ class AppDrawerFragment : BaseFragment() {
             }
             adapter.notifyItemRangeChanged(0, adapter.itemCount)
             adapter.filterApps(binding.search.query.toString())
+        }
+    }
+
+    private fun sendSearchTo(target: app.olauncher.helper.InAppSearch.Target) {
+        cancelAutoLaunch()
+        val query = binding.search.query.toString().trim()
+        if (query.isBlank()) {
+            binding.search.showKeyboard()
+            return
+        }
+        if (!inAppSearch.launch(target, query)) {
+            requireContext().showToast("Search is unavailable in ${target.app.appLabel}. Hold its code to edit its URL.")
         }
     }
 
@@ -779,6 +799,10 @@ class AppDrawerFragment : BaseFragment() {
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
                 cancelAutoLaunch()
+                if (adapter.searchCommandsOnly) {
+                    inAppSearch.targets[appModel.appPackage]?.let { sendSearchTo(it) }
+                    return@AppDrawerAdapter
+                }
                 if (launchAppSearch()) return@AppDrawerAdapter
                 viewModel.selectedApp(appModel, flag)
                 if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
@@ -859,13 +883,13 @@ class AppDrawerFragment : BaseFragment() {
                 viewModel.getAppList()
             },
             searchTarget = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage] else null },
-            searchClick = { activateAppSearch(it) },
+            searchClick = { if (adapter.searchCommandsOnly) sendSearchTo(it) else activateAppSearch(it) },
             searchHold = { showAppSearchEditor(it) },
             searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
-                    linearLayoutManager.reverseLayout = query.isNotBlank()
+                    linearLayoutManager.reverseLayout = activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
                     linearLayoutManager.stackFromEnd = false
                     binding.recyclerView.scrollToPosition(0)
                     binding.recyclerView.animateSearchResults(query)
@@ -951,9 +975,9 @@ class AppDrawerFragment : BaseFragment() {
             }
         }
 
+        inAppSearch.load(combined)
         adapter.setAppList(combined)
         adapter.filterApps(binding.search.query.toString())
-        inAppSearch.load(combined)
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
     }
 
