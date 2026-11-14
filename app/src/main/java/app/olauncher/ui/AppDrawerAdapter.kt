@@ -43,6 +43,10 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
+    private val searchTarget: (AppModel) -> app.olauncher.helper.InAppSearch.Target? = { null },
+    private val searchAlias: (AppModel) -> String? = { null },
+    private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
+    private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
@@ -85,6 +89,7 @@ class AppDrawerAdapter(
         super.onDetachedFromRecyclerView(recyclerView)
     }
 
+    @Volatile var searchPackage: String? = null
     private var requestedQuery = ""
     var committedQuery: String? = null
         private set
@@ -172,7 +177,7 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode
+                    thunderMode, searchTarget(appModel), searchClick, searchHold
                 )
             }
         } catch (e: Exception) {
@@ -186,9 +191,10 @@ class AppDrawerAdapter(
         return object : Filter() {
             override fun performFiltering(charSearch: CharSequence?): FilterResults {
                 val query = charSearch?.toString()?.trim().orEmpty()
-                val appFilteredList = if (query.isBlank()) appsList.toMutableList()
+                val appFilteredList = if (searchPackage != null) appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == android.os.Process.myUserHandle() }.toMutableList()
+                else if (query.isBlank()) appsList.toMutableList()
                 else appsList.filter { app ->
-                    app !is AppModel.PrivateSpaceHeader && appLabelMatches(app.appLabel, query)
+                    app !is AppModel.PrivateSpaceHeader && (appLabelMatches(app.appLabel, query) || searchAlias(app)?.startsWith(query, true) == true)
                 }.sortedWith(compareBy<AppModel> {
                     when {
                         it.appLabel.equals(query, true) -> 0
@@ -258,13 +264,14 @@ class AppDrawerAdapter(
     private class ViewHolder(private val binding: AdapterAppDrawerBinding) :
         RecyclerView.ViewHolder(binding.root) {
         private var iconJob: Job? = null
+        private var hasSearchBadge = false
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
             root.setBackgroundResource(R.drawable.dock_shell)
             appTitle.setTextColor(android.graphics.Color.WHITE)
-            resultBolt.isVisible = enabled
-            val endPadding = ((if (enabled) 68 else 24) * root.resources.displayMetrics.density).toInt()
+            resultBolt.isVisible = enabled && !hasSearchBadge
+            val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
             appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
@@ -286,7 +293,20 @@ class AppDrawerAdapter(
             iconScope: CoroutineScope,
             iconCache: LruCache<IconKey, Drawable.ConstantState>,
             thunderMode: Boolean,
+            target: app.olauncher.helper.InAppSearch.Target?,
+            searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit,
+            searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
         ) = with(binding) {
+            hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
+            searchBadge.isVisible = hasSearchBadge
+            if (target != null) {
+                searchBadge.text = appModel.appLabel.take(1).uppercase(java.util.Locale.ROOT)
+                searchBadge.background = app.olauncher.helper.InAppSearch.background(target.color, root.resources.displayMetrics.density)
+                searchBadge.setTextColor(app.olauncher.helper.InAppSearch.foreground(target.color))
+                searchBadge.contentDescription = "Search in ${appModel.appLabel}. Hold to change alias"
+                searchBadge.setOnClickListener { searchClick(target) }
+                searchBadge.setOnLongClickListener { searchHold(target); true }
+            }
             applyThunderStyle(thunderMode)
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE

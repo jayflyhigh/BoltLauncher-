@@ -41,6 +41,9 @@ import app.olauncher.helper.uninstall
 
 class AppDrawerFragment : BaseFragment() {
 
+    private lateinit var inAppSearch: app.olauncher.helper.InAppSearch
+    private var activeSearch: app.olauncher.helper.InAppSearch.Target? = null
+    private var searchTargetsLoad: kotlinx.coroutines.Job? = null
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
     private lateinit var linearLayoutManager: LinearLayoutManager
@@ -95,6 +98,7 @@ class AppDrawerFragment : BaseFragment() {
         savedInstanceState: Bundle?,
     ): View {
         dockExpanded = false
+        activeSearch = null
         contactsMode = false
         contactCommand = null
         commandKeys = emptyList()
@@ -107,6 +111,7 @@ class AppDrawerFragment : BaseFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         prefs = Prefs(requireContext())
+        inAppSearch = app.olauncher.helper.InAppSearch(requireContext().applicationContext)
         arguments?.let {
             flag = it.getInt(Constants.Key.FLAG, Constants.FLAG_LAUNCH_APP)
             canRename = it.getBoolean(Constants.Key.RENAME, false)
@@ -463,6 +468,8 @@ class AppDrawerFragment : BaseFragment() {
         adapter.setThunderMode(enabled)
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
+        val iconPadding = (13 * resources.displayMetrics.density).toInt()
+        binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
         binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
         binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else if (contactsMode) R.drawable.dock_contacts else R.drawable.dock_search)
         binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
@@ -489,7 +496,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun scheduleAutoLaunch(query: String) {
         cancelAutoLaunch()
-        if (!thunderMode || !dockExpanded || query.isBlank() ||
+        if (activeSearch != null || !thunderMode || !dockExpanded || query.isBlank() ||
             query == lastAutoLaunchedQuery || flag != Constants.FLAG_LAUNCH_APP ||
             adapter.itemCount != 1) return
         val task = object : Runnable {
@@ -541,6 +548,7 @@ class AppDrawerFragment : BaseFragment() {
 
     fun resetHomeSearch(animate: Boolean = true) {
         if (_binding == null) return
+        clearAppSearch()
         dockAnimator?.cancel()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
         binding.dockKeys.visibility = View.VISIBLE
@@ -603,6 +611,74 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private fun clearAppSearch() {
+        activeSearch = null
+        adapter.searchPackage = null
+        binding.dockSearch.contentDescription = "Search"
+        binding.dockSearch.setOnLongClickListener(null)
+    }
+
+    private fun activateAppSearch(target: app.olauncher.helper.InAppSearch.Target, query: String = "") {
+        cancelAutoLaunch()
+        setContactsMode(false)
+        setThunderMode(false)
+        activeSearch = target
+        adapter.searchPackage = target.app.appPackage
+        val size = (52 * resources.displayMetrics.density).toInt()
+        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = app.olauncher.helper.InAppSearch.foreground(target.color)
+            textSize = size * .46f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        android.graphics.Canvas(bitmap).drawText(target.app.appLabel.take(1).uppercase(java.util.Locale.ROOT), size / 2f,
+            size / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
+        binding.dockSearch.setPadding(0, 0, 0, 0)
+        binding.dockSearch.setImageBitmap(bitmap)
+        binding.dockSearch.imageTintList = null
+        binding.dockSearch.background = app.olauncher.helper.InAppSearch.background(target.color, resources.displayMetrics.density)
+        binding.dockSearch.contentDescription = "Search in ${target.app.appLabel}, alias ${inAppSearch.alias(target)}"
+        binding.dockSearch.setOnLongClickListener { editSearchAlias(target); true }
+        binding.search.queryHint = "Search in ${target.app.appLabel}....."
+        binding.search.setQuery(query, false)
+        adapter.filterApps(query)
+        setDockExpanded(true)
+        binding.search.showKeyboard()
+    }
+
+    private fun editSearchAlias(target: app.olauncher.helper.InAppSearch.Target) {
+        val field = android.widget.EditText(requireContext()).apply {
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setText(inAppSearch.alias(target))
+            selectAll()
+        }
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("${target.app.appLabel} alias code").setView(field)
+            .setPositiveButton("Save", null).setNegativeButton(android.R.string.cancel, null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val value = app.olauncher.helper.AppSearchAlias.normalize(field.text.toString())
+                if (inAppSearch.saveAlias(target, value)) dialog.dismiss()
+                else field.error = "Use a unique code with letters or numbers"
+            }
+            field.requestFocus()
+            dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        }
+        dialog.setOnDismissListener { if (_binding != null && dockExpanded) binding.search.showKeyboard() }
+        dialog.show()
+    }
+
+    private fun launchAppSearch(): Boolean {
+        val target = activeSearch ?: return false
+        val query = binding.search.query.toString().trim()
+        if (query.isBlank()) return true
+        try { inAppSearch.launch(target, query) }
+        catch (_: Exception) { requireContext().showToast("This app could not open search") }
+        return true
+    }
+
     private fun initViews() {
         if (flag == Constants.FLAG_HIDDEN_APPS)
             binding.search.queryHint = getString(R.string.hidden_apps)
@@ -620,6 +696,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
+                if (launchAppSearch()) return true
                 if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
                 else if (contactsMode) contactsAdapter.openFirst()
                 else if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
@@ -629,6 +706,14 @@ class AppDrawerFragment : BaseFragment() {
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
                     cancelAutoLaunch()
+                    if (activeSearch == null && !contactsMode && flag == Constants.FLAG_LAUNCH_APP && newText.contains(' ')) {
+                        val confirmed = app.olauncher.helper.AppSearchAlias.confirmed(newText)
+                        val target = confirmed?.first?.let { inAppSearch.find(it) }
+                        if (target != null) {
+                            activateAppSearch(target, confirmed?.second.orEmpty())
+                            return true
+                        }
+                    }
                     if (newText != lastAutoLaunchedQuery) lastAutoLaunchedQuery = null
                     if (contactsMode) {
                         if (contactCommand != ContactCommand.ADD) filterContacts(newText)
@@ -678,6 +763,7 @@ class AppDrawerFragment : BaseFragment() {
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
                 cancelAutoLaunch()
+                if (launchAppSearch()) return@AppDrawerAdapter
                 viewModel.selectedApp(appModel, flag)
                 if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
                     findNavController().popBackStack(R.id.mainFragment, false)
@@ -756,6 +842,10 @@ class AppDrawerFragment : BaseFragment() {
                 prefs.setAppRenameLabel(identifier, renameLabel)
                 viewModel.getAppList()
             },
+            searchTarget = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage] else null },
+            searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
+            searchClick = { activateAppSearch(it) },
+            searchHold = { editSearchAlias(it) },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
@@ -847,6 +937,11 @@ class AppDrawerFragment : BaseFragment() {
 
         adapter.setAppList(combined)
         adapter.filterApps(binding.search.query.toString())
+        searchTargetsLoad?.cancel()
+        searchTargetsLoad = viewLifecycleOwner.lifecycleScope.launch {
+            withContext(Dispatchers.IO) { inAppSearch.load(combined) }
+            if (_binding != null) adapter.notifyItemRangeChanged(0, adapter.itemCount)
+        }
     }
 
     private fun initClickListeners() {
@@ -915,6 +1010,7 @@ class AppDrawerFragment : BaseFragment() {
     override fun onDestroyView() {
         cancelAutoLaunch()
         contactsLoad?.cancel()
+        searchTargetsLoad?.cancel()
         dockAnimator?.cancel()
         dockAnimator = null
         commandKeys.forEach { it.animate().cancel() }
