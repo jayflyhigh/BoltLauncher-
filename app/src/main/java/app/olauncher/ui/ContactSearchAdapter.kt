@@ -21,6 +21,11 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
     data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>)
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
+    private val photoScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // Bound by bitmap bytes so large address books cannot retain unlimited photos.
+    private val photoCache = object : android.util.LruCache<Uri, android.graphics.Bitmap>(4 * 1024 * 1024) {
+        override fun sizeOf(key: Uri, value: android.graphics.Bitmap) = value.byteCount
+    }
 
     fun filter(query: String) {
         val terms = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
@@ -36,9 +41,8 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(results[position])
     override fun onViewRecycled(holder: Holder) { holder.photoJob?.cancel() }
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-        for (index in 0 until recyclerView.childCount) {
-            (recyclerView.getChildViewHolder(recyclerView.getChildAt(index)) as? Holder)?.photoJob?.cancel()
-        }
+        photoScope.coroutineContext.cancelChildren()
+        super.onDetachedFromRecyclerView(recyclerView)
     }
 
     inner class Holder(private val binding: AdapterAppDrawerBinding) : RecyclerView.ViewHolder(binding.root) {
@@ -72,16 +76,23 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
             initial.visibility = View.VISIBLE
             binding.root.setOnClickListener { open(contact) }
             contact.photo?.let { photo ->
-                photoJob = CoroutineScope(Dispatchers.Main.immediate).launch {
+                photoCache.get(photo)?.let { bitmap ->
+                    binding.appIcon.setImageBitmap(bitmap)
+                    initial.visibility = View.GONE
+                    return
+                }
+                val resolver = binding.root.context.applicationContext.contentResolver
+                photoJob = photoScope.launch {
                     val bitmap = withContext(Dispatchers.IO) {
                         try {
-                            binding.root.context.contentResolver.openInputStream(photo)?.use {
+                            resolver.openInputStream(photo)?.use {
                                 android.graphics.BitmapFactory.decodeStream(it, null,
                                     android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 })
                             }
                         } catch (_: Exception) { null }
                     }
                     if (bitmap != null) {
+                        photoCache.put(photo, bitmap)
                         binding.appIcon.setImageBitmap(bitmap)
                         initial.visibility = View.GONE
                     }
