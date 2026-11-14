@@ -50,9 +50,9 @@ class AppDrawerFragment : BaseFragment() {
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
     private enum class ContactCommand(val icon: Int, val hint: String) {
-        CALL(R.drawable.contact_call, "Call a contact......."),
-        MESSAGE(R.drawable.contact_message, "Message a contact......."),
-        WHATSAPP(R.drawable.contact_whatsapp, "WhatsApp message a contact......."),
+        CALL(R.drawable.contact_call, "Call....."),
+        MESSAGE(R.drawable.contact_message, "Message....."),
+        WHATSAPP(R.drawable.contact_whatsapp, "WhatsApp message....."),
         ADD(R.drawable.contact_add, "Add a contact.......")
     }
     private var contactCommand: ContactCommand? = null
@@ -249,7 +249,7 @@ class AppDrawerFragment : BaseFragment() {
                 setImageResource(icons[index])
                 imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
                 setPadding(original.paddingLeft, original.paddingTop, original.paddingRight, original.paddingBottom)
-                contentDescription = if (index == 0) "Contacts" else ContactCommand.entries[index - 1].hint.removeSuffix(".......")
+                contentDescription = if (index == 0) "Contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
                 visibility = View.GONE
                 binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(original.width, original.height).apply {
                     leftMargin = (binding.dockKeys.x + original.left - binding.dock.paddingLeft).toInt()
@@ -289,6 +289,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun selectContactCommand(command: ContactCommand) {
+        if (command == ContactCommand.ADD) {
+            addContact()
+            return
+        }
         contactCommand = command
         contactLaunchQuery = null
         binding.search.queryHint = command.hint
@@ -400,38 +404,15 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun addContact(query: String) {
-        val value = query.trim()
-        if (value.isEmpty()) return
-        val isNumber = value.any { it.isDigit() } && value.all { it.isDigit() || it in "+-(). " }
-        val form = android.widget.LinearLayout(requireContext()).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            val padding = (24 * resources.displayMetrics.density).toInt()
-            setPadding(padding, 0, padding, 0)
+    private fun addContact() {
+        cancelAutoLaunch()
+        val intent = android.content.Intent(android.content.Intent.ACTION_INSERT).apply {
+            type = android.provider.ContactsContract.Contacts.CONTENT_TYPE
         }
-        val name = android.widget.EditText(requireContext()).apply {
-            hint = "Name"; inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME
-            if (!isNumber) setText(value)
+        try { startActivity(intent) }
+        catch (_: android.content.ActivityNotFoundException) {
+            requireContext().showToast("No contacts app available")
         }
-        val phone = android.widget.EditText(requireContext()).apply {
-            hint = "Phone number"; inputType = android.text.InputType.TYPE_CLASS_PHONE
-            if (isNumber) setText(value)
-        }
-        form.addView(name); form.addView(phone)
-        contactDialogVisible = true
-        androidx.appcompat.app.AlertDialog.Builder(requireContext()).setTitle("Add contact").setView(form)
-            .setOnDismissListener { contactDialogVisible = false }
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("Continue") { _, _ ->
-                val intent = android.content.Intent(android.content.Intent.ACTION_INSERT,
-                    android.provider.ContactsContract.Contacts.CONTENT_URI).apply {
-                    type = android.provider.ContactsContract.Contacts.CONTENT_TYPE
-                    putExtra(android.provider.ContactsContract.Intents.Insert.NAME, name.text.toString().trim())
-                    putExtra(android.provider.ContactsContract.Intents.Insert.PHONE, phone.text.toString().trim())
-                }
-                try { startActivity(intent) }
-                catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No contacts app available") }
-            }.show()
     }
 
     private fun setContactsMode(enabled: Boolean) {
@@ -615,7 +596,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
-                if (contactsMode && contactCommand == ContactCommand.ADD) addContact(query.orEmpty())
+                if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
                 else if (contactsMode) contactsAdapter.openFirst()
                 else if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
                 return true
