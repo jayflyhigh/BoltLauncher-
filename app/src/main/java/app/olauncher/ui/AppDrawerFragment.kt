@@ -47,7 +47,6 @@ class AppDrawerFragment : BaseFragment() {
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
-    private var keyboardWasVisible = false
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
 
@@ -68,7 +67,6 @@ class AppDrawerFragment : BaseFragment() {
         savedInstanceState: Bundle?,
     ): View {
         dockExpanded = false
-        keyboardWasVisible = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -92,8 +90,7 @@ class AppDrawerFragment : BaseFragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (dockExpanded) resetHomeSearch()
-                    else if (!isHomePage) closeDrawer()
+                    if (!collapseSearch() && !isHomePage) closeDrawer()
                 }
             })
     }
@@ -107,11 +104,6 @@ class AppDrawerFragment : BaseFragment() {
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
-            val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
-            if (keyboardWasVisible && !keyboardVisible && dockExpanded) {
-                view.post { if (_binding != null && dockExpanded) resetHomeSearch() }
-            }
-            keyboardWasVisible = keyboardVisible
             // Reserve the system area beneath the dock in both gesture and button navigation.
             val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             view.setPadding(initialLeft + bars.left, maxOf(initialTop, status.top), initialRight + bars.right,
@@ -154,7 +146,12 @@ class AppDrawerFragment : BaseFragment() {
 
     fun collapseSearch(): Boolean {
         if (!dockExpanded || _binding == null) return false
-        resetHomeSearch()
+        val insets = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
+        if (insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true) {
+            binding.search.hideKeyboard()
+        } else {
+            resetHomeSearch()
+        }
         return true
     }
 
