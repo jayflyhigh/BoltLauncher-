@@ -111,8 +111,12 @@ class AppDrawerFragment : BaseFragment() {
                 binding.dock.layoutParams = dockParams
             }
             // Reserve the system area beneath the dock in both gesture and button navigation.
-            val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-            view.setPadding(initialLeft + bars.left, maxOf(initialTop, status.top), initialRight + bars.right,
+            // A hidden status bar still leaves the physical camera cutout unsafe.
+            val safe = insets.getInsetsIgnoringVisibility(
+                androidx.core.view.WindowInsetsCompat.Type.statusBars() or
+                    androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(initialLeft + maxOf(bars.left, safe.left), initialTop + safe.top,
+                initialRight + maxOf(bars.right, safe.right),
                 initialBottom + maxOf(bars.bottom, keyboard.bottom))
             insets
         }
