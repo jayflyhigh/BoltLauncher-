@@ -1,5 +1,9 @@
 package app.olauncher.ui
 
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
@@ -45,6 +49,16 @@ class AppDrawerFragment : BaseFragment() {
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
+    private var contactsMode = false
+    private lateinit var contactsAdapter: ContactSearchAdapter
+    private var contactsLoad: kotlinx.coroutines.Job? = null
+    private val contactsPermission = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && contactsMode && _binding != null) loadContacts()
+        else if (!granted && _binding != null) requireContext().showToast("Allow contacts access to search contacts")
+    }
+
     private var thunderMode = false
     private var pendingAutoLaunch: Runnable? = null
     private var lastAutoLaunchedQuery: String? = null
@@ -68,6 +82,7 @@ class AppDrawerFragment : BaseFragment() {
         savedInstanceState: Bundle?,
     ): View {
         dockExpanded = false
+        contactsMode = false
         thunderMode = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
@@ -171,18 +186,24 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockSearch.setOnClickListener {
             if (dockExpanded) resetHomeSearch()
             else {
+                setContactsMode(false)
                 setThunderMode(false)
                 setDockExpanded(true)
             }
         }
         binding.dockBolt.setOnClickListener {
+            setContactsMode(false)
             setThunderMode(true)
             setDockExpanded(true)
         }
         binding.dockContacts.setOnClickListener {
-            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
-                android.provider.ContactsContract.Contacts.CONTENT_URI)) }
-            catch (_: android.content.ActivityNotFoundException) { }
+            setContactsMode(true)
+            setThunderMode(false)
+            setDockExpanded(true)
+            if (androidx.core.content.ContextCompat.checkSelfPermission(requireContext(),
+                    android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                loadContacts()
+            } else contactsPermission.launch(android.Manifest.permission.READ_CONTACTS)
         }
         binding.dockSettings.setOnClickListener {
             findNavController().navigate(if (isHomePage)
@@ -199,6 +220,35 @@ class AppDrawerFragment : BaseFragment() {
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
 
+    private fun setContactsMode(enabled: Boolean) {
+        contactsMode = enabled
+        cancelAutoLaunch()
+        binding.recyclerView.adapter = if (enabled) contactsAdapter else adapter
+        binding.search.queryHint = if (enabled) "Search contacts" else "Search apps"
+        if (enabled) filterContacts(binding.search.query.toString())
+        else adapter.filterApps(binding.search.query.toString())
+    }
+
+    private fun filterContacts(query: String) {
+        contactsAdapter.filter(query)
+        linearLayoutManager.reverseLayout = query.isNotBlank()
+        linearLayoutManager.stackFromEnd = false
+        binding.recyclerView.scrollToPosition(0)
+        binding.recyclerView.animateSearchResults(query, force = true)
+    }
+
+    private fun loadContacts() {
+        contactsLoad?.cancel()
+        val context = requireContext().applicationContext
+        contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
+            val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
+            if (_binding != null && contactsMode) {
+                contactsAdapter.contacts = contacts
+                filterContacts(binding.search.query.toString())
+            }
+        }
+    }
+
     private fun setThunderMode(enabled: Boolean) {
         cancelAutoLaunch()
         thunderMode = enabled
@@ -207,7 +257,7 @@ class AppDrawerFragment : BaseFragment() {
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
         binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
-        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else R.drawable.dock_search)
+        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else if (contactsMode) R.drawable.dock_contacts else R.drawable.dock_search)
         binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
         searchTextView?.apply {
             setTextColor(foreground)
@@ -271,6 +321,7 @@ class AppDrawerFragment : BaseFragment() {
 
     fun resetHomeSearch(animate: Boolean = true) {
         if (_binding == null) return
+        setContactsMode(false)
         setThunderMode(false)
         binding.search.setQuery("", false)
         setDockExpanded(false, animate = animate)
@@ -338,7 +389,8 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
-                if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
+                if (contactsMode) contactsAdapter.openFirst()
+                else if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
                 return true
             }
 
@@ -346,7 +398,7 @@ class AppDrawerFragment : BaseFragment() {
                 try {
                     cancelAutoLaunch()
                     if (newText != lastAutoLaunchedQuery) lastAutoLaunchedQuery = null
-                    adapter.filterApps(newText)
+                    if (contactsMode) filterContacts(newText) else adapter.filterApps(newText)
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
                     return true
@@ -386,6 +438,13 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initAdapter() {
+        contactsAdapter = ContactSearchAdapter { contact ->
+            try {
+                startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri))
+            } catch (_: android.content.ActivityNotFoundException) {
+                requireContext().showToast("No contacts app available")
+            }
+        }
         adapter = AppDrawerAdapter(
             flag,
             prefs.appLabelAlignment,
@@ -471,6 +530,7 @@ class AppDrawerFragment : BaseFragment() {
             },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
+                    if (contactsMode) return@AppDrawerAdapter
                     linearLayoutManager.reverseLayout = query.isNotBlank()
                     linearLayoutManager.stackFromEnd = false
                     binding.recyclerView.scrollToPosition(0)
@@ -626,6 +686,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onDestroyView() {
         cancelAutoLaunch()
+        contactsLoad?.cancel()
         binding.recyclerView.adapter = null
         super.onDestroyView()
         dockAnimator?.cancel()

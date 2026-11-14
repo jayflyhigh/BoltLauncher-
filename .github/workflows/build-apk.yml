@@ -1,7 +1,7 @@
 name: Build debug APK
 on:
   push:
-    branches: [New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
+    branches: [adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
   workflow_dispatch:
 permissions:
   contents: read
