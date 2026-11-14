@@ -88,6 +88,9 @@ class MainActivity : AppCompatActivity() {
 
         val onBackPressedCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                val host = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
+                val drawer = host?.childFragmentManager?.primaryNavigationFragment as? app.olauncher.ui.AppDrawerFragment
+                if (drawer?.collapseSearch() == true) return
                 // Back never leaves the home screen; elsewhere it pops the nav stack
                 if (navController.currentDestination?.id != R.id.mainFragment)
                     navController.popBackStack()

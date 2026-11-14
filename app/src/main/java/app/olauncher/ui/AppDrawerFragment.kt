@@ -47,6 +47,7 @@ class AppDrawerFragment : BaseFragment() {
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
+    private var keyboardWasVisible = false
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
 
@@ -67,6 +68,7 @@ class AppDrawerFragment : BaseFragment() {
         savedInstanceState: Bundle?,
     ): View {
         dockExpanded = false
+        keyboardWasVisible = false
         _binding = FragmentAppDrawerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -105,6 +107,11 @@ class AppDrawerFragment : BaseFragment() {
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            if (keyboardWasVisible && !keyboardVisible && dockExpanded) {
+                view.post { if (_binding != null && dockExpanded) resetHomeSearch() }
+            }
+            keyboardWasVisible = keyboardVisible
             // Reserve the system area beneath the dock in both gesture and button navigation.
             val status = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             view.setPadding(initialLeft + bars.left, maxOf(initialTop, status.top), initialRight + bars.right,
@@ -137,7 +144,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dock.post {
             if (_binding == null) return@post
             val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
-            params.marginStart = binding.dockHome.right + (16 * resources.displayMetrics.density).toInt()
+            params.marginStart = binding.dockHome.right + (6 * resources.displayMetrics.density).toInt()
             binding.search.layoutParams = params
         }
         searchTextView?.setTextColor(android.graphics.Color.WHITE)
@@ -145,10 +152,16 @@ class AppDrawerFragment : BaseFragment() {
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
 
-    fun resetHomeSearch() {
+    fun collapseSearch(): Boolean {
+        if (!dockExpanded || _binding == null) return false
+        resetHomeSearch()
+        return true
+    }
+
+    fun resetHomeSearch(animate: Boolean = true) {
         if (_binding == null) return
         binding.search.setQuery("", false)
-        setDockExpanded(false, animate = false)
+        setDockExpanded(false, animate = animate)
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -469,7 +482,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onStop() {
         binding.search.hideKeyboard()
-        if (isHomePage) resetHomeSearch()
+        if (isHomePage) resetHomeSearch(animate = false)
         super.onStop()
     }
 
