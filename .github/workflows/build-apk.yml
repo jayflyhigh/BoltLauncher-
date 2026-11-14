@@ -1,7 +1,7 @@
 name: Build debug APK
 on:
   push:
-    branches: [New-search-bar-for-the-home-page]
+    branches: [New-search-bar-for-the-home-page, fix-search-results]
   workflow_dispatch:
 permissions:
   contents: read

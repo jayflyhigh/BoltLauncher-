@@ -8,7 +8,6 @@ import android.text.Spannable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AnimationUtils
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
@@ -27,7 +26,6 @@ import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.deletePinnedShortcut
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isEinkDisplay
-import app.olauncher.helper.isSystemAnimationsDisabled
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.openAppInfo
 import app.olauncher.helper.openSearch
@@ -170,8 +168,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
+        val opening = expanded && !dockExpanded
         dockExpanded = expanded
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
+        if (opening && animate) binding.recyclerView.animateSearchResults(binding.search.query.toString(), force = true)
         dockAnimator?.cancel()
         val start = (binding.dockSearch.tag as? Float) ?: 0f
         val target = if (expanded) 1f else 0f
@@ -361,6 +361,7 @@ class AppDrawerFragment : BaseFragment() {
                 linearLayoutManager.reverseLayout = searching
                 linearLayoutManager.stackFromEnd = false
                 binding.recyclerView.scrollToPosition(0)
+                binding.recyclerView.animateSearchResults(binding.search.query.toString())
             },
             privateSpaceToggleListener = {
                 viewModel.togglePrivateSpaceLock()
@@ -391,9 +392,6 @@ class AppDrawerFragment : BaseFragment() {
         binding.recyclerView.itemAnimator = null
         if (requireContext().isEinkDisplay())
             binding.recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
-        else if (requireContext().isSystemAnimationsDisabled().not())
-            binding.recyclerView.layoutAnimation =
-                AnimationUtils.loadLayoutAnimation(requireContext(), R.anim.layout_anim_from_bottom)
     }
 
     private fun initObservers() {
