@@ -174,6 +174,7 @@ class AppDrawerFragment : BaseFragment() {
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
         binding.dockSearch.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
+        binding.dockSearch.setImageResource(if (enabled) R.drawable.dock_bolt else R.drawable.dock_search)
         binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(foreground)
         searchTextView?.apply {
             setTextColor(foreground)
