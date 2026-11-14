@@ -248,7 +248,10 @@ class AppDrawerFragment : BaseFragment() {
             android.widget.ImageButton(requireContext()).apply {
                 setBackgroundResource(R.drawable.dock_key)
                 setImageResource(icons[index])
-                imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+                imageTintList = android.content.res.ColorStateList.valueOf(
+                    if (icons[index] == R.drawable.contact_whatsapp) android.graphics.Color.rgb(37, 211, 102)
+                    else android.graphics.Color.WHITE
+                )
                 setPadding(original.paddingLeft, original.paddingTop, original.paddingRight, original.paddingBottom)
                 contentDescription = if (index == 0) "Search contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
                 visibility = View.GONE
