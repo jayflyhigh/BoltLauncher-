@@ -18,13 +18,13 @@ import java.util.Locale
 
 /** Contact rows share the app result layout and dock-key silhouette. */
 class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.Adapter<ContactSearchAdapter.Holder>() {
-    data class Contact(val name: String, val uri: Uri, val photo: Uri?)
+    data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>)
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
 
     fun filter(query: String) {
         val terms = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        results = contacts.filter { contact -> terms.all { contact.name.contains(it, ignoreCase = true) } }
+        results = contacts.filter { contact -> terms.all { (contact.name.contains(it, ignoreCase = true) || contact.numbers.any { number -> number.contains(it) }) } }
         notifyDataSetChanged()
     }
 
@@ -95,6 +95,17 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
             val columns = arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.LOOKUP_KEY,
                 ContactsContract.Contacts.DISPLAY_NAME_PRIMARY, ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
             return try {
+                val numbers = mutableMapOf<Long, MutableList<String>>()
+                context.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID, ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER),
+                    null, null, null)?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        (cursor.getString(2)?.takeIf { it.isNotBlank() } ?: cursor.getString(1))?.takeIf { it.isNotBlank() }?.let {
+                            numbers.getOrPut(cursor.getLong(0)) { mutableListOf() }.add(it)
+                        }
+                    }
+                }
                 context.contentResolver.query(ContactsContract.Contacts.CONTENT_URI, columns, null, null,
                     "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE LOCALIZED ASC")?.use { cursor ->
                     buildList {
@@ -102,7 +113,7 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
                             val name = cursor.getString(2)?.trim().orEmpty()
                             if (name.isNotEmpty()) add(Contact(name,
                                 ContactsContract.Contacts.getLookupUri(cursor.getLong(0), cursor.getString(1)),
-                                cursor.getString(3)?.let(Uri::parse)))
+                                cursor.getString(3)?.let(Uri::parse), numbers[cursor.getLong(0)]?.distinct().orEmpty()))
                         }
                     }
                 } ?: emptyList()
