@@ -31,26 +31,9 @@ class InAppSearch(private val context: Context) {
         ensureAliases()
     }
 
-    /** A user-requested check retries a previously failed app without launching it. */
-    fun probe(app: AppModel): Target? {
-        if (app !is AppModel.App || app.user != android.os.Process.myUserHandle()) return null
-        return discover(app, retry = true)
-    }
-
-    fun add(target: Target) {
-        val editor = prefs.edit().remove("failed:${target.app.appPackage}")
-        val savedAlias = prefs.getString(target.app.appPackage, null)
-        if (savedAlias != null && targets.values.any {
-                it.app.appPackage != target.app.appPackage && alias(it).equals(savedAlias, true)
-            }) editor.remove(target.app.appPackage)
-        editor.apply()
-        targets = targets + (target.app.appPackage to target)
-        ensureAliases()
-    }
-
-    private fun discover(app: AppModel.App, retry: Boolean = false): Target? {
+    private fun discover(app: AppModel.App): Target? {
         try {
-            if (!retry && prefs.getLong("failed:${app.appPackage}", -1) == appVersion(app.appPackage)) return null
+            if (prefs.getLong("failed:${app.appPackage}", -1) == appVersion(app.appPackage)) return null
             val manager = context.getSystemService(Context.SEARCH_SERVICE) as SearchManager
             val routes = mutableListOf<Route>()
             // Prefer a query-bearing app link over a generic ACTION_SEARCH handler.

@@ -43,12 +43,7 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
-    private val searchTarget: (AppModel) -> app.olauncher.helper.InAppSearch.Target? = { null },
     private val searchAlias: (AppModel) -> String? = { null },
-    private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
-    private val searchProbe: (AppModel) -> Unit = {},
-    private val searchProbing: (AppModel) -> Boolean = { false },
-    private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
@@ -179,7 +174,7 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode, searchTarget(appModel), searchClick, searchHold, searchProbe, searchProbing(appModel)
+                    thunderMode
                 )
             }
         } catch (e: Exception) {
@@ -266,14 +261,13 @@ class AppDrawerAdapter(
     private class ViewHolder(private val binding: AdapterAppDrawerBinding) :
         RecyclerView.ViewHolder(binding.root) {
         private var iconJob: Job? = null
-        private var hasSearchBadge = false
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
             root.setBackgroundResource(R.drawable.dock_shell)
             appTitle.setTextColor(android.graphics.Color.WHITE)
-            resultBolt.isVisible = enabled && !hasSearchBadge
-            val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
+            resultBolt.isVisible = enabled
+            val endPadding = ((if (enabled) 68 else 24) * root.resources.displayMetrics.density).toInt()
             appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
@@ -295,32 +289,7 @@ class AppDrawerAdapter(
             iconScope: CoroutineScope,
             iconCache: LruCache<IconKey, Drawable.ConstantState>,
             thunderMode: Boolean,
-            target: app.olauncher.helper.InAppSearch.Target?,
-            searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit,
-            searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
-            searchProbe: (AppModel) -> Unit,
-            probing: Boolean,
         ) = with(binding) {
-            hasSearchBadge = flag == Constants.FLAG_LAUNCH_APP && appModel is AppModel.App
-            searchBadge.isEnabled = !probing
-            searchBadge.alpha = if (probing) .6f else 1f
-            searchBadge.isVisible = hasSearchBadge
-            if (target != null) {
-                searchBadge.text = appModel.appLabel.take(1).uppercase(java.util.Locale.ROOT)
-                searchBadge.background = app.olauncher.helper.InAppSearch.background(target.color, root.resources.displayMetrics.density)
-                searchBadge.setTextColor(app.olauncher.helper.InAppSearch.foreground(target.color))
-                searchBadge.contentDescription = "Search in ${appModel.appLabel}. Hold to change alias"
-                searchBadge.setOnClickListener { searchClick(target) }
-                searchBadge.setOnLongClickListener { searchHold(target); true }
-            } else {
-                searchBadge.text = if (probing) "…" else "+"
-                searchBadge.setTextColor(android.graphics.Color.WHITE)
-                searchBadge.setBackgroundResource(R.drawable.dock_key)
-                searchBadge.contentDescription = if (probing) "Checking search support for ${appModel.appLabel}"
-                    else "Check whether ${appModel.appLabel} supports search"
-                searchBadge.setOnClickListener { searchProbe(appModel) }
-                searchBadge.setOnLongClickListener(null)
-            }
             applyThunderStyle(thunderMode)
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
