@@ -3,6 +3,16 @@ package app.olauncher.ui
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.os.UserHandle
+import android.graphics.drawable.Drawable
+import android.util.LruCache
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -60,6 +70,20 @@ class AppDrawerAdapter(
         }
     }
 
+    private val iconScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val iconCache = LruCache<IconKey, Drawable.ConstantState>(128)
+    private data class IconKey(val packageName: String, val user: UserHandle, val density: Int)
+
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is ViewHolder) holder.cancelIconLoad()
+        super.onViewRecycled(holder)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        iconScope.coroutineContext.cancelChildren()
+        super.onDetachedFromRecyclerView(recyclerView)
+    }
+
     private var autoLaunch = false
     private var isBangSearch = false
     private var autoLaunchedQuery: String? = null
@@ -71,7 +95,7 @@ class AppDrawerAdapter(
     var appFilteredList: MutableList<AppModel> = mutableListOf()
 
     override fun getItemViewType(position: Int): Int {
-        return when (appFilteredList.getOrNull(position)) {
+        return when (getItem(position)) {
             is AppModel.PrivateSpaceHeader -> VIEW_TYPE_PRIVATE_HEADER
             else -> VIEW_TYPE_APP
         }
@@ -99,8 +123,8 @@ class AppDrawerAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         try {
-            if (appFilteredList.isEmpty() || position == RecyclerView.NO_POSITION) return
-            val appModel = appFilteredList[holder.bindingAdapterPosition]
+            if (position == RecyclerView.NO_POSITION) return
+            val appModel = getItem(position)
             when (holder) {
                 is PrivateSpaceHeaderViewHolder -> {
                     holder.bind(
@@ -119,7 +143,9 @@ class AppDrawerAdapter(
                     appDeleteListener,
                     appInfoListener,
                     appHideListener,
-                    appRenameListener
+                    appRenameListener,
+                    iconScope,
+                    iconCache
                 )
             }
         } catch (e: Exception) {
@@ -216,8 +242,16 @@ class AppDrawerAdapter(
         }
     }
 
-    class ViewHolder(private val binding: AdapterAppDrawerBinding) :
+    private class ViewHolder(private val binding: AdapterAppDrawerBinding) :
         RecyclerView.ViewHolder(binding.root) {
+        private var iconJob: Job? = null
+        private var renameWatcher: TextWatcher? = null
+
+        fun cancelIconLoad() {
+            iconJob?.cancel()
+            iconJob = null
+        }
+
         fun bind(
             flag: Int,
             appLabelGravity: Int,
@@ -228,20 +262,36 @@ class AppDrawerAdapter(
             appInfoListener: (AppModel) -> Unit,
             appHideListener: (AppModel, Int) -> Unit,
             appRenameListener: (AppModel, String) -> Unit,
+            iconScope: CoroutineScope,
+            iconCache: LruCache<IconKey, Drawable.ConstantState>,
         ) = with(binding) {
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE
 
+            cancelIconLoad()
             appIcon.setImageDrawable(null)
             appIcon.isVisible = appModel.appPackage.isNotEmpty()
             if (appModel.appPackage.isNotEmpty()) {
-                val launcher = root.context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-                val icon = try {
-                    launcher.getActivityList(appModel.appPackage, appModel.user)
-                        .firstOrNull()?.getBadgedIcon(root.resources.displayMetrics.densityDpi)
-                } catch (_: Exception) { null }
-                appIcon.setImageDrawable(icon ?: root.context.packageManager.defaultActivityIcon)
+                val key = IconKey(appModel.appPackage, appModel.user, root.resources.displayMetrics.densityDpi)
+                val cached = iconCache.get(key)
+                appIcon.setImageDrawable(cached?.newDrawable(root.resources)
+                    ?: root.context.packageManager.defaultActivityIcon)
+                if (cached == null) {
+                    val context = root.context.applicationContext
+                    iconJob = iconScope.launch {
+                        val icon = withContext(Dispatchers.IO) {
+                            try {
+                                val launcher = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+                                launcher.getActivityList(key.packageName, key.user)
+                                    .firstOrNull()?.getBadgedIcon(key.density)
+                            } catch (_: Exception) { null }
+                        }
+                        ensureActive()
+                        icon?.constantState?.let { iconCache.put(key, it) }
+                        if (icon != null) appIcon.setImageDrawable(icon)
+                    }
+                }
             }
             appIcon.setOnClickListener { clickListener(appModel) }
             // Show indicators in title based on app type and state
@@ -297,9 +347,10 @@ class AppDrawerAdapter(
             etAppRename.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                 appTitle.visibility = if (hasFocus) View.INVISIBLE else View.VISIBLE
             }
-            etAppRename.addTextChangedListener(object : TextWatcher {
+            renameWatcher?.let { etAppRename.removeTextChangedListener(it) }
+            renameWatcher = object : TextWatcher {
                 override fun afterTextChanged(s: Editable?) {
-                    etAppRename.hint = getAppName(etAppRename.context, appModel.appPackage, appModel.user)
+                    etAppRename.hint = appModel.appLabel
                 }
 
                 override fun beforeTextChanged(
@@ -313,7 +364,8 @@ class AppDrawerAdapter(
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                     etAppRename.hint = ""
                 }
-            })
+            }
+            etAppRename.addTextChangedListener(renameWatcher)
             etAppRename.setOnEditorActionListener { _, actionCode, _ ->
                 if (actionCode == EditorInfo.IME_ACTION_DONE) {
                     val renameLabel = etAppRename.text.toString().trim()
