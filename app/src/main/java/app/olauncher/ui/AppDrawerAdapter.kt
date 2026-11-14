@@ -59,10 +59,10 @@ class AppDrawerAdapter(
         }
     }
 
-    private var autoLaunch = true
+    private var autoLaunch = false
     private var isBangSearch = false
     private var autoLaunchedQuery: String? = null
-    var allowAutoLaunch = true
+    var allowAutoLaunch = false
     private val appFilter = createAppFilter()
     private val myUserHandle = android.os.Process.myUserHandle()
 
@@ -234,6 +234,17 @@ class AppDrawerAdapter(
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE
 
+            appIcon.setImageDrawable(null)
+            appIcon.isVisible = appModel.appPackage.isNotEmpty()
+            if (appModel.appPackage.isNotEmpty()) {
+                val launcher = root.context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+                val icon = try {
+                    launcher.getActivityList(appModel.appPackage, appModel.user)
+                        .firstOrNull()?.getBadgedIcon(root.resources.displayMetrics.densityDpi)
+                } catch (_: Exception) { null }
+                appIcon.setImageDrawable(icon ?: root.context.packageManager.defaultActivityIcon)
+            }
+            appIcon.setOnClickListener { clickListener(appModel) }
             // Show indicators in title based on app type and state
             appTitle.text = buildString {
                 append(appModel.appLabel)

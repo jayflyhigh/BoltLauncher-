@@ -44,6 +44,9 @@ class AppDrawerFragment : BaseFragment() {
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
 
+    private var dockExpanded = false
+    private var dockAnimator: android.animation.ValueAnimator? = null
+
     private var flag = Constants.FLAG_LAUNCH_APP
     private var canRename = false
     private var currentAppList: List<AppModel>? = null
@@ -77,6 +80,69 @@ class AppDrawerFragment : BaseFragment() {
         initAdapter()
         initObservers()
         initClickListeners()
+        initDock()
+    }
+
+    private fun initDock() {
+        binding.dockHome.setOnClickListener {
+            binding.search.hideKeyboard()
+            findNavController().popBackStack(R.id.mainFragment, false)
+        }
+        binding.dockSearch.setOnClickListener { setDockExpanded(!dockExpanded) }
+        binding.dockBolt.setOnClickListener { setDockExpanded(true) }
+        binding.dockContacts.setOnClickListener {
+            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,
+                android.provider.ContactsContract.Contacts.CONTENT_URI)) }
+            catch (_: android.content.ActivityNotFoundException) { }
+        }
+        binding.dockSettings.setOnClickListener {
+            findNavController().navigate(R.id.action_appListFragment_to_settingsFragment2)
+        }
+        searchTextView?.setTextColor(android.graphics.Color.WHITE)
+        searchTextView?.setHintTextColor(0xFFBDBDBD.toInt())
+        searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+    }
+
+    private fun setDockExpanded(expanded: Boolean) {
+        dockExpanded = expanded
+        dockAnimator?.cancel()
+        val start = (binding.dockSearch.tag as? Float) ?: 0f
+        val target = if (expanded) 1f else 0f
+        binding.search.visibility = View.VISIBLE
+        if (!expanded) {
+            binding.search.hideKeyboard()
+            binding.search.clearFocus()
+        }
+        dockAnimator = android.animation.ValueAnimator.ofFloat(start, target).apply {
+            duration = (220 * kotlin.math.abs(target - start)).toLong()
+            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
+            addUpdateListener {
+                val progress = it.animatedValue as Float
+                val b = _binding ?: return@addUpdateListener
+                b.dockSearch.tag = progress
+                b.dockSearch.translationX = -b.dockSearch.width * progress
+                b.dockSearch.translationZ = 8f
+                b.dockHome.alpha = 1f - progress
+                b.dockHome.isEnabled = !expanded
+                listOf(b.dockBolt, b.dockContacts, b.dockSettings).forEach { key ->
+                    key.alpha = 1f - progress
+                    key.isEnabled = !expanded
+                }
+                b.search.alpha = progress
+                b.search.translationX = -b.search.width * (1f - progress)
+                b.search.clipBounds = android.graphics.Rect(
+                    (b.search.width * (1f - progress)).toInt(), 0,
+                    b.search.width, b.search.height)
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (_binding == null || dockExpanded != expanded) return
+                    if (expanded) binding.search.showKeyboard()
+                    else binding.search.visibility = View.INVISIBLE
+                }
+            })
+            start()
+        }
     }
 
     private fun initViews() {
@@ -95,18 +161,13 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
-                if (query?.startsWith("!") == true)
-                    requireContext().openUrl(Constants.URL_DUCK_SEARCH + query.replace(" ", "%20"))
-                else if (adapter.itemCount == 0)
-                    requireContext().openSearch(query?.trim())
-                else
-                    adapter.launchFirstInList()
+                adapter.launchFirstInList()
                 return true
             }
 
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
-                    adapter.allowAutoLaunch = !isSearchComposing()
+                    adapter.allowAutoLaunch = false
                     adapter.filter.filter(newText)
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
@@ -330,32 +391,8 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun getRecyclerViewOnScrollListener(): RecyclerView.OnScrollListener {
-        return object : RecyclerView.OnScrollListener() {
-
-            var onTop = false
-
-            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                super.onScrollStateChanged(recyclerView, newState)
-                when (newState) {
-
-                    RecyclerView.SCROLL_STATE_DRAGGING -> {
-                        onTop = !recyclerView.canScrollVertically(-1)
-                        if (onTop)
-                            binding.search.hideKeyboard()
-                    }
-
-                    RecyclerView.SCROLL_STATE_IDLE -> {
-                        if (!recyclerView.canScrollVertically(1))
-                            binding.search.hideKeyboard()
-                        else if (!recyclerView.canScrollVertically(-1))
-                            if (!onTop && isRemoving.not())
-                                binding.search.showKeyboard(prefs.autoShowKeyboard)
-                    }
-                }
-            }
-        }
-    }
+    private fun getRecyclerViewOnScrollListener(): RecyclerView.OnScrollListener =
+        object : RecyclerView.OnScrollListener() {}
 
     private fun checkMessageAndExit() {
         if (!closeDrawer()) return
@@ -370,7 +407,7 @@ class AppDrawerFragment : BaseFragment() {
     override fun onStart() {
         super.onStart()
         cachedIsCjkKeyboard = null
-        binding.search.showKeyboard(prefs.autoShowKeyboard)
+        if (dockExpanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
     }
 
     override fun onStop() {
@@ -380,6 +417,8 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        dockAnimator?.cancel()
+        dockAnimator = null
         searchTextView = null
         _binding = null
     }
