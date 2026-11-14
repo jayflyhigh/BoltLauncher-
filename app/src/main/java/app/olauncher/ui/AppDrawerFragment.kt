@@ -29,6 +29,7 @@ import app.olauncher.data.Prefs
 import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.deletePinnedShortcut
 import app.olauncher.helper.hideKeyboard
+import app.olauncher.helper.isSystemAnimationsDisabled
 import app.olauncher.helper.isEinkDisplay
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.openAppInfo
@@ -280,7 +281,8 @@ class AppDrawerFragment : BaseFragment() {
             key.alpha = if (index == 0) 1f else 0f
             key.translationX = if (index == 0)
                 binding.dockContacts.x - binding.dockHome.x else 28f * resources.displayMetrics.density
-            key.animate().translationX(0f).alpha(1f).setDuration(220L)
+            key.animate().translationX(0f).alpha(1f)
+                .setDuration(if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0L else 220L)
                 .setInterpolator(android.view.animation.DecelerateInterpolator())
                 .withEndAction { key.isEnabled = true }.start()
         }
@@ -318,7 +320,8 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.visibility = View.VISIBLE
         commandKeys.forEach { it.animate().cancel(); it.isEnabled = false }
         dockAnimator = android.animation.ValueAnimator.ofFloat(commandProgress, if (expanded) 1f else 0f).apply {
-            duration = 220L
+            duration = if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0L
+                else (220 * kotlin.math.abs((if (expanded) 1f else 0f) - commandProgress)).toLong()
             interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
             addUpdateListener {
                 val b = _binding ?: return@addUpdateListener
@@ -336,8 +339,12 @@ class AppDrawerFragment : BaseFragment() {
                     b.search.width, b.search.height)
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
+                private var cancelled = false
+                override fun onAnimationCancel(animation: android.animation.Animator) {
+                    cancelled = true
+                }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    if (_binding == null) return
+                    if (cancelled || _binding == null) return
                     commandKeys.forEachIndexed { index, key -> key.isEnabled = !expanded || index == selectedIndex }
                     if (expanded) binding.search.showKeyboard()
                     else {
@@ -560,7 +567,8 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.clearFocus()
         }
         dockAnimator = android.animation.ValueAnimator.ofFloat(start, target).apply {
-            duration = if (animate) (220 * kotlin.math.abs(target - start)).toLong() else 0L
+            duration = if (animate && !requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled())
+                (220 * kotlin.math.abs(target - start)).toLong() else 0L
             interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
             addUpdateListener {
                 val progress = it.animatedValue as Float
@@ -581,8 +589,12 @@ class AppDrawerFragment : BaseFragment() {
                     b.search.width, b.search.height)
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
+                private var cancelled = false
+                override fun onAnimationCancel(animation: android.animation.Animator) {
+                    cancelled = true
+                }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
-                    if (_binding == null || dockExpanded != expanded) return
+                    if (cancelled || _binding == null || dockExpanded != expanded) return
                     if (expanded) binding.search.showKeyboard()
                     else binding.search.visibility = View.INVISIBLE
                 }
@@ -903,12 +915,12 @@ class AppDrawerFragment : BaseFragment() {
     override fun onDestroyView() {
         cancelAutoLaunch()
         contactsLoad?.cancel()
+        dockAnimator?.cancel()
+        dockAnimator = null
         commandKeys.forEach { it.animate().cancel() }
         commandKeys = emptyList()
         binding.recyclerView.adapter = null
         super.onDestroyView()
-        dockAnimator?.cancel()
-        dockAnimator = null
         searchTextView = null
         _binding = null
     }
