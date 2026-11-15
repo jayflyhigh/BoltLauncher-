@@ -40,7 +40,8 @@ class HomeInfoView @JvmOverloads constructor(
         setBackgroundResource(app.olauncher.R.drawable.home_info_crown)
         orientation = HORIZONTAL
         gravity = Gravity.CENTER
-        setPadding(dp(28), dp(4), dp(28), dp(4))
+        // Extend the background behind the dock corners; keep content above the overlap.
+        setPadding(dp(28), dp(4), dp(28), dp(34))
         label.apply {
             gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTextColor(Color.WHITE)
