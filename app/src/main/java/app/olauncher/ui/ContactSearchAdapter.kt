@@ -21,6 +21,23 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
     data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>)
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
+    private var selectedUri: Uri? = null
+    val selectedContact: Contact?
+        get() = contacts.firstOrNull { it.uri == selectedUri }
+
+    fun toggleSelection(contact: Contact) {
+        val previous = selectedUri
+        selectedUri = if (previous == contact.uri) null else contact.uri
+        results.forEachIndexed { index, result ->
+            if (result.uri == previous || result.uri == selectedUri) notifyItemChanged(index)
+        }
+    }
+
+    fun clearSelection() {
+        val previous = selectedUri ?: return
+        selectedUri = null
+        results.indexOfFirst { it.uri == previous }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+    }
     private val photoScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     // Bound by bitmap bytes so large address books cannot retain unlimited photos.
     private val photoCache = object : android.util.LruCache<Uri, android.graphics.Bitmap>(4 * 1024 * 1024) {
@@ -58,6 +75,12 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
         }
         fun bind(contact: Contact) {
             photoJob?.cancel()
+            binding.root.isSelected = contact.uri == selectedUri
+            binding.root.foreground = if (binding.root.isSelected) GradientDrawable().apply {
+                setColor(Color.TRANSPARENT)
+                cornerRadius = 30f * binding.root.resources.displayMetrics.density
+                setStroke((2f * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1), Color.rgb(255, 214, 0))
+            } else null
             binding.appTitle.text = contact.name
             binding.otherProfileIndicator.visibility = View.GONE
             binding.resultBolt.visibility = View.GONE
