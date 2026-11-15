@@ -65,6 +65,9 @@ class AppDrawerAdapter(
                 oldItem is AppModel.PinnedShortcut && newItem is AppModel.PinnedShortcut ->
                     oldItem.identity == newItem.identity
 
+                oldItem is AppModel.SearchSuggestion && newItem is AppModel.SearchSuggestion ->
+                    oldItem.appLabel == newItem.appLabel
+
                 oldItem is AppModel.PrivateSpaceHeader && newItem is AppModel.PrivateSpaceHeader -> true
 
                 else -> false
@@ -91,15 +94,35 @@ class AppDrawerAdapter(
 
     @Volatile var searchPackage: String? = null
     @Volatile var searchCommandsOnly = false
+    private var suggestions: List<String> = emptyList()
     private var requestedQuery = ""
     var committedQuery: String? = null
         private set
     private var thunderMode = false
 
     fun filterApps(query: String) {
+        val trimmed = query.trim()
+        suggestions = if (searchPackage != null && trimmed.isNotEmpty())
+            (listOf(trimmed) + suggestions.filter { it.contains(trimmed, ignoreCase = true) })
+                .distinct().take(7)
+        else emptyList()
         requestedQuery = query
+        if (searchPackage != null) {
+            val target = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle }
+            submitList(target + suggestions.map { AppModel.SearchSuggestion(it, query) })
+        }
         committedQuery = null
         appFilter.filter(query)
+    }
+
+    fun showSuggestions(query: String, values: List<String>) {
+        if (query != requestedQuery || searchPackage == null) return
+        suggestions = (listOf(query.trim()) + values).filter { it.isNotBlank() }.distinct().take(7)
+        val items = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle } +
+            suggestions.map { AppModel.SearchSuggestion(it, query) }
+        submitList(items) {
+            if (query == requestedQuery) resultsChanged(query)
+        }
     }
 
     fun setThunderMode(enabled: Boolean) {
@@ -220,7 +243,8 @@ class AppDrawerAdapter(
                 results?.values?.let {
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
-                    submitList(items) {
+                    val displayed = if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) } else items
+                    submitList(displayed) {
                         if (query == requestedQuery) {
                             committedQuery = query
                             resultsChanged(query)
@@ -269,6 +293,7 @@ class AppDrawerAdapter(
         RecyclerView.ViewHolder(binding.root) {
         private var iconJob: Job? = null
         private var hasSearchBadge = false
+        private var isSuggestion = false
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
@@ -277,7 +302,7 @@ class AppDrawerAdapter(
             searchBadge.isVisible = hasSearchBadge && !enabled
             resultBolt.isVisible = enabled
             val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
-            appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
+            appTitle.setPaddingRelative(((if (isSuggestion) 24 else 76) * root.resources.displayMetrics.density).toInt(), appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
         fun cancelIconLoad() {
@@ -303,6 +328,7 @@ class AppDrawerAdapter(
             searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
             searchCommandsOnly: Boolean,
         ) = with(binding) {
+            isSuggestion = appModel is AppModel.SearchSuggestion
             hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
@@ -318,6 +344,42 @@ class AppDrawerAdapter(
                 searchBadge.setOnLongClickListener(null)
             }
             applyThunderStyle(thunderMode)
+            if (appModel is AppModel.SearchSuggestion) {
+                cancelIconLoad()
+                appHideLayout.visibility = View.GONE
+                renameLayout.visibility = View.GONE
+                appTitle.visibility = View.VISIBLE
+                appTitle.text = android.text.SpannableString(appModel.appLabel).apply {
+                    val needle = appModel.query.trim()
+                    if (needle.isNotEmpty()) {
+                        var start = appModel.appLabel.indexOf(needle, ignoreCase = true)
+                        while (start >= 0) {
+                            setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.rgb(255, 214, 0)),
+                                start, start + needle.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            start = appModel.appLabel.indexOf(needle, start + needle.length, ignoreCase = true)
+                        }
+                    }
+                }
+                appTitle.maxLines = 2
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    appTitle, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                appTitle.ellipsize = null
+                appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                appIcon.isVisible = false
+                appIcon.setImageDrawable(null)
+                otherProfileIndicator.isVisible = false
+                root.setOnClickListener { clickListener(appModel) }
+                appTitle.setOnClickListener { clickListener(appModel) }
+                appIcon.setOnClickListener { clickListener(appModel) }
+                root.setOnLongClickListener(null)
+                appTitle.setOnLongClickListener(null)
+                appIcon.setOnLongClickListener(null)
+                return@with
+            }
+            appTitle.maxLines = 1
+            androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
+            appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
+            appTitle.ellipsize = android.text.TextUtils.TruncateAt.END
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE
