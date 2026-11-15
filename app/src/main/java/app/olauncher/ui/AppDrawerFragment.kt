@@ -78,11 +78,10 @@ class AppDrawerFragment : BaseFragment() {
     private var thunderMode = false
     private var pendingAutoLaunch: Runnable? = null
     private var lastAutoLaunchedQuery: String? = null
+    private var dockThunderTransition = false
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
     private val searchRevealBounds = android.graphics.Rect()
-    // The dock key that was tapped; it animates over the Contacts slot while search is open.
-    private var expandedDockKey: View? = null
 
     private var flag = Constants.FLAG_LAUNCH_APP
     private var canRename = false
@@ -222,6 +221,10 @@ class AppDrawerFragment : BaseFragment() {
                     return true
                 }
 
+                override fun onLongPress(event: android.view.MotionEvent) {
+                    if (isHomePage && !dockExpanded && !contactsMode) showHomeSettings()
+                }
+
                 override fun onScroll(
                     start: android.view.MotionEvent?,
                     current: android.view.MotionEvent,
@@ -238,75 +241,41 @@ class AppDrawerFragment : BaseFragment() {
                     return true
                 }
             })
-        detector.setIsLongpressEnabled(false)
+        detector.setIsLongpressEnabled(true)
         binding.root.setOnTouchListener { _, event ->
             if (isHomePage && !dockExpanded) detector.onTouchEvent(event) else false
         }
     }
 
     private fun initDock() {
-        binding.dockPlaceholder.isEnabled = true
-        binding.dockPlaceholder.setOnLongClickListener { showAppSearchEditor(); true }
-        binding.dockPlaceholder.setOnClickListener {
-            expandedDockKey = binding.dockPlaceholder
+        binding.homeSearch.setOnClickListener {
             clearAppSearch()
-            adapter.searchCommandsOnly = true
             setContactsMode(false)
             setThunderMode(false)
-            binding.search.queryHint = "Search within apps"
-            binding.search.setQuery("", false)
-            adapter.filterApps("")
             setDockExpanded(true)
         }
-        binding.dockSearch.setOnClickListener {
-            if (dockExpanded) resetHomeSearch()
-            else {
-                expandedDockKey = binding.dockSearch
-                clearAppSearch()
-                setContactsMode(false)
-                setThunderMode(false)
-                setDockExpanded(true)
-            }
+        binding.dockSearch.setOnClickListener { switchSearchDestination() }
+        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
+        searchTextView?.let {
+            binding.homeSearch.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, it.textSize)
+            binding.homeSearch.typeface = it.typeface
         }
-        binding.dockSearch.setOnLongClickListener(null)
         binding.dockBolt.setOnClickListener {
-            expandedDockKey = binding.dockBolt
             clearAppSearch()
             setContactsMode(false)
             setThunderMode(true)
             setDockExpanded(true)
         }
         binding.dockContacts.setOnClickListener { showContactCommands() }
-        binding.dockSettings.setOnClickListener {
-            findNavController().navigate(if (isHomePage)
-                R.id.action_mainFragment_to_settingsFragment
-                else R.id.action_appListFragment_to_settingsFragment2)
-        }
-        binding.dockSettings.setOnLongClickListener {
-            cancelAutoLaunch()
-            try {
-                startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS))
-            } catch (_: android.content.ActivityNotFoundException) {
-                requireContext().showToast("System settings are unavailable")
-            }
-            true
-        }
-        binding.dock.post {
-            if (_binding == null) return@post
-            val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
-            params.marginStart = binding.dockContacts.right + (6 * resources.displayMetrics.density).toInt()
-            binding.search.layoutParams = params
-        }
         setThunderMode(false)
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
 
     private fun ensureCommandKeys() {
         if (commandKeys.isNotEmpty()) return
-        val originals = listOf(binding.dockContacts, binding.dockSearch, binding.dockBolt,
-            binding.dockPlaceholder, binding.dockSettings)
+        val slotWidth = binding.dockKeys.width / 5
         val icons = listOf(R.drawable.dock_search) + ContactCommand.entries.filter { it != ContactCommand.SEARCH }.map { it.icon }
-        commandKeys = originals.mapIndexed { index, original ->
+        commandKeys = icons.mapIndexed { index, _ ->
             android.widget.ImageButton(requireContext()).apply {
                 setBackgroundResource(R.drawable.dock_key)
                 setImageResource(icons[index])
@@ -314,12 +283,13 @@ class AppDrawerFragment : BaseFragment() {
                     if (icons[index] == R.drawable.contact_whatsapp) android.graphics.Color.rgb(37, 211, 102)
                     else android.graphics.Color.WHITE
                 )
-                setPadding(original.paddingLeft, original.paddingTop, original.paddingRight, original.paddingBottom)
+                val padding = (13 * resources.displayMetrics.density).toInt()
+                setPadding(padding, padding, padding, padding)
                 contentDescription = if (index == 0) "Search contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
                 visibility = View.GONE
-                binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(original.width, original.height).apply {
-                    leftMargin = (binding.dockKeys.x + original.left - binding.dock.paddingLeft).toInt()
-                    topMargin = (binding.dockKeys.y + original.top - binding.dock.paddingTop).toInt()
+                binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(slotWidth - (8 * resources.displayMetrics.density).toInt(), binding.dockContacts.height).apply {
+                    leftMargin = index * slotWidth + (4 * resources.displayMetrics.density).toInt()
+                    topMargin = binding.dockContacts.top
                 })
                 setOnClickListener {
                     if (contactCommand != null) animateContactSearch(false)
@@ -332,6 +302,9 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun showContactCommands() {
         clearAppSearch()
+        binding.homeSearch.visibility = View.GONE
+        binding.dockSearch.visibility = View.GONE
+        binding.dockKeys.translationZ = 0f
         ensureCommandKeys()
         cancelAutoLaunch()
         setContactsMode(true)
@@ -391,6 +364,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun animateContactSearch(expanded: Boolean) {
         val selected = contactCommand ?: return
+        configureSearchGeometry(contact = true)
         cancelAutoLaunch()
         dockAnimator?.cancel()
         dockExpanded = expanded
@@ -513,7 +487,7 @@ class AppDrawerFragment : BaseFragment() {
         contactsMode = enabled
         cancelAutoLaunch()
         binding.recyclerView.adapter = if (enabled) contactsAdapter else adapter
-        binding.search.queryHint = if (enabled) "Search contacts" else "Search apps"
+        binding.search.queryHint = if (enabled) "Search contacts" else "Search Anything"
         if (enabled) filterContacts(binding.search.query.toString())
         else adapter.filterApps(binding.search.query.toString())
     }
@@ -551,6 +525,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
         binding.dockSearch.setBackgroundResource(R.drawable.dock_key)
         if (activeSearch == null) {
+            binding.dockSearch.contentDescription = if (adapter.searchCommandsOnly)
+                "Search destination: Search within Apps. Tap to switch; hold to edit" else
+                "Search destination: Apps. Tap to switch; hold to edit Search within Apps"
             binding.dockSearch.setImageResource(if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
             binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
         }
@@ -637,74 +614,129 @@ class AppDrawerFragment : BaseFragment() {
         setDockExpanded(false, animate = animate)
     }
 
+    private fun configureSearchGeometry(contact: Boolean = false) {
+        val density = resources.displayMetrics.density
+        val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
+        params.marginStart = if (contact && commandKeys.isNotEmpty())
+            commandKeys[0].right + (6 * density).toInt() else (64 * density).toInt()
+        params.marginEnd = ((if (contact || dockExpanded) 4 else 64) * density).toInt()
+        binding.search.layoutParams = params
+        binding.search.setPadding(0, 0, 0, 0)
+        binding.dockSearch.visibility = if (dockExpanded && !contact && !thunderMode) View.VISIBLE else View.GONE
+    }
+
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
         val opening = expanded && !dockExpanded
         dockExpanded = expanded
+        if (expanded) dockThunderTransition = thunderMode
+        val animateThunder = dockThunderTransition
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
         if (opening && animate) binding.recyclerView.animateSearchResults(binding.search.query.toString(), force = true)
         dockAnimator?.cancel()
-        val start = (binding.dockSearch.tag as? Float) ?: 0f
-        val target = if (expanded) 1f else 0f
+        configureSearchGeometry()
+        binding.dockKeys.visibility = View.VISIBLE
+        binding.dockContacts.isEnabled = !expanded
+        binding.dockBolt.isEnabled = !expanded
+        binding.dockKeys.translationZ = if (animateThunder) 8f else 0f
         binding.search.visibility = View.VISIBLE
-        if (!expanded) {
+        binding.search.clipBounds = null
+        binding.search.alpha = 1f
+        binding.search.translationX = 0f
+        binding.homeSearch.visibility = View.VISIBLE
+        binding.homeSearch.isClickable = !expanded
+        if (expanded) binding.search.showKeyboard()
+        else {
             binding.search.hideKeyboard()
             binding.search.clearFocus()
         }
-        val dockKeys = listOf(binding.dockSearch, binding.dockContacts, binding.dockBolt,
-            binding.dockPlaceholder, binding.dockSettings)
-        dockKeys.forEach { it.isEnabled = !expanded }
-        if (expanded) binding.search.showKeyboard()
+        // Expand into the freed right-hand slot while the selected icon takes
+        // the left slot. Use the existing reversible dock timing and easing.
+        val start = (binding.dockSearch.tag as? Float) ?: 0f
+        val target = if (expanded) 1f else 0f
         dockAnimator = android.animation.ValueAnimator.ofFloat(start, target).apply {
             duration = if (animate && !requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled())
-                ((if (expanded) 380 else 300) * kotlin.math.abs(target - start)).toLong() else 0L
+                (320 * kotlin.math.abs(target - start)).toLong() else 0L
             interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)
             addUpdateListener {
-                val progress = it.animatedValue as Float
                 val b = _binding ?: return@addUpdateListener
+                val progress = it.animatedValue as Float
                 b.dockSearch.tag = progress
-                val selectedKey = expandedDockKey ?: b.dockSearch
-                val leftmost = b.dockContacts.left
-                dockKeys.forEach { key ->
-                    val isSelected = key === selectedKey
-                    key.translationX = if (isSelected) (leftmost - key.left) * progress else 0f
-                    key.translationZ = if (isSelected) 8f else 0f
-                    key.alpha = if (isSelected) 1f else 1f - progress
-                }
+                b.homeSearch.alpha = 1f - progress
                 b.search.alpha = progress
-                b.search.translationX = 0f
-                searchRevealBounds.set(0, 0, (b.search.width * progress).toInt(), b.search.height)
-                b.search.clipBounds = searchRevealBounds
+                b.dockSearch.alpha = progress
+                b.dockSearch.translationX = 0f
+                b.dockContacts.alpha = 1f - progress
+                b.dockBolt.alpha = if (animateThunder) 1f else 1f - progress
+                b.dockBolt.translationX = if (animateThunder)
+                    (b.dockContacts.left - b.dockBolt.left) * progress else 0f
+                val params = b.search.layoutParams as android.widget.FrameLayout.LayoutParams
+                val endMargin = ((64f - 60f * progress) * resources.displayMetrics.density).toInt()
+                if (params.marginEnd != endMargin) {
+                    params.marginEnd = endMargin
+                    b.search.layoutParams = params
+                }
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 private var cancelled = false
-                override fun onAnimationCancel(animation: android.animation.Animator) {
-                    cancelled = true
-                }
+                override fun onAnimationCancel(animation: android.animation.Animator) { cancelled = true }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     if (cancelled || _binding == null || dockExpanded != expanded) return
-                    if (!expanded) {
-                        binding.search.visibility = View.INVISIBLE
-                        expandedDockKey = null
-                    }
+                    binding.homeSearch.visibility = if (expanded) View.GONE else View.VISIBLE
+                    binding.search.visibility = if (expanded) View.VISIBLE else View.INVISIBLE
+                    if (!expanded) dockThunderTransition = false
                 }
             })
             start()
         }
     }
 
+    private fun switchSearchDestination() {
+        if (!dockExpanded || contactsMode || thunderMode) return
+        val input = searchTextView as? android.widget.EditText
+        val start = input?.selectionStart ?: -1
+        val end = input?.selectionEnd ?: -1
+        val commandsOnly = !adapter.searchCommandsOnly
+        // Do not replace the query, change focus, or issue an IME request here.
+        // This also preserves a deliberately hidden keyboard.
+        clearAppSearch()
+        adapter.searchCommandsOnly = commandsOnly
+        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Anything"
+        setThunderMode(false)
+        adapter.filterApps(binding.search.query.toString())
+        if (input != null && start >= 0 && end >= 0) {
+            input.setSelection(start.coerceAtMost(input.length()), end.coerceAtMost(input.length()))
+        }
+    }
+
+    private fun showHomeSettings() {
+        cancelAutoLaunch()
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setItems(arrayOf("Launcher settings", "System settings")) { _, which ->
+                if (which == 0) {
+                    findNavController().navigate(if (isHomePage) R.id.action_mainFragment_to_settingsFragment
+                        else R.id.action_appListFragment_to_settingsFragment2)
+                } else {
+                    try {
+                        startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS))
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        requireContext().showToast("System settings are unavailable")
+                    }
+                }
+            }.show()
+    }
+
     private fun clearAppSearch() {
         adapter.searchCommandsOnly = false
         activeSearch = null
         adapter.searchPackage = null
-        binding.dockSearch.contentDescription = "Search apps"
-        binding.dockSearch.setOnLongClickListener(null)
+        binding.dockSearch.contentDescription = "Search destination: Apps. Tap to switch; hold to edit Search within Apps"
+        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
     }
 
     private fun activateAppSearch(target: app.olauncher.helper.InAppSearch.Target, query: String = "") {
         cancelAutoLaunch()
         setContactsMode(false)
         setThunderMode(false)
-        expandedDockKey = binding.dockSearch
         activeSearch = target
         adapter.searchPackage = target.app.appPackage
         val size = (52 * resources.displayMetrics.density).toInt()
@@ -772,7 +804,7 @@ class AppDrawerFragment : BaseFragment() {
             if (!inAppSearch.launch(target, query)) {
                 clearAppSearch()
                 setThunderMode(false)
-                binding.search.queryHint = "Search apps"
+                binding.search.queryHint = "Search Anything"
                 adapter.filterApps(query)
                 adapter.notifyItemRangeChanged(0, adapter.itemCount)
                 requireContext().showToast("Search is unavailable in ${target.app.appLabel}. Hold search to edit its URL.")
@@ -800,7 +832,7 @@ class AppDrawerFragment : BaseFragment() {
         val commandsOnly = adapter.searchCommandsOnly
         clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search apps"
+        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Anything"
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
         adapter.filterApps(binding.search.query.toString())
         setThunderMode(false)
@@ -881,7 +913,7 @@ class AppDrawerFragment : BaseFragment() {
             appClickListener = { appModel ->
                 cancelAutoLaunch()
                 if (adapter.searchCommandsOnly) {
-                    inAppSearch.targets[appModel.appPackage]?.let { activateAppSearch(it, binding.search.query.toString()) }
+                    inAppSearch.targets[appModel.appPackage]?.let { sendSearchTo(it) }
                     return@AppDrawerAdapter
                 }
                 if (launchAppSearch()) return@AppDrawerAdapter

@@ -311,7 +311,7 @@ class AppDrawerAdapter(
                 searchBadge.setTextColor(app.olauncher.helper.InAppSearch.foreground(target.color))
                 androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(searchBadge, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
                 searchBadge.contentDescription = "Search in ${appModel.appLabel}, alias ${target.code}"
-                searchBadge.setOnClickListener { if (searchCommandsOnly) clickListener(appModel) else searchClick(target) }
+                searchBadge.setOnClickListener { searchClick(target) }
                 searchBadge.setOnLongClickListener { searchHold(target); true }
             } else {
                 searchBadge.setOnClickListener(null)
