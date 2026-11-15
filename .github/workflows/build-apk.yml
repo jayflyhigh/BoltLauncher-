@@ -1,7 +1,7 @@
 name: Build debug APK
 on:
   push:
-    branches: [Show-contacts-when-opened, Switch-contacts-and-apps, student-fixes-launcher, adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
+    branches: [search-defaults, Show-contacts-when-opened, Switch-contacts-and-apps, student-fixes-launcher, adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,8 +16,8 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - name: Compile debug APK
-        run: chmod +x gradlew && ./gradlew assembleDebug --console=plain
+        run: chmod +x gradlew && ./gradlew testDebugUnitTest assembleDebug --console=plain
       - uses: actions/upload-artifact@v4
         with:
-          name: Bolt-Switch-Contacts-and-Apps-Debug
+          name: Bolt-Search-Defaults-Debug
           path: app/build/outputs/apk/debug/*.apk

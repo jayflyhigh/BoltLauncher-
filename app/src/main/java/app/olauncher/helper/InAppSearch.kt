@@ -11,7 +11,7 @@ import app.olauncher.data.AppModel
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** User-configured search commands, always restricted to the chosen app. */
+/** Built-in and user-configured search commands, restricted to the chosen app. */
 class InAppSearch(private val context: Context) {
     data class Target(val app: AppModel.App, val template: String, val color: Int, val code: String)
     private val prefs = context.getSharedPreferences("in_app_search", Context.MODE_PRIVATE)
@@ -26,6 +26,7 @@ class InAppSearch(private val context: Context) {
     fun load(apps: List<AppModel>) {
         val installed = apps.filterIsInstance<AppModel.App>()
             .filter { it.user == android.os.Process.myUserHandle() }.associateBy { it.appPackage }
+        seedDefaults(installed.keys)
         targets = configurations().mapNotNull { config ->
             val app = installed[config.optString("package")] ?: return@mapNotNull null
             val url = config.optString("url")
@@ -33,6 +34,27 @@ class InAppSearch(private val context: Context) {
             if (!SearchCommandUrl.valid(url) || code.isBlank()) return@mapNotNull null
             app.appPackage to Target(app, url, config.optInt("color", Color.DKGRAY), code)
         }.toMap()
+    }
+
+    /** Seed each installed app once; edits and removals remain the user's choice. */
+    private fun seedDefaults(installedPackages: Set<String>) {
+        val seeded = prefs.getStringSet("seeded_defaults", emptySet()).orEmpty().toMutableSet()
+        val configs = configurations().toMutableList()
+        var changed = false
+        for (preset in defaults) {
+            if (preset.packageName !in installedPackages || preset.packageName in seeded) continue
+            if (configs.none { it.optString("package") == preset.packageName } &&
+                configs.none { it.optString("alias").equals(preset.code, true) }) {
+                configs.add(JSONObject().put("package", preset.packageName)
+                    .put("url", preset.url).put("color", Color.parseColor(preset.color))
+                    .put("alias", preset.code))
+            }
+            seeded.add(preset.packageName)
+            changed = true
+        }
+        if (changed) prefs.edit()
+            .putString("custom_commands", JSONArray(configs).toString())
+            .putStringSet("seeded_defaults", seeded).apply()
     }
 
     fun alias(target: Target) = target.code
@@ -83,7 +105,16 @@ class InAppSearch(private val context: Context) {
     } catch (_: android.content.ActivityNotFoundException) { false }
       catch (_: SecurityException) { false }
 
+    private data class Preset(val packageName: String, val url: String, val color: String, val code: String)
+
     companion object {
+        private val defaults = listOf(
+            Preset("com.sec.android.app.sbrowser", "https://www.google.com/search?q={query}", "#7885F8", "WEB"),
+            Preset("com.reddit.frontpage", "https://www.reddit.com/search/?q={query}", "#FF4500", "RD"),
+            Preset("com.pinterest", "https://www.pinterest.com/search/pins/?q={query}", "#E60023", "PIN"),
+            Preset("com.zhiliaoapp.musically", "https://www.tiktok.com/search?q={query}", "#000000", "Tik")
+        )
+
         fun background(color: Int, density: Float) = GradientDrawable().apply {
             setColor(color)
             cornerRadius = 18f * density
