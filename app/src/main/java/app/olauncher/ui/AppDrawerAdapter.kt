@@ -274,7 +274,8 @@ class AppDrawerAdapter(
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
             root.setBackgroundResource(R.drawable.dock_shell)
             appTitle.setTextColor(android.graphics.Color.WHITE)
-            resultBolt.isVisible = enabled && !hasSearchBadge
+            searchBadge.isVisible = hasSearchBadge && !enabled
+            resultBolt.isVisible = enabled
             val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
             appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
