@@ -32,7 +32,7 @@ class HomeInfoView @JvmOverloads constructor(
     init {
         setBackgroundResource(app.olauncher.R.drawable.home_info_crown)
         gravity = Gravity.CENTER
-        setTextColor(Color.WHITE)
+        setTextColor(android.graphics.Color.WHITE)
         textSize = 18f
         includeFontPadding = false
         setSingleLine()
