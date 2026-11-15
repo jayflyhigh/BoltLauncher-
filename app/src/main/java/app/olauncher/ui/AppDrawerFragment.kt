@@ -624,7 +624,10 @@ class AppDrawerFragment : BaseFragment() {
         val density = resources.displayMetrics.density
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
         val startMargin = if (contact && commandKeys.isNotEmpty())
-            commandKeys[0].right + (6 * density).toInt() else (56 * density).toInt()
+            commandKeys[0].right + (6 * density).toInt()
+        else if (!thunderMode && !contactsMode && activeSearch == null && !adapter.searchCommandsOnly)
+            (4 * density).toInt()
+        else (56 * density).toInt()
         val endMargin = (4 * density).toInt()
         if (params.marginStart != startMargin || params.marginEnd != endMargin) {
             params.marginStart = startMargin
@@ -632,7 +635,8 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.layoutParams = params
         }
         binding.search.setPadding(0, 0, 0, 0)
-        binding.dockSearch.visibility = if (dockExpanded && !contact && !thunderMode) View.VISIBLE else View.GONE
+        binding.dockSearch.visibility = if (dockExpanded && !contact && !contactsMode && !thunderMode &&
+            (activeSearch != null || adapter.searchCommandsOnly)) View.VISIBLE else View.GONE
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -708,6 +712,7 @@ class AppDrawerFragment : BaseFragment() {
         adapter.searchCommandsOnly = commandsOnly
         binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Anything"
         setThunderMode(false)
+        configureSearchGeometry()
         adapter.filterApps(binding.search.query.toString())
         if (input != null && start >= 0 && end >= 0) {
             input.setSelection(start.coerceAtMost(input.length()), end.coerceAtMost(input.length()))
@@ -842,13 +847,24 @@ class AppDrawerFragment : BaseFragment() {
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
         adapter.filterApps(binding.search.query.toString())
         setThunderMode(false)
+        configureSearchGeometry()
         binding.search.showKeyboard()
+        return true
+    }
+
+    private fun toggleEmptySearchDestination(): Boolean {
+        if (!dockExpanded || contactsMode || thunderMode || activeSearch != null ||
+            flag != Constants.FLAG_LAUNCH_APP || binding.search.query.isNotEmpty()) return false
+        switchSearchDestination()
         return true
     }
 
     private fun initSearch() {
         (binding.search.findViewById<android.view.View>(R.id.search_src_text) as? AliasSearchInput)
-            ?.undoAlias = { undoSearchAlias() }
+            ?.apply {
+                undoAlias = { undoSearchAlias() }
+                submitEmpty = { toggleEmptySearchDestination() }
+            }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
