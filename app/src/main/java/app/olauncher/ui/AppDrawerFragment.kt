@@ -913,7 +913,7 @@ class AppDrawerFragment : BaseFragment() {
             appClickListener = { appModel ->
                 cancelAutoLaunch()
                 if (adapter.searchCommandsOnly) {
-                    inAppSearch.targets[appModel.appPackage]?.let { activateAppSearch(it, binding.search.query.toString()) }
+                    inAppSearch.targets[appModel.appPackage]?.let { sendSearchTo(it) }
                     return@AppDrawerAdapter
                 }
                 if (launchAppSearch()) return@AppDrawerAdapter
