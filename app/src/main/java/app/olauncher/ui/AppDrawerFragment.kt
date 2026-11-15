@@ -243,6 +243,10 @@ class AppDrawerFragment : BaseFragment() {
                     return true
                 }
             })
+        // Home taps must cycle on every release, including rapid repeated taps.
+        // SimpleOnGestureListener also installs double-tap handling by default,
+        // which otherwise diverts the second tap away from onSingleTapUp.
+        detector.setOnDoubleTapListener(null)
         detector.setIsLongpressEnabled(true)
         binding.root.setOnTouchListener { _, event ->
             if (isHomePage && !dockExpanded) detector.onTouchEvent(event) else false
