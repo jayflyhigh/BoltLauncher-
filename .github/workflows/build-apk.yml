@@ -1,7 +1,7 @@
 name: Build debug APK
 on:
   push:
-    branches: [animation-fixes, search-defaults, Show-contacts-when-opened, Switch-contacts-and-apps, student-fixes-launcher, adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
+    branches: [cursor-color-fix-thunder-mode, animation-fixes, search-defaults, Show-contacts-when-opened, Switch-contacts-and-apps, student-fixes-launcher, adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,5 +19,5 @@ jobs:
         run: chmod +x gradlew && ./gradlew testDebugUnitTest assembleDebug --console=plain
       - uses: actions/upload-artifact@v4
         with:
-          name: Bolt-Animation-Fixes-Debug
+          name: Bolt-Black-Thunder-Cursor-Debug
           path: app/build/outputs/apk/debug/*.apk

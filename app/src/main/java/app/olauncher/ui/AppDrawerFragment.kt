@@ -559,15 +559,8 @@ class AppDrawerFragment : BaseFragment() {
         searchTextView?.apply {
             setTextColor(foreground)
             setHintTextColor(if (enabled) android.graphics.Color.BLACK else 0xFFBDBDBD.toInt())
-            // The theme supplies a stateful cursor on Android 7–9 as well.
             isActivated = enabled
-            isCursorVisible = true
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                textCursorDrawable = androidx.appcompat.content.res.AppCompatResources.getDrawable(
-                    context, R.drawable.bolt_search_cursor)?.apply {
-                        state = if (enabled) intArrayOf(android.R.attr.state_activated) else intArrayOf()
-                    }
-            }
+            (this as? AliasSearchInput)?.setThunderCursor(enabled)
             refreshDrawableState()
         }
     }
