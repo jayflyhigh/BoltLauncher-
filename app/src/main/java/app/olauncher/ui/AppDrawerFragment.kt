@@ -615,12 +615,17 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun configureSearchGeometry(contact: Boolean = false) {
+        binding.dock.setSearchProgress(null)
         val density = resources.displayMetrics.density
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
-        params.marginStart = if (contact && commandKeys.isNotEmpty())
+        val startMargin = if (contact && commandKeys.isNotEmpty())
             commandKeys[0].right + (6 * density).toInt() else (64 * density).toInt()
-        params.marginEnd = ((if (contact || dockExpanded) 4 else 64) * density).toInt()
-        binding.search.layoutParams = params
+        val endMargin = (4 * density).toInt()
+        if (params.marginStart != startMargin || params.marginEnd != endMargin) {
+            params.marginStart = startMargin
+            params.marginEnd = endMargin
+            binding.search.layoutParams = params
+        }
         binding.search.setPadding(0, 0, 0, 0)
         binding.dockSearch.visibility = if (dockExpanded && !contact && !thunderMode) View.VISIBLE else View.GONE
     }
@@ -634,6 +639,7 @@ class AppDrawerFragment : BaseFragment() {
         if (opening && animate) binding.recyclerView.animateSearchResults(binding.search.query.toString(), force = true)
         dockAnimator?.cancel()
         configureSearchGeometry()
+        binding.dock.setSearchProgress((binding.dockSearch.tag as? Float) ?: 0f)
         binding.dockKeys.visibility = View.VISIBLE
         binding.dockContacts.isEnabled = !expanded
         binding.dockBolt.isEnabled = !expanded
@@ -669,12 +675,7 @@ class AppDrawerFragment : BaseFragment() {
                 b.dockBolt.alpha = if (animateThunder) 1f else 1f - progress
                 b.dockBolt.translationX = if (animateThunder)
                     (b.dockContacts.left - b.dockBolt.left) * progress else 0f
-                val params = b.search.layoutParams as android.widget.FrameLayout.LayoutParams
-                val endMargin = ((64f - 60f * progress) * resources.displayMetrics.density).toInt()
-                if (params.marginEnd != endMargin) {
-                    params.marginEnd = endMargin
-                    b.search.layoutParams = params
-                }
+                b.dock.setSearchProgress(progress)
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 private var cancelled = false
