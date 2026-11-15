@@ -293,6 +293,7 @@ class AppDrawerAdapter(
         RecyclerView.ViewHolder(binding.root) {
         private var iconJob: Job? = null
         private var hasSearchBadge = false
+        private var isSuggestion = false
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
@@ -301,7 +302,7 @@ class AppDrawerAdapter(
             searchBadge.isVisible = hasSearchBadge && !enabled
             resultBolt.isVisible = enabled
             val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
-            appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
+            appTitle.setPaddingRelative(((if (isSuggestion) 24 else 76) * root.resources.displayMetrics.density).toInt(), appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
         fun cancelIconLoad() {
@@ -327,6 +328,7 @@ class AppDrawerAdapter(
             searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
             searchCommandsOnly: Boolean,
         ) = with(binding) {
+            isSuggestion = appModel is AppModel.SearchSuggestion
             hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
@@ -358,12 +360,13 @@ class AppDrawerAdapter(
                         }
                     }
                 }
+                appTitle.maxLines = 2
                 androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
                     appTitle, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
                 appTitle.ellipsize = null
                 appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
-                appIcon.isVisible = true
-                appIcon.setImageResource(R.drawable.dock_search)
+                appIcon.isVisible = false
+                appIcon.setImageDrawable(null)
                 otherProfileIndicator.isVisible = false
                 root.setOnClickListener { clickListener(appModel) }
                 appTitle.setOnClickListener { clickListener(appModel) }
@@ -373,6 +376,7 @@ class AppDrawerAdapter(
                 appIcon.setOnLongClickListener(null)
                 return@with
             }
+            appTitle.maxLines = 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
             appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
             appTitle.ellipsize = android.text.TextUtils.TruncateAt.END
