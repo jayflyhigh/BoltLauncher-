@@ -31,6 +31,13 @@ sealed class AppModel : Comparable<AppModel> {
             get() = shortcutIdentity(appPackage, shortcutId, user.toString())
     }
 
+    data class SearchSuggestion(override val appLabel: String) : AppModel() {
+        override val key: CollationKey? = null
+        override val appPackage: String = ""
+        override val user: UserHandle = android.os.Process.myUserHandle()
+        override val isNew: Boolean = false
+    }
+
     data class PrivateSpaceHeader(
         val isLocked: Boolean = true,
         override val user: UserHandle = android.os.Process.myUserHandle(),

@@ -65,6 +65,9 @@ class AppDrawerAdapter(
                 oldItem is AppModel.PinnedShortcut && newItem is AppModel.PinnedShortcut ->
                     oldItem.identity == newItem.identity
 
+                oldItem is AppModel.SearchSuggestion && newItem is AppModel.SearchSuggestion ->
+                    oldItem.appLabel == newItem.appLabel
+
                 oldItem is AppModel.PrivateSpaceHeader && newItem is AppModel.PrivateSpaceHeader -> true
 
                 else -> false
@@ -91,15 +94,27 @@ class AppDrawerAdapter(
 
     @Volatile var searchPackage: String? = null
     @Volatile var searchCommandsOnly = false
+    private var suggestions: List<String> = emptyList()
     private var requestedQuery = ""
     var committedQuery: String? = null
         private set
     private var thunderMode = false
 
     fun filterApps(query: String) {
+        suggestions = emptyList()
         requestedQuery = query
         committedQuery = null
         appFilter.filter(query)
+    }
+
+    fun showSuggestions(query: String, values: List<String>) {
+        if (query != requestedQuery || searchPackage == null) return
+        suggestions = values
+        val items = appFilteredList.filterNot { it is AppModel.SearchSuggestion } +
+            values.map { AppModel.SearchSuggestion(it) }
+        submitList(items) {
+            if (query == requestedQuery) resultsChanged(query)
+        }
     }
 
     fun setThunderMode(enabled: Boolean) {
@@ -220,7 +235,8 @@ class AppDrawerAdapter(
                 results?.values?.let {
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
-                    submitList(items) {
+                    val displayed = if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it) } else items
+                    submitList(displayed) {
                         if (query == requestedQuery) {
                             committedQuery = query
                             resultsChanged(query)
@@ -318,6 +334,24 @@ class AppDrawerAdapter(
                 searchBadge.setOnLongClickListener(null)
             }
             applyThunderStyle(thunderMode)
+            if (appModel is AppModel.SearchSuggestion) {
+                cancelIconLoad()
+                appHideLayout.visibility = View.GONE
+                renameLayout.visibility = View.GONE
+                appTitle.visibility = View.VISIBLE
+                appTitle.text = appModel.appLabel
+                appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                appIcon.isVisible = true
+                appIcon.setImageResource(R.drawable.dock_search)
+                otherProfileIndicator.isVisible = false
+                root.setOnClickListener { clickListener(appModel) }
+                appTitle.setOnClickListener { clickListener(appModel) }
+                appIcon.setOnClickListener { clickListener(appModel) }
+                root.setOnLongClickListener(null)
+                appTitle.setOnLongClickListener(null)
+                appIcon.setOnLongClickListener(null)
+                return@with
+            }
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE

@@ -43,6 +43,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var inAppSearch: app.olauncher.helper.InAppSearch
     private var activeSearch: app.olauncher.helper.InAppSearch.Target? = null
+    private var suggestionJob: kotlinx.coroutines.Job? = null
     private var searchEditor: androidx.appcompat.app.AlertDialog? = null
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
@@ -489,7 +490,7 @@ class AppDrawerFragment : BaseFragment() {
         contactsMode = enabled
         cancelAutoLaunch()
         binding.recyclerView.adapter = if (enabled) contactsAdapter else adapter
-        binding.search.queryHint = if (enabled) "Search contacts" else "Search Anything"
+        binding.search.queryHint = if (enabled) "Search contacts" else "Search Apps"
         if (enabled) filterContacts(binding.search.query.toString())
         else adapter.filterApps(binding.search.query.toString())
     }
@@ -505,6 +506,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun loadContacts() {
+        suggestionJob?.cancel()
         contactsLoad?.cancel()
         val context = requireContext().applicationContext
         contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
@@ -710,7 +712,7 @@ class AppDrawerFragment : BaseFragment() {
         // This also preserves a deliberately hidden keyboard.
         clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Anything"
+        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Apps"
         setThunderMode(false)
         configureSearchGeometry()
         adapter.filterApps(binding.search.query.toString())
@@ -737,6 +739,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun clearAppSearch() {
+        suggestionJob?.cancel()
         adapter.searchCommandsOnly = false
         activeSearch = null
         adapter.searchPackage = null
@@ -772,8 +775,24 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.queryHint = "Search in ${target.app.appLabel}....."
         binding.search.setQuery(query, false)
         adapter.filterApps(query)
+        updateSearchSuggestions(query)
         setDockExpanded(true)
         binding.search.showKeyboard()
+    }
+
+    private fun updateSearchSuggestions(query: String) {
+        suggestionJob?.cancel()
+        val target = activeSearch ?: return
+        if (query.isBlank()) return
+        suggestionJob = viewLifecycleOwner.lifecycleScope.launch {
+            kotlinx.coroutines.delay(250)
+            val suggestions = withContext(Dispatchers.IO) {
+                app.olauncher.helper.SearchSuggestions.fetch(query)
+            }
+            if (_binding != null && activeSearch == target && binding.search.query.toString() == query) {
+                adapter.showSuggestions(query, suggestions)
+            }
+        }
     }
 
     private fun showAppSearchEditor(initial: app.olauncher.helper.InAppSearch.Target? = activeSearch) {
@@ -815,7 +834,7 @@ class AppDrawerFragment : BaseFragment() {
             if (!inAppSearch.launch(target, query)) {
                 clearAppSearch()
                 setThunderMode(false)
-                binding.search.queryHint = "Search Anything"
+                binding.search.queryHint = "Search Apps"
                 adapter.filterApps(query)
                 adapter.notifyItemRangeChanged(0, adapter.itemCount)
                 requireContext().showToast("Search is unavailable in ${target.app.appLabel}. Hold search to edit its URL.")
@@ -843,7 +862,7 @@ class AppDrawerFragment : BaseFragment() {
         val commandsOnly = adapter.searchCommandsOnly
         clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Anything"
+        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search Apps"
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
         adapter.filterApps(binding.search.query.toString())
         setThunderMode(false)
@@ -892,7 +911,10 @@ class AppDrawerFragment : BaseFragment() {
                     if (newText != lastAutoLaunchedQuery) lastAutoLaunchedQuery = null
                     if (contactsMode) {
                         if (contactCommand != ContactCommand.ADD) filterContacts(newText)
-                    } else adapter.filterApps(newText)
+                    } else {
+                        adapter.filterApps(newText)
+                        updateSearchSuggestions(newText)
+                    }
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
                     return true
@@ -938,11 +960,18 @@ class AppDrawerFragment : BaseFragment() {
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
                 cancelAutoLaunch()
+                if (appModel is AppModel.SearchSuggestion) {
+                    activeSearch?.let { target ->
+                        if (!inAppSearch.launch(target, appModel.appLabel))
+                            requireContext().showToast("Search is unavailable in ${target.app.appLabel}")
+                    }
+                    return@AppDrawerAdapter
+                }
+                if (launchAppSearch()) return@AppDrawerAdapter
                 if (adapter.searchCommandsOnly) {
                     inAppSearch.targets[appModel.appPackage]?.let { sendSearchTo(it) }
                     return@AppDrawerAdapter
                 }
-                if (launchAppSearch()) return@AppDrawerAdapter
                 viewModel.selectedApp(appModel, flag)
                 if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
                     findNavController().popBackStack(R.id.mainFragment, false)
@@ -959,7 +988,7 @@ class AppDrawerFragment : BaseFragment() {
             },
             appDeleteListener = { appModel ->
                 when (appModel) {
-                    is AppModel.PrivateSpaceHeader -> {}
+                    is AppModel.PrivateSpaceHeader, is AppModel.SearchSuggestion -> {}
                     is AppModel.PinnedShortcut ->
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
                             requireContext().deletePinnedShortcut(
@@ -1185,6 +1214,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onDestroyView() {
         cancelAutoLaunch()
+        suggestionJob?.cancel()
         contactsLoad?.cancel()
         searchEditor?.dismiss()
         searchEditor = null
