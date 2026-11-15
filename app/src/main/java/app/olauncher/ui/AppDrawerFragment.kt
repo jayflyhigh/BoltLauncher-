@@ -235,7 +235,7 @@ class AppDrawerFragment : BaseFragment() {
             setThunderMode(true)
             setDockExpanded(true)
         }
-        binding.dockContacts.setOnClickListener { showContactList() }
+        binding.dockContacts.setOnClickListener { showContactCommands() }
         binding.dockSettings.setOnClickListener {
             findNavController().navigate(if (isHomePage)
                 R.id.action_mainFragment_to_settingsFragment
@@ -289,25 +289,6 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun showContactList() {
-        clearAppSearch()
-        ensureCommandKeys()
-        cancelAutoLaunch()
-        setContactsMode(true)
-        setThunderMode(false)
-        binding.dockKeys.visibility = View.INVISIBLE
-        commandProgress = 0f
-        commandKeys.forEach { key ->
-            key.visibility = View.VISIBLE
-            key.isEnabled = false
-            key.alpha = 1f
-            key.translationX = 0f
-        }
-        // Open directly into the searchable contact list instead of requiring
-        // the user to choose the Search contacts command first.
-        selectContactCommand(ContactCommand.SEARCH)
-    }
-
     private fun showContactCommands() {
         clearAppSearch()
         ensureCommandKeys()
@@ -316,9 +297,18 @@ class AppDrawerFragment : BaseFragment() {
         setThunderMode(false)
         contactCommand = null
         dockExpanded = false
+        binding.search.hideKeyboard()
         binding.search.visibility = View.INVISIBLE
-        binding.recyclerView.visibility = View.INVISIBLE
         binding.search.setQuery("", false)
+        // Show the full list above the contact shortcuts without entering search.
+        binding.recyclerView.visibility = View.VISIBLE
+        filterContacts("")
+        if (androidx.core.content.ContextCompat.checkSelfPermission(requireContext(),
+                android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            loadContacts()
+        } else {
+            contactsPermission.launch(android.Manifest.permission.READ_CONTACTS)
+        }
         binding.dockKeys.visibility = View.INVISIBLE
         commandProgress = 0f
         commandKeys.forEachIndexed { index, key ->
@@ -398,7 +388,9 @@ class AppDrawerFragment : BaseFragment() {
                         contactLaunchQuery = null
                         binding.search.setQuery("", false)
                         binding.search.visibility = View.INVISIBLE
-                        binding.recyclerView.visibility = View.INVISIBLE
+                        // Returning from a contact command keeps the contacts list visible.
+                        binding.recyclerView.visibility = View.VISIBLE
+                        filterContacts("")
                     }
                 }
             })
@@ -430,8 +422,8 @@ class AppDrawerFragment : BaseFragment() {
     private fun runContactCommand(contact: ContactSearchAdapter.Contact) {
         cancelAutoLaunch()
         contactLaunchQuery = binding.search.query.toString()
-        val command = contactCommand ?: return
-        if (command == ContactCommand.SEARCH) {
+        val command = contactCommand
+        if (command == null || command == ContactCommand.SEARCH) {
             try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri)) }
             catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No contacts app available") }
             return
