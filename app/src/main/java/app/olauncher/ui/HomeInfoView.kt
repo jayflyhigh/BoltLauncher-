@@ -38,18 +38,18 @@ class HomeInfoView @JvmOverloads constructor(
 
     init {
         setBackgroundResource(app.olauncher.R.drawable.home_info_crown)
-        orientation = VERTICAL
+        orientation = HORIZONTAL
         gravity = Gravity.CENTER
-        setPadding(dp(28), dp(6), dp(28), dp(5))
+        setPadding(dp(28), dp(4), dp(28), dp(4))
         label.apply {
-            gravity = Gravity.CENTER
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTextColor(Color.WHITE)
             textSize = 20f
             includeFontPadding = false
             setSingleLine()
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        addView(label, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(label, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         val indicators = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER
