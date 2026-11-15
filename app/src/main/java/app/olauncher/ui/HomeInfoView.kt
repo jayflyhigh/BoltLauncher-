@@ -71,7 +71,11 @@ class HomeInfoView @JvmOverloads constructor(
     private fun dp(value: Int) = (value * density + 0.5f).toInt()
 
     override fun onDraw(canvas: Canvas) {
+        // TextView clips to its text area, which excludes the dots' bottom padding.
+        // Restore the full canvas before drawing the indicators below the label.
+        val textCanvas = canvas.save()
         super.onDraw(canvas)
+        canvas.restoreToCount(textCanvas)
         val centerX = width / 2f
         val centerY = height - 8f * density
         for (index in 0..2) {
