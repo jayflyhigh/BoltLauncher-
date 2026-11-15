@@ -564,8 +564,10 @@ class AppDrawerFragment : BaseFragment() {
             isCursorVisible = true
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 textCursorDrawable = androidx.appcompat.content.res.AppCompatResources.getDrawable(
-                    context, R.drawable.bolt_search_cursor)?.apply {
-                        state = if (enabled) intArrayOf(android.R.attr.state_activated) else intArrayOf()
+                    context, R.drawable.bolt_search_cursor)?.mutate()?.apply {
+                        // TextView updates cursor state while blinking and focusing.
+                        // Keep the mode color independent of those state changes.
+                        setTint(foreground)
                     }
             }
             refreshDrawableState()
