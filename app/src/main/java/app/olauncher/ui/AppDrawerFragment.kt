@@ -826,7 +826,7 @@ class AppDrawerFragment : BaseFragment() {
             appClickListener = { appModel ->
                 cancelAutoLaunch()
                 if (adapter.searchCommandsOnly) {
-                    inAppSearch.targets[appModel.appPackage]?.let { sendSearchTo(it) }
+                    inAppSearch.targets[appModel.appPackage]?.let { activateAppSearch(it, binding.search.query.toString()) }
                     return@AppDrawerAdapter
                 }
                 if (launchAppSearch()) return@AppDrawerAdapter
@@ -909,7 +909,7 @@ class AppDrawerFragment : BaseFragment() {
                 viewModel.getAppList()
             },
             searchTarget = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage] else null },
-            searchClick = { if (adapter.searchCommandsOnly) sendSearchTo(it) else activateAppSearch(it) },
+            searchClick = { activateAppSearch(it, binding.search.query.toString()) },
             searchHold = { showAppSearchEditor(it) },
             searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             resultsChanged = { query ->
