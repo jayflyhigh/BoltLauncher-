@@ -206,6 +206,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun initDock() {
         binding.dockPlaceholder.isEnabled = true
+        binding.dockPlaceholder.setOnLongClickListener { showAppSearchEditor(); true }
         binding.dockPlaceholder.setOnClickListener {
             expandedDockKey = binding.dockPlaceholder
             clearAppSearch()
@@ -227,7 +228,7 @@ class AppDrawerFragment : BaseFragment() {
                 setDockExpanded(true)
             }
         }
-        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
+        binding.dockSearch.setOnLongClickListener(null)
         binding.dockBolt.setOnClickListener {
             expandedDockKey = binding.dockBolt
             clearAppSearch()
@@ -657,7 +658,7 @@ class AppDrawerFragment : BaseFragment() {
         activeSearch = null
         adapter.searchPackage = null
         binding.dockSearch.contentDescription = "Search apps"
-        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
+        binding.dockSearch.setOnLongClickListener(null)
     }
 
     private fun activateAppSearch(target: app.olauncher.helper.InAppSearch.Target, query: String = "") {
