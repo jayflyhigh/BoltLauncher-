@@ -125,7 +125,6 @@ class AppDrawerFragment : BaseFragment() {
         initObservers()
         initClickListeners()
         initDock()
-        binding.homeInfo.visibility = if (isHomePage) View.VISIBLE else View.GONE
         initHomeSwipe()
         applyDockInsets()
         binding.recyclerView.visibility = if (isHomePage) View.INVISIBLE else View.VISIBLE
@@ -218,7 +217,6 @@ class AppDrawerFragment : BaseFragment() {
 
                 override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
                     if (!isHomePage || dockExpanded) return false
-                    binding.homeInfo.cycle()
                     if (contactsMode) resetHomeSearch()
                     return true
                 }
@@ -243,9 +241,7 @@ class AppDrawerFragment : BaseFragment() {
                     return true
                 }
             })
-        // Home taps must cycle on every release, including rapid repeated taps.
-        // SimpleOnGestureListener also installs double-tap handling by default,
-        // which otherwise diverts the second tap away from onSingleTapUp.
+        // Keep rapid home taps available for dismissing contact commands.
         detector.setOnDoubleTapListener(null)
         detector.setIsLongpressEnabled(true)
         binding.root.setOnTouchListener { _, event ->
@@ -374,7 +370,6 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         dockAnimator?.cancel()
         dockExpanded = expanded
-        binding.homeInfo.visibility = if (isHomePage && !expanded) View.VISIBLE else View.GONE
         if (!expanded) {
             binding.search.hideKeyboard()
             binding.search.clearFocus()
@@ -527,10 +522,11 @@ class AppDrawerFragment : BaseFragment() {
         lastAutoLaunchedQuery = null
         adapter.setThunderMode(enabled)
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-        binding.search.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_key)
+        binding.dock.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_search_bar)
+        binding.search.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         val iconPadding = (13 * resources.displayMetrics.density).toInt()
         binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
-        binding.dockSearch.setBackgroundResource(R.drawable.dock_key)
+        binding.dockSearch.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         if (activeSearch == null) {
             binding.dockSearch.contentDescription = if (adapter.searchCommandsOnly)
                 "Search destination: Search within Apps. Tap to switch; hold to edit" else
@@ -538,8 +534,10 @@ class AppDrawerFragment : BaseFragment() {
             binding.dockSearch.setImageResource(if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
             binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
         }
-        // The thunder glyph stays black in both collapsed and expanded states.
-        binding.dockBolt.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.BLACK)
+        // Both controls share the search bar surface; yellow identifies Bolt at rest.
+        binding.dockBolt.imageTintList = android.content.res.ColorStateList.valueOf(
+            if (enabled) android.graphics.Color.BLACK else 0xFFFFD54F.toInt()
+        )
         searchTextView?.apply {
             setTextColor(foreground)
             setHintTextColor(if (enabled) android.graphics.Color.BLACK else 0xFFBDBDBD.toInt())
@@ -626,7 +624,7 @@ class AppDrawerFragment : BaseFragment() {
         val density = resources.displayMetrics.density
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
         val startMargin = if (contact && commandKeys.isNotEmpty())
-            commandKeys[0].right + (6 * density).toInt() else (64 * density).toInt()
+            commandKeys[0].right + (6 * density).toInt() else (56 * density).toInt()
         val endMargin = (4 * density).toInt()
         if (params.marginStart != startMargin || params.marginEnd != endMargin) {
             params.marginStart = startMargin
@@ -640,7 +638,6 @@ class AppDrawerFragment : BaseFragment() {
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
         val opening = expanded && !dockExpanded
         dockExpanded = expanded
-        binding.homeInfo.visibility = if (isHomePage && !expanded) View.VISIBLE else View.GONE
         if (expanded) dockThunderTransition = thunderMode
         val animateThunder = dockThunderTransition
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
