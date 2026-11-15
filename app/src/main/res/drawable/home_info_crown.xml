@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp" android:height="28dp"
+    android:viewportWidth="160" android:viewportHeight="28">
+    <!-- Broad rounded shoulders flow directly into the dock shell. -->
+    <path android:fillColor="#252729"
+        android:pathData="M0,28 C12,28 14,27 20,17 C27,4 33,0 46,0 L114,0 C127,0 133,4 140,17 C146,27 148,28 160,28 Z"/>
+</vector>

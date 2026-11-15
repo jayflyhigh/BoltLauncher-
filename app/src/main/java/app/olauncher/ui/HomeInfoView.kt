@@ -4,10 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
 import android.os.BatteryManager
 import android.util.AttributeSet
 import android.view.Gravity
@@ -22,8 +18,6 @@ class HomeInfoView @JvmOverloads constructor(
     private var battery = "—%"
     private var time = ""
     private var date = ""
-    private val shell = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(37, 39, 41) }
-    private val crown = Path()
     private val updates = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
@@ -36,6 +30,7 @@ class HomeInfoView @JvmOverloads constructor(
     }
 
     init {
+        setBackgroundResource(app.olauncher.R.drawable.home_info_crown)
         gravity = Gravity.CENTER
         setTextColor(Color.WHITE)
         textSize = 18f
@@ -85,20 +80,4 @@ class HomeInfoView @JvmOverloads constructor(
         super.onDetachedFromWindow()
     }
 
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        val x = w.toFloat()
-        val y = h.toFloat()
-        crown.reset()
-        crown.moveTo(0f, y)
-        crown.cubicTo(x * .12f, y, x * .10f, 0f, x * .28f, 0f)
-        crown.lineTo(x * .72f, 0f)
-        crown.cubicTo(x * .90f, 0f, x * .88f, y, x, y)
-        crown.close()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        canvas.drawPath(crown, shell)
-        super.onDraw(canvas)
-    }
 }
