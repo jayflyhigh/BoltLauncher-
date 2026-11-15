@@ -559,30 +559,8 @@ class AppDrawerFragment : BaseFragment() {
         searchTextView?.apply {
             setTextColor(foreground)
             setHintTextColor(if (enabled) android.graphics.Color.BLACK else 0xFFBDBDBD.toInt())
-            // The theme supplies a stateful cursor on Android 7–9 as well.
             isActivated = enabled
-            isCursorVisible = true
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val cursorWidth = (2 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
-                textCursorDrawable = object : android.graphics.drawable.Drawable() {
-                    private val paint = android.graphics.Paint().apply { color = foreground }
-
-                    override fun draw(canvas: android.graphics.Canvas) {
-                        canvas.drawRect(bounds, paint)
-                    }
-
-                    override fun getIntrinsicWidth(): Int = cursorWidth
-                    override fun setAlpha(alpha: Int) {
-                        paint.alpha = alpha
-                        invalidateSelf()
-                    }
-
-                    // Theme/IME tint filters must not recolor the mode's cursor.
-                    override fun setColorFilter(filter: android.graphics.ColorFilter?) = Unit
-                    @Suppress("DEPRECATION")
-                    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
-                }
-            }
+            (this as? AliasSearchInput)?.setThunderCursor(enabled)
             refreshDrawableState()
         }
     }
