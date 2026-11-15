@@ -235,7 +235,7 @@ class AppDrawerFragment : BaseFragment() {
             setThunderMode(true)
             setDockExpanded(true)
         }
-        binding.dockContacts.setOnClickListener { showContactCommands() }
+        binding.dockContacts.setOnClickListener { showContactList() }
         binding.dockSettings.setOnClickListener {
             findNavController().navigate(if (isHomePage)
                 R.id.action_mainFragment_to_settingsFragment
@@ -287,6 +287,25 @@ class AppDrawerFragment : BaseFragment() {
                 }
             }
         }
+    }
+
+    private fun showContactList() {
+        clearAppSearch()
+        ensureCommandKeys()
+        cancelAutoLaunch()
+        setContactsMode(true)
+        setThunderMode(false)
+        binding.dockKeys.visibility = View.INVISIBLE
+        commandProgress = 0f
+        commandKeys.forEach { key ->
+            key.visibility = View.VISIBLE
+            key.isEnabled = false
+            key.alpha = 1f
+            key.translationX = 0f
+        }
+        // Open directly into the searchable contact list instead of requiring
+        // the user to choose the Search contacts command first.
+        selectContactCommand(ContactCommand.SEARCH)
     }
 
     private fun showContactCommands() {
