@@ -1,7 +1,7 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="160dp" android:height="28dp"
-    android:viewportWidth="160" android:viewportHeight="28">
-    <!-- Broad rounded shoulders flow directly into the dock shell. -->
+    android:width="360dp" android:height="36dp"
+    android:viewportWidth="360" android:viewportHeight="36">
+    <!-- Compact shoulders keep the full-width label and indicators inside the crown. -->
     <path android:fillColor="#252729"
-        android:pathData="M0,28 C12,28 14,27 20,17 C27,4 33,0 46,0 L114,0 C127,0 133,4 140,17 C146,27 148,28 160,28 Z"/>
+        android:pathData="M0,36 C8,36 10,32 14,20 C18,6 22,0 30,0 L330,0 C338,0 342,6 346,20 C350,32 352,36 360,36 Z"/>
 </vector>
