@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.BatteryManager
 import android.util.AttributeSet
 import android.view.Gravity
@@ -18,6 +21,8 @@ class HomeInfoView @JvmOverloads constructor(
     private var battery = "—%"
     private var time = ""
     private var date = ""
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val density = resources.displayMetrics.density
     private val updates = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
@@ -33,7 +38,8 @@ class HomeInfoView @JvmOverloads constructor(
         setBackgroundResource(app.olauncher.R.drawable.home_info_crown)
         gravity = Gravity.CENTER
         setTextColor(android.graphics.Color.WHITE)
-        textSize = 18f
+        textSize = 20f
+        setPadding(dp(28), dp(6), dp(28), dp(18))
         includeFontPadding = false
         setSingleLine()
         setOnClickListener { cycle() }
@@ -54,10 +60,23 @@ class HomeInfoView @JvmOverloads constructor(
 
     private fun showLabel() {
         text = when (mode) { 1 -> battery; 2 -> date; else -> time }
+        invalidate()
         contentDescription = when (mode) {
             1 -> "Battery $battery. Tap to show date"
             2 -> "$date. Tap to show time"
             else -> "$time. Tap to show battery"
+        }
+    }
+
+    private fun dp(value: Int) = (value * density + 0.5f).toInt()
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val centerX = width / 2f
+        val centerY = height - 8f * density
+        for (index in 0..2) {
+            dotPaint.color = if (index == mode) Color.rgb(255, 214, 0) else Color.rgb(128, 128, 128)
+            canvas.drawCircle(centerX + (index - 1) * 10f * density, centerY, 2.5f * density, dotPaint)
         }
     }
 
