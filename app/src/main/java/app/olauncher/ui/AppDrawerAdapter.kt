@@ -274,7 +274,8 @@ class AppDrawerAdapter(
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
             root.setBackgroundResource(R.drawable.dock_shell)
             appTitle.setTextColor(android.graphics.Color.WHITE)
-            resultBolt.isVisible = enabled && !hasSearchBadge
+            searchBadge.isVisible = hasSearchBadge && !enabled
+            resultBolt.isVisible = enabled
             val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
             appTitle.setPaddingRelative(appTitle.paddingStart, appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
@@ -358,7 +359,17 @@ class AppDrawerAdapter(
             appTitle.setOnClickListener { clickListener(appModel) }
             root.setOnClickListener(if (searchCommandsOnly) View.OnClickListener { clickListener(appModel) } else null)
 
+            val editSearch = if (searchCommandsOnly && target != null) View.OnLongClickListener {
+                searchHold(target)
+                true
+            } else null
+            root.setOnLongClickListener(editSearch)
+            appIcon.setOnLongClickListener(editSearch)
             appTitle.setOnLongClickListener {
+                if (searchCommandsOnly && target != null) {
+                    searchHold(target)
+                    return@setOnLongClickListener true
+                }
                 if (appModel.appPackage.isNotEmpty()) {
                     appDelete.alpha = when (
                         appModel is AppModel.PinnedShortcut || !root.context.isSystemApp(appModel.appPackage, appModel.user)

@@ -206,6 +206,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun initDock() {
         binding.dockPlaceholder.isEnabled = true
+        binding.dockPlaceholder.setOnLongClickListener { showAppSearchEditor(); true }
         binding.dockPlaceholder.setOnClickListener {
             expandedDockKey = binding.dockPlaceholder
             clearAppSearch()
@@ -227,7 +228,7 @@ class AppDrawerFragment : BaseFragment() {
                 setDockExpanded(true)
             }
         }
-        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
+        binding.dockSearch.setOnLongClickListener(null)
         binding.dockBolt.setOnClickListener {
             expandedDockKey = binding.dockBolt
             clearAppSearch()
@@ -657,7 +658,7 @@ class AppDrawerFragment : BaseFragment() {
         activeSearch = null
         adapter.searchPackage = null
         binding.dockSearch.contentDescription = "Search apps"
-        binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
+        binding.dockSearch.setOnLongClickListener(null)
     }
 
     private fun activateAppSearch(target: app.olauncher.helper.InAppSearch.Target, query: String = "") {
@@ -754,7 +755,23 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private fun undoSearchAlias(): Boolean {
+        if (activeSearch == null) return false
+        cancelAutoLaunch()
+        val commandsOnly = adapter.searchCommandsOnly
+        clearAppSearch()
+        adapter.searchCommandsOnly = commandsOnly
+        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search apps"
+        adapter.notifyItemRangeChanged(0, adapter.itemCount)
+        adapter.filterApps(binding.search.query.toString())
+        setThunderMode(false)
+        binding.search.showKeyboard()
+        return true
+    }
+
     private fun initSearch() {
+        (binding.search.findViewById<android.view.View>(R.id.search_src_text) as? AliasSearchInput)
+            ?.undoAlias = { undoSearchAlias() }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
@@ -825,7 +842,7 @@ class AppDrawerFragment : BaseFragment() {
             appClickListener = { appModel ->
                 cancelAutoLaunch()
                 if (adapter.searchCommandsOnly) {
-                    inAppSearch.targets[appModel.appPackage]?.let { sendSearchTo(it) }
+                    inAppSearch.targets[appModel.appPackage]?.let { activateAppSearch(it, binding.search.query.toString()) }
                     return@AppDrawerAdapter
                 }
                 if (launchAppSearch()) return@AppDrawerAdapter
@@ -908,7 +925,7 @@ class AppDrawerFragment : BaseFragment() {
                 viewModel.getAppList()
             },
             searchTarget = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage] else null },
-            searchClick = { if (adapter.searchCommandsOnly) sendSearchTo(it) else activateAppSearch(it) },
+            searchClick = { activateAppSearch(it, binding.search.query.toString()) },
             searchHold = { showAppSearchEditor(it) },
             searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             resultsChanged = { query ->
