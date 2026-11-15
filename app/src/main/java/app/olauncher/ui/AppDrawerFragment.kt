@@ -80,6 +80,7 @@ class AppDrawerFragment : BaseFragment() {
     private var lastAutoLaunchedQuery: String? = null
     private var dockExpanded = false
     private var dockAnimator: android.animation.ValueAnimator? = null
+    private val searchRevealBounds = android.graphics.Rect()
     // The dock key that was tapped; it animates over the Contacts slot while search is open.
     private var expandedDockKey: View? = null
 
@@ -163,6 +164,45 @@ class AppDrawerFragment : BaseFragment() {
                 initialBottom + maxOf(bars.bottom, keyboard.bottom))
             insets
         }
+        // The IME applies its final padding before drawing. Offset that layout jump,
+        // then follow the system keyboard animation using compositor translations.
+        androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(root,
+            object : androidx.core.view.WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                private var startBottom = 0
+                private var offset = 0f
+                private val location = IntArray(2)
+                private fun dockBottom(): Int {
+                    binding.dock.getLocationOnScreen(location)
+                    return location[1] + binding.dock.height
+                }
+                override fun onPrepare(animation: androidx.core.view.WindowInsetsAnimationCompat) {
+                    if (animation.typeMask and androidx.core.view.WindowInsetsCompat.Type.ime() != 0) {
+                        root.translationY = 0f
+                        startBottom = dockBottom()
+                    }
+                }
+                override fun onStart(animation: androidx.core.view.WindowInsetsAnimationCompat,
+                    bounds: androidx.core.view.WindowInsetsAnimationCompat.BoundsCompat): androidx.core.view.WindowInsetsAnimationCompat.BoundsCompat {
+                    if (animation.typeMask and androidx.core.view.WindowInsetsCompat.Type.ime() != 0) {
+                        offset = if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0f
+                            else (startBottom - dockBottom()).toFloat()
+                        root.translationY = offset
+                    }
+                    return bounds
+                }
+                override fun onProgress(insets: androidx.core.view.WindowInsetsCompat,
+                    runningAnimations: MutableList<androidx.core.view.WindowInsetsAnimationCompat>): androidx.core.view.WindowInsetsCompat {
+                    runningAnimations.firstOrNull {
+                        it.typeMask and androidx.core.view.WindowInsetsCompat.Type.ime() != 0
+                    }?.let { root.translationY = offset * (1f - it.interpolatedFraction) }
+                    return insets
+                }
+                override fun onEnd(animation: androidx.core.view.WindowInsetsAnimationCompat) {
+                    if (animation.typeMask and androidx.core.view.WindowInsetsCompat.Type.ime() != 0) {
+                        root.translationY = 0f
+                    }
+                }
+            })
         root.post { androidx.core.view.ViewCompat.requestApplyInsets(root) }
     }
 
@@ -304,23 +344,28 @@ class AppDrawerFragment : BaseFragment() {
         // Show the full list above the contact shortcuts without entering search.
         binding.recyclerView.visibility = View.VISIBLE
         filterContacts("")
+        binding.recyclerView.animateSearchResults("", force = true)
         if (androidx.core.content.ContextCompat.checkSelfPermission(requireContext(),
                 android.Manifest.permission.READ_CONTACTS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
             loadContacts()
         } else {
             contactsPermission.launch(android.Manifest.permission.READ_CONTACTS)
         }
+        dockAnimator?.cancel()
+        binding.dockSearch.tag = 0f
         binding.dockKeys.visibility = View.INVISIBLE
         commandProgress = 0f
         commandKeys.forEachIndexed { index, key ->
+            key.animate().cancel()
+            key.translationZ = 0f
             key.visibility = View.VISIBLE
             key.isEnabled = false
             key.alpha = if (index == 0) 1f else 0f
             key.translationX = if (index == 0)
-                0f else 28f * resources.displayMetrics.density
+                0f else 12f * resources.displayMetrics.density
             key.animate().translationX(0f).alpha(1f)
-                .setDuration(if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0L else 220L)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .setDuration(if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0L else 320L)
+                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f))
                 .withEndAction { key.isEnabled = true }.start()
         }
     }
@@ -356,10 +401,11 @@ class AppDrawerFragment : BaseFragment() {
         val selectedIndex = if (selected == ContactCommand.SEARCH) 0 else selected.ordinal + 1
         binding.search.visibility = View.VISIBLE
         commandKeys.forEach { it.animate().cancel(); it.isEnabled = false }
+        if (expanded) binding.search.showKeyboard()
         dockAnimator = android.animation.ValueAnimator.ofFloat(commandProgress, if (expanded) 1f else 0f).apply {
             duration = if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0L
-                else (220 * kotlin.math.abs((if (expanded) 1f else 0f) - commandProgress)).toLong()
-            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
+                else ((if (expanded) 380 else 300) * kotlin.math.abs((if (expanded) 1f else 0f) - commandProgress)).toLong()
+            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)
             addUpdateListener {
                 val b = _binding ?: return@addUpdateListener
                 val progress = it.animatedValue as Float
@@ -371,9 +417,9 @@ class AppDrawerFragment : BaseFragment() {
                     key.translationZ = if (index == selectedIndex) 12f else 0f
                 }
                 b.search.alpha = progress
-                b.search.translationX = -b.search.width * (1f - progress)
-                b.search.clipBounds = android.graphics.Rect((b.search.width * (1f - progress)).toInt(), 0,
-                    b.search.width, b.search.height)
+                b.search.translationX = 0f
+                searchRevealBounds.set(0, 0, (b.search.width * progress).toInt(), b.search.height)
+                b.search.clipBounds = searchRevealBounds
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 private var cancelled = false
@@ -383,8 +429,7 @@ class AppDrawerFragment : BaseFragment() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     if (cancelled || _binding == null) return
                     commandKeys.forEachIndexed { index, key -> key.isEnabled = !expanded || index == selectedIndex }
-                    if (expanded) binding.search.showKeyboard()
-                    else {
+                    if (!expanded) {
                         contactCommand = null
                         contactLaunchQuery = null
                         binding.search.setQuery("", false)
@@ -479,7 +524,7 @@ class AppDrawerFragment : BaseFragment() {
         linearLayoutManager.reverseLayout = query.isNotBlank()
         linearLayoutManager.stackFromEnd = false
         binding.recyclerView.scrollToPosition(0)
-        binding.recyclerView.animateSearchResults(query, force = true)
+        binding.recyclerView.animateSearchResults(query)
         scheduleContactLaunch(query)
     }
 
@@ -612,28 +657,30 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.hideKeyboard()
             binding.search.clearFocus()
         }
+        val dockKeys = listOf(binding.dockSearch, binding.dockContacts, binding.dockBolt,
+            binding.dockPlaceholder, binding.dockSettings)
+        dockKeys.forEach { it.isEnabled = !expanded }
+        if (expanded) binding.search.showKeyboard()
         dockAnimator = android.animation.ValueAnimator.ofFloat(start, target).apply {
             duration = if (animate && !requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled())
-                (220 * kotlin.math.abs(target - start)).toLong() else 0L
-            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
+                ((if (expanded) 380 else 300) * kotlin.math.abs(target - start)).toLong() else 0L
+            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)
             addUpdateListener {
                 val progress = it.animatedValue as Float
                 val b = _binding ?: return@addUpdateListener
                 b.dockSearch.tag = progress
                 val selectedKey = expandedDockKey ?: b.dockSearch
                 val leftmost = b.dockContacts.left
-                listOf(b.dockSearch, b.dockContacts, b.dockBolt, b.dockPlaceholder, b.dockSettings).forEach { key ->
+                dockKeys.forEach { key ->
                     val isSelected = key === selectedKey
                     key.translationX = if (isSelected) (leftmost - key.left) * progress else 0f
                     key.translationZ = if (isSelected) 8f else 0f
                     key.alpha = if (isSelected) 1f else 1f - progress
-                    key.isEnabled = !expanded
                 }
                 b.search.alpha = progress
-                b.search.translationX = -b.search.width * (1f - progress)
-                b.search.clipBounds = android.graphics.Rect(
-                    (b.search.width * (1f - progress)).toInt(), 0,
-                    b.search.width, b.search.height)
+                b.search.translationX = 0f
+                searchRevealBounds.set(0, 0, (b.search.width * progress).toInt(), b.search.height)
+                b.search.clipBounds = searchRevealBounds
             }
             addListener(object : android.animation.AnimatorListenerAdapter() {
                 private var cancelled = false
@@ -642,8 +689,7 @@ class AppDrawerFragment : BaseFragment() {
                 }
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     if (cancelled || _binding == null || dockExpanded != expanded) return
-                    if (expanded) binding.search.showKeyboard()
-                    else {
+                    if (!expanded) {
                         binding.search.visibility = View.INVISIBLE
                         expandedDockKey = null
                     }
@@ -1091,6 +1137,8 @@ class AppDrawerFragment : BaseFragment() {
         contactsLoad?.cancel()
         searchEditor?.dismiss()
         searchEditor = null
+        androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(binding.root, null)
+        binding.root.translationY = 0f
         dockAnimator?.cancel()
         dockAnimator = null
         commandKeys.forEach { it.animate().cancel() }

@@ -2,7 +2,7 @@ package app.olauncher.ui
 
 import android.content.Context
 import android.util.AttributeSet
-import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import androidx.core.view.doOnPreDraw
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.helper.isEinkDisplay
@@ -19,7 +19,15 @@ class DockResultsView @JvmOverloads constructor(
 
     /** Animate the rows, keeping the panel and keyboard completely stationary. */
     fun animateSearchResults(query: String, force: Boolean = false) {
-        if (!force && lastQuery == query) return
+        // Filtering should stay steady: never restart every visible row on a keystroke.
+        if (!force) {
+            if (lastQuery != query) {
+                animationGeneration++
+                resetRows()
+            }
+            lastQuery = query
+            return
+        }
         lastQuery = query
         val generation = ++animationGeneration
         resetRows()
@@ -28,14 +36,15 @@ class DockResultsView @JvmOverloads constructor(
             if (generation != animationGeneration || scrollState != SCROLL_STATE_IDLE || !isShown) return@doOnPreDraw
             val rows = (0 until childCount).map { getChildAt(it) }.sortedByDescending { it.top }
             rows.forEachIndexed { index, row ->
-                row.alpha = 0f
-                row.translationY = 14f * resources.displayMetrics.density
+                row.animate().cancel()
+                row.alpha = 0.72f
+                row.translationY = 8f * resources.displayMetrics.density
                 row.animate()
                     .alpha(1f)
                     .translationY(0f)
-                    .setStartDelay((index.coerceAtMost(4) * 16).toLong())
-                    .setDuration(180L)
-                    .setInterpolator(DecelerateInterpolator())
+                    .setStartDelay((index.coerceAtMost(5) * 8).toLong())
+                    .setDuration(300L)
+                    .setInterpolator(PathInterpolator(0.2f, 0f, 0.2f, 1f))
                     .start()
             }
         }
