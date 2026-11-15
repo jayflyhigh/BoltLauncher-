@@ -4,8 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.util.AttributeSet
+import android.view.View
+import android.widget.LinearLayout
 import android.view.Gravity
 import androidx.appcompat.widget.AppCompatTextView
 import java.util.Date
@@ -13,11 +17,14 @@ import java.util.Date
 /** A fixed-size dock crown: taps only swap cached text, without animators or delayed clicks. */
 class HomeInfoView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
-) : AppCompatTextView(context, attrs) {
+) : LinearLayout(context, attrs) {
     private var mode = 0
     private var battery = "—%"
     private var time = ""
     private var date = ""
+    private val label = AppCompatTextView(context)
+    private val dots = Array(3) { View(context) }
+    private val density = resources.displayMetrics.density
     private val updates = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
@@ -31,11 +38,32 @@ class HomeInfoView @JvmOverloads constructor(
 
     init {
         setBackgroundResource(app.olauncher.R.drawable.home_info_crown)
+        orientation = HORIZONTAL
         gravity = Gravity.CENTER
-        setTextColor(android.graphics.Color.WHITE)
-        textSize = 18f
-        includeFontPadding = false
-        setSingleLine()
+        // Extend the background behind the dock corners; keep content above the overlap.
+        setPadding(dp(28), dp(4), dp(28), dp(34))
+        label.apply {
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            includeFontPadding = false
+            setSingleLine()
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        addView(label, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        val indicators = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        dots.forEach { dot ->
+            dot.background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+            indicators.addView(dot, LayoutParams(dp(6), dp(6)).apply {
+                leftMargin = dp(3)
+                rightMargin = dp(3)
+            })
+        }
+        addView(indicators, LayoutParams(LayoutParams.WRAP_CONTENT, dp(12)))
         setOnClickListener { cycle() }
         refreshLabels()
     }
@@ -53,13 +81,20 @@ class HomeInfoView @JvmOverloads constructor(
     }
 
     private fun showLabel() {
-        text = when (mode) { 1 -> battery; 2 -> date; else -> time }
+        label.text = when (mode) { 1 -> battery; 2 -> date; else -> time }
+        dots.forEachIndexed { index, dot ->
+            (dot.background as GradientDrawable).setColor(
+                if (index == mode) Color.rgb(255, 214, 0) else Color.rgb(128, 128, 128)
+            )
+        }
         contentDescription = when (mode) {
             1 -> "Battery $battery. Tap to show date"
             2 -> "$date. Tap to show time"
             else -> "$time. Tap to show battery"
         }
     }
+
+    private fun dp(value: Int) = (value * density + 0.5f).toInt()
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
