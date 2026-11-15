@@ -625,7 +625,7 @@ class AppDrawerFragment : BaseFragment() {
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
         val startMargin = if (contact && commandKeys.isNotEmpty())
             commandKeys[0].right + (6 * density).toInt()
-        else if (!thunderMode && !contactsMode && activeSearch == null && !adapter.searchCommandsOnly)
+        else if (!thunderMode && !contactsMode && activeSearch == null)
             (4 * density).toInt()
         else (56 * density).toInt()
         val endMargin = (4 * density).toInt()
@@ -636,7 +636,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.search.setPadding(0, 0, 0, 0)
         binding.dockSearch.visibility = if (dockExpanded && !contact && !contactsMode && !thunderMode &&
-            (activeSearch != null || adapter.searchCommandsOnly)) View.VISIBLE else View.GONE
+            activeSearch != null) View.VISIBLE else View.GONE
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -871,6 +871,10 @@ class AppDrawerFragment : BaseFragment() {
                 if (launchAppSearch()) return true
                 if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
                 else if (contactsMode) contactsAdapter.openFirst()
+                else if (adapter.searchCommandsOnly) {
+                    if (!inAppSearch.launchBrowser(binding.search.query.toString()))
+                        requireContext().showToast("No browser available")
+                }
                 else if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
                 return true
             }

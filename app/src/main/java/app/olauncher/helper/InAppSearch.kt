@@ -27,8 +27,12 @@ class InAppSearch(private val context: Context) {
         val installed = apps.filterIsInstance<AppModel.App>()
             .filter { it.user == android.os.Process.myUserHandle() }.associateBy { it.appPackage }
         seedDefaults(installed.keys)
+        val browsers = context.packageManager.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER), 0
+        ).map { it.activityInfo.packageName }.toSet() + "com.sec.android.app.sbrowser"
         targets = configurations().mapNotNull { config ->
             val app = installed[config.optString("package")] ?: return@mapNotNull null
+            if (app.appPackage in browsers) return@mapNotNull null
             val url = config.optString("url")
             val code = config.optString("alias")
             if (!SearchCommandUrl.valid(url) || code.isBlank()) return@mapNotNull null
@@ -96,11 +100,44 @@ class InAppSearch(private val context: Context) {
         return intent.setComponent(ComponentName(activity.packageName, activity.name))
     }
 
-    fun launch(target: Target, query: String): Boolean = try {
-        val intent = resolve(target.app.appPackage, SearchCommandUrl.build(target.template, query))
-        if (intent == null) false else {
+    fun launchBrowser(query: String): Boolean {
+        if (query.isBlank()) return true
+        return try {
+            val browser = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)
+                .resolveActivity(context.packageManager)?.packageName
+            val intent = Intent(Intent.ACTION_VIEW,
+                Uri.parse(SearchCommandUrl.build("https://www.google.com/search?q={query}", query)))
+            if (browser != null && browser != "android") intent.setPackage(browser)
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             true
+        } catch (_: android.content.ActivityNotFoundException) { false }
+          catch (_: SecurityException) { false }
+    }
+
+    fun launch(target: Target, query: String): Boolean = try {
+        if (target.app.appPackage == "com.google.android.apps.bard" &&
+            target.template == "https://gemini.google.com/app") {
+            val share = Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, query).setPackage(target.app.appPackage)
+            if (share.resolveActivity(context.packageManager) != null) {
+                context.startActivity(share.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            } else {
+                val launch = context.packageManager.getLaunchIntentForPackage(target.app.appPackage)
+                if (launch == null) false else {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Gemini prompt", query))
+                    context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    android.widget.Toast.makeText(context, "Prompt copied. Paste it into Gemini.", android.widget.Toast.LENGTH_LONG).show()
+                    true
+                }
+            }
+        } else {
+            val intent = resolve(target.app.appPackage, SearchCommandUrl.build(target.template, query))
+            if (intent == null) false else {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            }
         }
     } catch (_: android.content.ActivityNotFoundException) { false }
       catch (_: SecurityException) { false }
@@ -109,7 +146,9 @@ class InAppSearch(private val context: Context) {
 
     companion object {
         private val defaults = listOf(
-            Preset("com.sec.android.app.sbrowser", "https://www.google.com/search?q={query}", "#7885F8", "WEB"),
+            Preset("com.android.vending", "https://play.google.com/store/search?q={query}", "#34A853", "PS"),
+            Preset("com.google.android.apps.maps", "https://www.google.com/maps/search/?api=1&query={query}", "#4285F4", "MAP"),
+            Preset("com.google.android.apps.bard", "https://gemini.google.com/app", "#8E75FF", "GEM"),
             Preset("com.reddit.frontpage", "https://www.reddit.com/search/?q={query}", "#FF4500", "RD"),
             Preset("com.pinterest", "https://www.pinterest.com/search/pins/?q={query}", "#E60023", "PIN"),
             Preset("com.zhiliaoapp.musically", "https://www.tiktok.com/search?q={query}", "#000000", "Tik")
