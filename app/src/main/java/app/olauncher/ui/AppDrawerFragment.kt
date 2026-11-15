@@ -351,6 +351,12 @@ class AppDrawerFragment : BaseFragment() {
             addContact()
             return
         }
+        val selected = contactsAdapter.selectedContact
+        if (selected != null && command in listOf(ContactCommand.CALL, ContactCommand.MESSAGE, ContactCommand.WHATSAPP)) {
+            runContactCommand(selected, command)
+            return
+        }
+        contactsAdapter.clearSelection()
         contactCommand = command
         contactLaunchQuery = null
         binding.search.queryHint = command.hint
@@ -442,10 +448,12 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.postDelayed(task, 500L)
     }
 
-    private fun runContactCommand(contact: ContactSearchAdapter.Contact) {
+    private fun runContactCommand(
+        contact: ContactSearchAdapter.Contact,
+        command: ContactCommand? = contactCommand
+    ) {
         cancelAutoLaunch()
         contactLaunchQuery = binding.search.query.toString()
-        val command = contactCommand
         if (command == null || command == ContactCommand.SEARCH) {
             try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri)) }
             catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No contacts app available") }
@@ -488,6 +496,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun setContactsMode(enabled: Boolean) {
         contactsMode = enabled
+        contactsAdapter.clearSelection()
         cancelAutoLaunch()
         binding.recyclerView.adapter = if (enabled) contactsAdapter else adapter
         binding.search.queryHint = if (enabled) "Search contacts" else "Search Apps"
@@ -957,7 +966,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initAdapter() {
-        contactsAdapter = ContactSearchAdapter { contact -> runContactCommand(contact) }
+        contactsAdapter = ContactSearchAdapter { contact ->
+            if (contactsMode && contactCommand == null) contactsAdapter.toggleSelection(contact)
+            else runContactCommand(contact)
+        }
         adapter = AppDrawerAdapter(
             flag,
             prefs.appLabelAlignment,
