@@ -7,8 +7,12 @@ import java.net.URLEncoder
 
 /** Autocomplete is requested only after a search destination has been selected. */
 object SearchSuggestions {
+    private val cache = android.util.LruCache<String, List<String>>(64)
+    fun cached(query: String): List<String>? = cache.get(query.trim())
+
     fun fetch(query: String): List<String> {
         if (query.isBlank()) return emptyList()
+        cached(query)?.let { return it }
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         var connection: HttpURLConnection? = null
         return try {
@@ -20,7 +24,7 @@ object SearchSuggestions {
             val values = JSONArray(response).getJSONArray(1)
             (0 until values.length()).map { values.getString(it) }
                 .filter { it.isNotBlank() && !it.equals(query.trim(), true) }
-                .distinct().take(6)
+                .distinct().take(6).also { cache.put(query.trim(), it) }
         } catch (_: Exception) {
             emptyList()
         } finally {

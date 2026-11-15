@@ -784,8 +784,11 @@ class AppDrawerFragment : BaseFragment() {
         suggestionJob?.cancel()
         val target = activeSearch ?: return
         if (query.isBlank()) return
+        app.olauncher.helper.SearchSuggestions.cached(query)?.let {
+            adapter.showSuggestions(query, it)
+            return
+        }
         suggestionJob = viewLifecycleOwner.lifecycleScope.launch {
-            kotlinx.coroutines.delay(250)
             val suggestions = withContext(Dispatchers.IO) {
                 app.olauncher.helper.SearchSuggestions.fetch(query)
             }
@@ -1060,7 +1063,7 @@ class AppDrawerFragment : BaseFragment() {
                     linearLayoutManager.reverseLayout = activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
                     linearLayoutManager.stackFromEnd = false
                     binding.recyclerView.scrollToPosition(0)
-                    binding.recyclerView.animateSearchResults(query)
+                    if (activeSearch == null) binding.recyclerView.animateSearchResults(query)
                     scheduleAutoLaunch(query)
                 }
             },

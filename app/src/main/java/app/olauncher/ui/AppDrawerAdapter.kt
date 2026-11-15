@@ -101,17 +101,25 @@ class AppDrawerAdapter(
     private var thunderMode = false
 
     fun filterApps(query: String) {
-        suggestions = emptyList()
+        val trimmed = query.trim()
+        suggestions = if (searchPackage != null && trimmed.isNotEmpty())
+            (listOf(trimmed) + suggestions.filter { it.contains(trimmed, ignoreCase = true) })
+                .distinct().take(7)
+        else emptyList()
         requestedQuery = query
+        if (searchPackage != null) {
+            val target = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle }
+            submitList(target + suggestions.map { AppModel.SearchSuggestion(it, query) })
+        }
         committedQuery = null
         appFilter.filter(query)
     }
 
     fun showSuggestions(query: String, values: List<String>) {
         if (query != requestedQuery || searchPackage == null) return
-        suggestions = values
-        val items = appFilteredList.filterNot { it is AppModel.SearchSuggestion } +
-            values.map { AppModel.SearchSuggestion(it) }
+        suggestions = (listOf(query.trim()) + values).filter { it.isNotBlank() }.distinct().take(7)
+        val items = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle } +
+            suggestions.map { AppModel.SearchSuggestion(it, query) }
         submitList(items) {
             if (query == requestedQuery) resultsChanged(query)
         }
@@ -235,7 +243,7 @@ class AppDrawerAdapter(
                 results?.values?.let {
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
-                    val displayed = if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it) } else items
+                    val displayed = if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) } else items
                     submitList(displayed) {
                         if (query == requestedQuery) {
                             committedQuery = query
@@ -339,7 +347,20 @@ class AppDrawerAdapter(
                 appHideLayout.visibility = View.GONE
                 renameLayout.visibility = View.GONE
                 appTitle.visibility = View.VISIBLE
-                appTitle.text = appModel.appLabel
+                appTitle.text = android.text.SpannableString(appModel.appLabel).apply {
+                    val needle = appModel.query.trim()
+                    if (needle.isNotEmpty()) {
+                        var start = appModel.appLabel.indexOf(needle, ignoreCase = true)
+                        while (start >= 0) {
+                            setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.rgb(255, 214, 0)),
+                                start, start + needle.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            start = appModel.appLabel.indexOf(needle, start + needle.length, ignoreCase = true)
+                        }
+                    }
+                }
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    appTitle, 8, 20, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                appTitle.ellipsize = null
                 appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
                 appIcon.isVisible = true
                 appIcon.setImageResource(R.drawable.dock_search)
@@ -352,6 +373,9 @@ class AppDrawerAdapter(
                 appIcon.setOnLongClickListener(null)
                 return@with
             }
+            androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
+            appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
+            appTitle.ellipsize = android.text.TextUtils.TruncateAt.END
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE
