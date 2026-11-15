@@ -563,12 +563,25 @@ class AppDrawerFragment : BaseFragment() {
             isActivated = enabled
             isCursorVisible = true
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                textCursorDrawable = androidx.appcompat.content.res.AppCompatResources.getDrawable(
-                    context, R.drawable.bolt_search_cursor)?.mutate()?.apply {
-                        // TextView updates cursor state while blinking and focusing.
-                        // Keep the mode color independent of those state changes.
-                        setTint(foreground)
+                val cursorWidth = (2 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+                textCursorDrawable = object : android.graphics.drawable.Drawable() {
+                    private val paint = android.graphics.Paint().apply { color = foreground }
+
+                    override fun draw(canvas: android.graphics.Canvas) {
+                        canvas.drawRect(bounds, paint)
                     }
+
+                    override fun getIntrinsicWidth(): Int = cursorWidth
+                    override fun setAlpha(alpha: Int) {
+                        paint.alpha = alpha
+                        invalidateSelf()
+                    }
+
+                    // Theme/IME tint filters must not recolor the mode's cursor.
+                    override fun setColorFilter(filter: android.graphics.ColorFilter?) = Unit
+                    @Suppress("DEPRECATION")
+                    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
+                }
             }
             refreshDrawableState()
         }
