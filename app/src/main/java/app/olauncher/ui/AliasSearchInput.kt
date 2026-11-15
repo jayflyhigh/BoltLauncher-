@@ -11,6 +11,54 @@ import androidx.appcompat.widget.SearchView
 /** Receives empty/start-of-query Backspace from both software and physical keyboards. */
 class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     SearchView.SearchAutoComplete(context, attrs) {
+    private var thunderCursor = false
+    private var blinkStart = 0L
+    private val cursorPaint = android.graphics.Paint().apply { color = android.graphics.Color.BLACK }
+
+    fun setThunderCursor(enabled: Boolean) {
+        thunderCursor = enabled
+        // Hide the framework cursor entirely in thunder mode.
+        isCursorVisible = !enabled
+        blinkStart = android.os.SystemClock.uptimeMillis()
+        invalidate()
+    }
+
+    override fun onSelectionChanged(start: Int, end: Int) {
+        super.onSelectionChanged(start, end)
+        blinkStart = android.os.SystemClock.uptimeMillis()
+        invalidate()
+    }
+
+    override fun onFocusChanged(focused: Boolean, direction: Int, previous: android.graphics.Rect?) {
+        super.onFocusChanged(focused, direction, previous)
+        blinkStart = android.os.SystemClock.uptimeMillis()
+        invalidate()
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        super.onWindowFocusChanged(hasWindowFocus)
+        blinkStart = android.os.SystemClock.uptimeMillis()
+        invalidate()
+    }
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        super.onDraw(canvas)
+        if (!thunderCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
+            selectionStart != selectionEnd) return
+        val textLayout = layout ?: return
+        val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart
+        if ((elapsed / 500L) % 2L == 0L) {
+            val offset = selectionStart.coerceAtMost(textLayout.text.length)
+            val line = textLayout.getLineForOffset(offset)
+            val x = compoundPaddingLeft + textLayout.getPrimaryHorizontal(offset)
+            val originY = baseline - textLayout.getLineBaseline(0)
+            val top = (originY + textLayout.getLineTop(line)).toFloat()
+            val bottom = (originY + textLayout.getLineBottom(line)).toFloat()
+            canvas.drawRect(x, top, x + 2f * resources.displayMetrics.density, bottom, cursorPaint)
+        }
+        postInvalidateDelayed(500L - elapsed % 500L)
+    }
+
     var undoAlias: (() -> Boolean)? = null
 
     private fun undoAtStart(): Boolean =
