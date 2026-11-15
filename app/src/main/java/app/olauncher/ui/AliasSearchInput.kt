@@ -59,6 +59,24 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
         postInvalidateDelayed(500L - elapsed % 500L)
     }
 
+    var submitEmpty: (() -> Boolean)? = null
+    private var consumingEnter = false
+
+    private fun submitEmptyQuery(): Boolean = text.isNullOrEmpty() && submitEmpty?.invoke() == true
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.repeatCount == 0) consumingEnter = submitEmptyQuery()
+                if (consumingEnter) return true
+            } else if (event.action == KeyEvent.ACTION_UP && consumingEnter) {
+                consumingEnter = false
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     var undoAlias: (() -> Boolean)? = null
 
     private fun undoAtStart(): Boolean =
@@ -72,6 +90,13 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val connection = super.onCreateInputConnection(outAttrs) ?: return null
         return object : InputConnectionWrapper(connection, false) {
+            override fun performEditorAction(editorAction: Int): Boolean {
+                if ((editorAction == EditorInfo.IME_ACTION_SEARCH ||
+                        editorAction == EditorInfo.IME_ACTION_DONE ||
+                        editorAction == EditorInfo.IME_ACTION_GO ||
+                        editorAction == EditorInfo.IME_NULL) && submitEmptyQuery()) return true
+                return super.performEditorAction(editorAction)
+            }
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
                 if (beforeLength > 0 && afterLength == 0 && undoAtStart()) return true
                 return super.deleteSurroundingText(beforeLength, afterLength)
