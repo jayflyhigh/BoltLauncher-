@@ -755,7 +755,23 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private fun undoSearchAlias(): Boolean {
+        if (activeSearch == null) return false
+        cancelAutoLaunch()
+        val commandsOnly = adapter.searchCommandsOnly
+        clearAppSearch()
+        adapter.searchCommandsOnly = commandsOnly
+        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search apps"
+        adapter.notifyItemRangeChanged(0, adapter.itemCount)
+        adapter.filterApps(binding.search.query.toString())
+        setThunderMode(false)
+        binding.search.showKeyboard()
+        return true
+    }
+
     private fun initSearch() {
+        (binding.search.findViewById<android.view.View>(R.id.search_src_text) as? AliasSearchInput)
+            ?.undoAlias = { undoSearchAlias() }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
