@@ -125,6 +125,7 @@ class AppDrawerFragment : BaseFragment() {
         initObservers()
         initClickListeners()
         initDock()
+        binding.homeInfo.visibility = if (isHomePage) View.VISIBLE else View.GONE
         initHomeSwipe()
         applyDockInsets()
         binding.recyclerView.visibility = if (isHomePage) View.INVISIBLE else View.VISIBLE
@@ -216,8 +217,9 @@ class AppDrawerFragment : BaseFragment() {
                 }
 
                 override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
-                    if (!isHomePage || !contactsMode || dockExpanded) return false
-                    resetHomeSearch()
+                    if (!isHomePage || dockExpanded) return false
+                    binding.homeInfo.cycle()
+                    if (contactsMode) resetHomeSearch()
                     return true
                 }
 
@@ -368,6 +370,7 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         dockAnimator?.cancel()
         dockExpanded = expanded
+        binding.homeInfo.visibility = if (isHomePage && !expanded) View.VISIBLE else View.GONE
         if (!expanded) {
             binding.search.hideKeyboard()
             binding.search.clearFocus()
@@ -633,6 +636,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
         val opening = expanded && !dockExpanded
         dockExpanded = expanded
+        binding.homeInfo.visibility = if (isHomePage && !expanded) View.VISIBLE else View.GONE
         if (expanded) dockThunderTransition = thunderMode
         val animateThunder = dockThunderTransition
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
