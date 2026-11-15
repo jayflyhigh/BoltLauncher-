@@ -43,8 +43,8 @@ class DockResultsView @JvmOverloads constructor(
                     .alpha(1f)
                     .translationY(0f)
                     .setStartDelay((index.coerceAtMost(5) * 8).toLong())
-                    .setDuration(220L)
-                    .setInterpolator(PathInterpolator(0.22f, 1f, 0.36f, 1f))
+                    .setDuration(300L)
+                    .setInterpolator(PathInterpolator(0.2f, 0f, 0.2f, 1f))
                     .start()
             }
         }
