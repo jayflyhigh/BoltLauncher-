@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Шпалери</string>
+    <string name="keep_current">Залишити поточні</string>
+    <string name="theme_wallpaper_message">Залишити поточні шпалери чи вибрати однотонне тло, що відповідає новій темі?</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">วอลเปเปอร์</string>
+    <string name="keep_current">ใช้ภาพปัจจุบัน</string>
+    <string name="theme_wallpaper_message">ใช้วอลเปเปอร์ปัจจุบันต่อไป หรือเปลี่ยนเป็นพื้นหลังสีเรียบที่เข้ากับธีมใหม่?</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Papel de parede</string>
+    <string name="keep_current">Manter o atual</string>
+    <string name="theme_wallpaper_message">Manter o papel de parede atual ou mudar para um de cor sólida que combine com o novo tema?</string>
+</resources>

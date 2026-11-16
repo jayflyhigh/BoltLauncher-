@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">טפט</string>
+    <string name="keep_current">שמירת הטפט הנוכחי</string>
+    <string name="theme_wallpaper_message">לשמור את הטפט הנוכחי או לעבור לטפט אחיד שמתאים לערכת הנושא החדשה?</string>
+</resources>

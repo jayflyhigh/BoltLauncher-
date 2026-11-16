@@ -1,6 +1,7 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.annotation.SuppressLint
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -9,6 +10,9 @@ import android.view.inputmethod.InputConnectionWrapper
 import androidx.appcompat.widget.SearchView
 
 /** Receives empty/start-of-query Backspace from both software and physical keyboards. */
+// SearchView requires its SearchAutoComplete subclass in the custom layout (it casts internally).
+// Keep this exception local to the input that supplies alias undo and the thunder cursor.
+@SuppressLint("RestrictedApi")
 class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     SearchView.SearchAutoComplete(context, attrs) {
     private var thunderCursor = false

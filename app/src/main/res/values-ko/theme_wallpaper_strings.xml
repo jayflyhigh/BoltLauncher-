@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">배경화면</string>
+    <string name="keep_current">현재 배경화면 유지</string>
+    <string name="theme_wallpaper_message">현재 배경화면을 유지할까요, 아니면 새 테마에 어울리는 단색 배경화면으로 바꿀까요?</string>
+</resources>

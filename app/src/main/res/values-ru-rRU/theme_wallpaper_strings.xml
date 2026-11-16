@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Обои</string>
+    <string name="keep_current">Оставить текущие</string>
+    <string name="theme_wallpaper_message">Оставить текущие обои или выбрать однотонный фон, подходящий к новой теме?</string>
+</resources>

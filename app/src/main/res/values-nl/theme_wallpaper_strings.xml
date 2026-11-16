@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Achtergrond</string>
+    <string name="keep_current">Huidige behouden</string>
+    <string name="theme_wallpaper_message">Je huidige achtergrond behouden of overschakelen naar een effen achtergrond die bij het nieuwe thema past?</string>
+</resources>

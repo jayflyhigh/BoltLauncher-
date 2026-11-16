@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">壁紙</string>
+    <string name="keep_current">現在の壁紙を維持</string>
+    <string name="theme_wallpaper_message">現在の壁紙を維持しますか？それとも新しいテーマに合う単色の壁紙に変更しますか？</string>
+</resources>

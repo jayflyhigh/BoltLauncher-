@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">壁纸</string>
+    <string name="keep_current">保留当前壁纸</string>
+    <string name="theme_wallpaper_message">保留当前壁纸，还是切换为与新主题匹配的纯色壁纸？</string>
+</resources>

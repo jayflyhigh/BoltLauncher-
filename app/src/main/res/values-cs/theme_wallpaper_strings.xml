@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Tapeta</string>
+    <string name="keep_current">Ponechat aktuální</string>
+    <string name="theme_wallpaper_message">Ponechat aktuální tapetu, nebo přepnout na jednobarevnou tapetu odpovídající novému motivu?</string>
+</resources>
