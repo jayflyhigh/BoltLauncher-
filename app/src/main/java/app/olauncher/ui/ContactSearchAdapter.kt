@@ -51,7 +51,7 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
     private var filterGeneration = 0L
     private val termSeparator = Regex("\\s+")
 
-    fun filter(query: String, applied: () -> Unit = {}) {
+    fun filter(query: String, showAll: Boolean = true, applied: () -> Unit = {}) {
         filterJob?.cancel()
         committedQuery = null
         val generation = ++filterGeneration
@@ -60,7 +60,7 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
         filterJob = photoScope.launch {
             val previous = results
             val (filtered, changes) = withContext(Dispatchers.Default) {
-                val next = if (terms.isEmpty()) source else source.filter { contact ->
+                val next = if (terms.isEmpty()) { if (showAll) source else emptyList() } else source.filter { contact ->
                     ensureActive()
                     terms.all { contact.name.contains(it, ignoreCase = true) ||
                         contact.numbers.any { number -> number.contains(it) } }

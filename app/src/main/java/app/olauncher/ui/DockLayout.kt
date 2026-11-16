@@ -27,7 +27,7 @@ class DockLayout @JvmOverloads constructor(
         val search = findViewById<View>(R.id.search) ?: return
         val params = search.layoutParams as LayoutParams
         // Match the original integer margin interpolation, including at fractional densities.
-        val endMargin = ((56f - 52f * progress) * resources.displayMetrics.density).toInt()
+        val endMargin = ((56f + (params.marginEnd / resources.displayMetrics.density - 56f) * progress) * resources.displayMetrics.density).toInt()
         val viewportWidth = (width - paddingLeft - paddingRight - params.leftMargin - endMargin)
             .coerceAtLeast(0)
         if (search.width == viewportWidth && search.measuredWidth == viewportWidth) return
