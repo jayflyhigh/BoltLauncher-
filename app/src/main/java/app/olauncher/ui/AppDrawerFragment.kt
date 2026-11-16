@@ -78,14 +78,15 @@ class AppDrawerFragment : BaseFragment() {
     private fun isUnifiedSearch() = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
         !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
 
-    private fun configureResultSections(query: String) {
+    private fun configureResultSections(query: String): Boolean {
+        val previousAdapter = binding.recyclerView.adapter
         if (!isUnifiedSearch()) {
             unifiedReversed = null
             unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = null
             val target = if (contactsMode) contactsAdapter else adapter
             if (binding.recyclerView.adapter !== target) binding.recyclerView.adapter = target
-            return
+            return previousAdapter !== target
         }
         val reversed = query.isNotBlank()
         if (unifiedReversed != reversed || binding.recyclerView.adapter !== unifiedAdapter) {
@@ -99,6 +100,7 @@ class AppDrawerFragment : BaseFragment() {
         linearLayoutManager.reverseLayout = reversed
         linearLayoutManager.stackFromEnd = false
         updateSectionHeaders()
+        return previousAdapter !== unifiedAdapter
     }
 
     private fun updateSectionHeaders() {
@@ -817,6 +819,11 @@ class AppDrawerFragment : BaseFragment() {
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
         if (opening && animate) binding.recyclerView.animateSearchResults(binding.search.query.toString(), force = true)
         dockAnimator?.cancel()
+        val query = binding.search.query.toString()
+        if (configureResultSections(query)) {
+            if (contactsMode) filterContacts(query) else adapter.filterApps(query)
+            if (isUnifiedSearch()) filterUnifiedContacts(query)
+        }
         configureSearchGeometry()
         binding.dock.setSearchProgress((binding.dockSearch.tag as? Float) ?: 0f)
         binding.dockKeys.visibility = View.VISIBLE
