@@ -26,11 +26,10 @@ class SearchGestureLayout @JvmOverloads constructor(
                 startX = event.x
                 startY = event.y
                 consumed = false
-                // Keep normal scrolling/selection gestures on visible result rows.
-                val results = findViewById<android.view.View>(R.id.recyclerView)
-                val onResults = results?.isShown == true && results.getGlobalVisibleRect(bounds) &&
+                val bar = findViewById<android.view.View>(R.id.homeSearch)
+                val onBar = bar?.isShown == true && bar.getGlobalVisibleRect(bounds) &&
                     bounds.contains(event.rawX.toInt(), event.rawY.toInt())
-                candidate = !onResults && canSwitchSearch?.invoke() == true
+                candidate = onBar && canSwitchSearch?.invoke() == true
             }
             MotionEvent.ACTION_POINTER_DOWN -> candidate = false
             MotionEvent.ACTION_MOVE -> {

@@ -51,6 +51,7 @@ class AppDrawerFragment : BaseFragment() {
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
     private var positionedAppQuery: String? = null
+    private var homeSearchCommandsOnly = false
 
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
@@ -218,11 +219,11 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun initHomeSwipe() {
         binding.root.canSwitchSearch = {
-            isHomePage && flag == Constants.FLAG_LAUNCH_APP && !contactsMode && !thunderMode
+            isHomePage && flag == Constants.FLAG_LAUNCH_APP && !dockExpanded && !contactsMode && !thunderMode
         }
         binding.root.switchSearch = {
-            if (!dockExpanded) setDockExpanded(true)
-            switchSearchDestination()
+            homeSearchCommandsOnly = !homeSearchCommandsOnly
+            updateHomeSearchHint()
         }
         val threshold = 64f * resources.displayMetrics.density
         var notificationsOpened = false
@@ -267,11 +268,21 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private fun updateHomeSearchHint() {
+        val hint = if (homeSearchCommandsOnly) "Search within apps" else "Search Apps"
+        binding.homeSearch.text = hint
+        binding.homeSearch.contentDescription = hint
+    }
+
     private fun initDock() {
+        updateHomeSearchHint()
         binding.homeSearch.setOnClickListener {
             clearAppSearch()
             setContactsMode(false)
+            adapter.searchCommandsOnly = homeSearchCommandsOnly
+            binding.search.queryHint = binding.homeSearch.text
             setThunderMode(false)
+            adapter.filterApps(binding.search.query.toString())
             setDockExpanded(true)
         }
         binding.dockSearch.setOnClickListener { switchSearchDestination() }
