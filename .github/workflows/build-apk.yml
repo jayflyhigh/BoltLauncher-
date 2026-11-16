@@ -18,6 +18,15 @@ jobs:
       - name: Compile debug APK
         run: chmod +x gradlew && ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: Bolt-Web-Search-Button-Debug
+          name: Bolt-Bug-Fixes-2.0-Debug
           path: app/build/outputs/apk/debug/*.apk
+      - name: Retain validation reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Bolt-Bug-Fixes-2.0-Validation
+          path: |
+            app/build/reports/lint-results-debug.*
+            app/build/test-results/testDebugUnitTest/*.xml
