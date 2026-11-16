@@ -444,6 +444,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun showContactCommands() {
+        val keepSearchFocused = binding.search.hasFocus()
         dismissSelectedContactActions()
         clearAppSearch()
         binding.homeSearch.visibility = View.GONE
@@ -455,8 +456,10 @@ class AppDrawerFragment : BaseFragment() {
         setThunderMode(false)
         contactCommand = null
         dockExpanded = false
-        binding.search.hideKeyboard()
-        binding.search.visibility = View.INVISIBLE
+        // Keep the focused editor visible to the IME beneath the contact shortcuts.
+        // Making it invisible detaches the input connection and dismisses the keyboard.
+        binding.search.visibility = if (keepSearchFocused) View.VISIBLE else View.INVISIBLE
+        binding.search.alpha = 0f
         binding.search.setQuery("", false)
         // Do not expose cached contacts after permission has been revoked.
         if (androidx.core.content.ContextCompat.checkSelfPermission(requireContext(),
@@ -759,7 +762,7 @@ class AppDrawerFragment : BaseFragment() {
         if (_binding != null && contactsMode) {
             val keyboardVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
                 ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-            if (dockExpanded && keyboardVisible) {
+            if ((dockExpanded || binding.search.hasFocus()) && keyboardVisible) {
                 // Keep the command, query, and results available for scrolling.
                 binding.search.hideKeyboard()
             } else if (contactCommand != null) {
