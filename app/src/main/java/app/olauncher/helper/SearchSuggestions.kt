@@ -5,7 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLEncoder
 
-/** Autocomplete is requested only after a search destination has been selected. */
+/** Autocomplete for a selected search destination or app searches with no matches. */
 object SearchSuggestions {
     private val cache = android.util.LruCache<String, List<String>>(64)
     fun cached(query: String): List<String>? = cache.get(query.trim())
