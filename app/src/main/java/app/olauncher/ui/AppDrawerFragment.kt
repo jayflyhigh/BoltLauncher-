@@ -789,9 +789,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
     }
 
+    private fun canShowWebSuggestions(): Boolean =
+        dockExpanded && !contactsMode && !thunderMode && activeSearch == null &&
+            !adapter.searchCommandsOnly && flag == Constants.FLAG_LAUNCH_APP
+
     private fun updateSearchSuggestions(query: String) {
         suggestionJob?.cancel()
-        val target = activeSearch ?: return
+        val target = activeSearch
+        if (target == null && (!canShowWebSuggestions() || adapter.appFilteredList.isNotEmpty())) return
         if (query.isBlank()) return
         app.olauncher.helper.SearchSuggestions.cached(query)?.let {
             adapter.showSuggestions(query, it)
@@ -909,7 +914,7 @@ class AppDrawerFragment : BaseFragment() {
                 else if (adapter.committedQuery == binding.search.query.toString()) {
                     val text = binding.search.query.toString().trim()
                     if (!thunderMode && flag == Constants.FLAG_LAUNCH_APP &&
-                        adapter.itemCount == 0 && text.isNotBlank()) {
+                        adapter.appFilteredList.isEmpty() && text.isNotBlank()) {
                         if (!inAppSearch.launchBrowser(text))
                             requireContext().showToast("No browser available")
                     } else adapter.launchFirstInList()
@@ -944,7 +949,7 @@ class AppDrawerFragment : BaseFragment() {
                         if (contactCommand != ContactCommand.ADD) filterContacts(newText)
                     } else {
                         adapter.filterApps(newText)
-                        updateSearchSuggestions(newText)
+                        if (activeSearch != null) updateSearchSuggestions(newText)
                     }
                     binding.appRename.visibility =
                         if (canRename && newText.isNotBlank()) View.VISIBLE else View.GONE
@@ -998,6 +1003,9 @@ class AppDrawerFragment : BaseFragment() {
                     activeSearch?.let { target ->
                         if (!inAppSearch.launch(target, appModel.appLabel))
                             requireContext().showToast("Search is unavailable in ${target.app.appLabel}")
+                    } ?: run {
+                        if (canShowWebSuggestions() && !inAppSearch.launchBrowser(appModel.appLabel))
+                            requireContext().showToast("No browser available")
                     }
                     return@AppDrawerAdapter
                 }
@@ -1088,6 +1096,8 @@ class AppDrawerFragment : BaseFragment() {
             searchClick = { activateAppSearch(it, binding.search.query.toString()) },
             searchHold = { showAppSearchEditor(it) },
             searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
+            webSuggestionsEnabled = { canShowWebSuggestions() },
+            emptyAppResults = { query -> updateSearchSuggestions(query) },
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
