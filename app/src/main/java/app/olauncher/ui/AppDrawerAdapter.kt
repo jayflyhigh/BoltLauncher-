@@ -47,6 +47,8 @@ class AppDrawerAdapter(
     private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val searchAlias: (AppModel) -> String? = { null },
+    private val webSuggestionsEnabled: () -> Boolean = { false },
+    private val emptyAppResults: (String) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
@@ -116,7 +118,8 @@ class AppDrawerAdapter(
     }
 
     fun showSuggestions(query: String, values: List<String>) {
-        if (query != requestedQuery || searchPackage == null) return
+        if (query != requestedQuery || (searchPackage == null &&
+            (!webSuggestionsEnabled() || appFilteredList.isNotEmpty()))) return
         suggestions = (listOf(query.trim()) + values).filter { it.isNotBlank() }.distinct().take(7)
         val items = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle } +
             suggestions.map { AppModel.SearchSuggestion(it, query) }
@@ -243,11 +246,14 @@ class AppDrawerAdapter(
                 results?.values?.let {
                     val items = it as MutableList<AppModel>
                     appFilteredList = items
-                    val displayed = if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) } else items
+                    val webFallback = items.isEmpty() && query.isNotBlank() && webSuggestionsEnabled()
+                    val displayed = if (webFallback) listOf(AppModel.SearchSuggestion(query.trim(), query))
+                        else if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) } else items
                     submitList(displayed) {
                         if (query == requestedQuery) {
                             committedQuery = query
                             resultsChanged(query)
+                            if (webFallback) emptyAppResults(query)
                         }
                     }
                 }
