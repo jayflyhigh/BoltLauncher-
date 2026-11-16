@@ -975,18 +975,6 @@ class AppDrawerFragment : BaseFragment() {
                 try {
                     cancelAutoLaunch()
                     suggestionJob?.cancel()
-                    if (dockExpanded && !contactsMode && !thunderMode && activeSearch == null &&
-                        !adapter.searchCommandsOnly && flag == Constants.FLAG_LAUNCH_APP &&
-                        newText.endsWith('.') && !isSearchComposing()) {
-                        val browserQuery = newText.dropLast(1).trim()
-                        if (browserQuery.isNotBlank()) {
-                            // Consume the shortcut before launching so returning cannot resend it.
-                            binding.search.setQuery(browserQuery, false)
-                            if (!inAppSearch.launchBrowser(browserQuery))
-                                requireContext().showToast("No browser available")
-                            return true
-                        }
-                    }
                     if (activeSearch == null && !contactsMode && flag == Constants.FLAG_LAUNCH_APP && newText.contains(' ') && !isSearchComposing()) {
                         val confirmed = inAppSearch.confirmed(newText)
                         if (confirmed != null) {
