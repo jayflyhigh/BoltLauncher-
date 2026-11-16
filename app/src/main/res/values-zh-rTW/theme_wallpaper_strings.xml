@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">桌布</string>
+    <string name="keep_current">保留目前桌布</string>
+    <string name="theme_wallpaper_message">保留目前桌布，還是切換為與新主題相符的純色桌布？</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Wallpaper</string>
+    <string name="keep_current">Pertahankan yang sekarang</string>
+    <string name="theme_wallpaper_message">Pertahankan wallpaper saat ini atau ganti ke wallpaper polos yang sesuai dengan tema baru?</string>
+</resources>

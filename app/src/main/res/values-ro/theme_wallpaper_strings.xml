@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Imagine de fundal</string>
+    <string name="keep_current">Păstrează imaginea actuală</string>
+    <string name="theme_wallpaper_message">Păstrezi imaginea de fundal actuală sau alegi un fundal simplu care se potrivește cu noua temă?</string>
+</resources>

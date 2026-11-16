@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Pozadina</string>
+    <string name="keep_current">Zadrži trenutačnu</string>
+    <string name="theme_wallpaper_message">Zadržati trenutačnu pozadinu ili prijeći na jednobojnu koja odgovara novoj temi?</string>
+</resources>

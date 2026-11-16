@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Sfondo</string>
+    <string name="keep_current">Mantieni quello attuale</string>
+    <string name="theme_wallpaper_message">Vuoi mantenere lo sfondo attuale o passare a uno a tinta unita abbinato al nuovo tema?</string>
+</resources>

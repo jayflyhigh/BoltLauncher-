@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Hình nền</string>
+    <string name="keep_current">Giữ hình nền hiện tại</string>
+    <string name="theme_wallpaper_message">Giữ hình nền hiện tại hay chuyển sang hình nền đơn sắc phù hợp với giao diện mới?</string>
+</resources>

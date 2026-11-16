@@ -55,6 +55,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val homeAppAlignment = MutableLiveData<Int>()
     val screenTimeValue = MutableLiveData<String>()
     private var screenTimeJob: Job? = null
+    private var appListJob: Job? = null
+    private var hiddenAppsJob: Job? = null
+    private var privateSpaceJob: Job? = null
 
     val privateSpaceApps = MutableLiveData<List<AppModel>?>()
     val privateSpaceLocked = MutableLiveData<Boolean>()
@@ -106,6 +109,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun launchShortcut(appModel: AppModel.PinnedShortcut) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
+            appContext.showToast(appContext.getString(R.string.unable_to_open_shortcut))
+            return
+        }
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val query = LauncherApps.ShortcutQuery().apply {
             setPackage(appModel.appPackage)
@@ -366,7 +373,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun launchApp(packageName: String, activityClassName: String?, userHandle: UserHandle) {
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-        val activityInfo = launcher.getActivityList(packageName, userHandle)
+        val activityInfo = try {
+            launcher.getActivityList(packageName, userHandle)
+        } catch (_: Exception) {
+            appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+            return
+        }
 
         val isActivityValid = activityClassName.isNullOrBlank().not()
                 && activityInfo.any { it.componentName.className == activityClassName }
@@ -399,7 +411,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getAppList(includeHiddenApps: Boolean = false) {
-        viewModelScope.launch {
+        appListJob?.cancel()
+        appListJob = viewModelScope.launch {
             val apps = getAppsList(appContext, prefs, includeRegularApps = true, includeHiddenApps)
             appList.value = apps
         }
@@ -407,7 +420,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getHiddenApps() {
-        viewModelScope.launch {
+        hiddenAppsJob?.cancel()
+        hiddenAppsJob = viewModelScope.launch {
             hiddenApps.value =
                 getAppsList(appContext, prefs, includeRegularApps = false, includeHiddenApps = true)
         }
@@ -474,7 +488,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getPrivateSpaceAppList() {
-        viewModelScope.launch {
+        privateSpaceJob?.cancel()
+        privateSpaceJob = viewModelScope.launch {
             val handle = getPrivateSpaceUserHandle(appContext)
             privateSpaceAvailable.value = handle != null
             if (handle != null) {

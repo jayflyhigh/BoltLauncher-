@@ -1,7 +1,7 @@
 name: Build debug APK
 on:
   push:
-    branches: [hold-to-add-search-alias-code, web-search-button, highlight-contact, search-apps, fix-widget-info, time-battery-date, new-search-dock-bar, cursor-color-fix-thunder-mode, animation-fixes, search-defaults, Show-contacts-when-opened, Switch-contacts-and-apps, student-fixes-launcher, adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
+    branches: [bug-fixes-2.0, hold-to-add-search-alias-code, web-search-button, highlight-contact, search-apps, fix-widget-info, time-battery-date, new-search-dock-bar, cursor-color-fix-thunder-mode, animation-fixes, search-defaults, Show-contacts-when-opened, Switch-contacts-and-apps, student-fixes-launcher, adding-contact-search, New-search-bar-for-the-home-page, fix-search-results, choppy-scrolling, new-Bolt-Launcher-search, fixes-for-Bolt-Launcher]
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,8 +16,17 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
       - name: Compile debug APK
-        run: chmod +x gradlew && ./gradlew testDebugUnitTest assembleDebug --console=plain
+        run: chmod +x gradlew && ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: Bolt-Web-Search-Button-Debug
+          name: Bolt-Bug-Fixes-2.0-Debug
           path: app/build/outputs/apk/debug/*.apk
+      - name: Retain validation reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Bolt-Bug-Fixes-2.0-Validation
+          path: |
+            app/build/reports/lint-results-debug.*
+            app/build/test-results/testDebugUnitTest/*.xml

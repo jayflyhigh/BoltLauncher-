@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Ταπετσαρία</string>
+    <string name="keep_current">Διατήρηση τρέχουσας</string>
+    <string name="theme_wallpaper_message">Να διατηρηθεί η τρέχουσα ταπετσαρία ή να αλλάξει σε μια μονόχρωμη που ταιριάζει με το νέο θέμα;</string>
+</resources>

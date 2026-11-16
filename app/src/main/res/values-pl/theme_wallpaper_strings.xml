@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Tapeta</string>
+    <string name="keep_current">Zachowaj obecną</string>
+    <string name="theme_wallpaper_message">Zachować obecną tapetę czy zmienić ją na jednolite tło pasujące do nowego motywu?</string>
+</resources>

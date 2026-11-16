@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Taustakuva</string>
+    <string name="keep_current">Säilytä nykyinen</string>
+    <string name="theme_wallpaper_message">Säilytetäänkö nykyinen taustakuva vai vaihdetaanko uuteen teemaan sopivaan yksiväriseen taustaan?</string>
+</resources>

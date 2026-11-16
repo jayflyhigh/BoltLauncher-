@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Háttérkép</string>
+    <string name="keep_current">Jelenlegi megtartása</string>
+    <string name="theme_wallpaper_message">Megtartja a jelenlegi háttérképet, vagy az új témához illő egyszínű háttérre vált?</string>
+</resources>

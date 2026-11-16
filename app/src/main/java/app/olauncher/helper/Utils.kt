@@ -519,6 +519,8 @@ fun openCalendar(context: Context) {
         try {
             val intent = Intent(Intent.ACTION_MAIN)
             intent.addCategory(Intent.CATEGORY_APP_CALENDAR)
+            intent.component = intent.resolveActivity(context.packageManager)
+                ?: throw android.content.ActivityNotFoundException("No calendar available")
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()

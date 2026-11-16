@@ -83,7 +83,10 @@ fun Context.resetDefaultLauncher() {
         )
         val selector = Intent(Intent.ACTION_MAIN)
         selector.addCategory(Intent.CATEGORY_HOME)
-        startActivity(selector)
+        // Resolve first, preserving the default home/resolver destination while launching explicitly.
+        selector.component = selector.resolveActivity(packageManager)
+            ?: throw android.content.ActivityNotFoundException("No home activity available")
+        startActivity(selector.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         packageManager.setComponentEnabledSetting(
             componentName,
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED,

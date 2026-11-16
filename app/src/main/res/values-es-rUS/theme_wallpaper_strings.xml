@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Fondo de pantalla</string>
+    <string name="keep_current">Mantener el actual</string>
+    <string name="theme_wallpaper_message">¿Quieres mantener tu fondo de pantalla actual o cambiar a uno liso que combine con el nuevo tema?</string>
+</resources>

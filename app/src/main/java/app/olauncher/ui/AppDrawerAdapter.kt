@@ -31,6 +31,7 @@ import app.olauncher.data.Constants
 import app.olauncher.databinding.AdapterAppDrawerBinding
 import app.olauncher.databinding.AdapterPrivateSpaceHeaderBinding
 import app.olauncher.helper.appLabelMatches
+import app.olauncher.helper.appSearchRank
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.showKeyboard
@@ -91,6 +92,7 @@ class AppDrawerAdapter(
     }
 
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        cancelFiltering()
         iconScope.coroutineContext.cancelChildren()
         super.onDetachedFromRecyclerView(recyclerView)
     }
@@ -103,19 +105,69 @@ class AppDrawerAdapter(
         private set
     private var thunderMode = false
 
+    private var filterGeneration = 0L
+    private var filterJob: Job? = null
+
+    /** Invalidate work even when a mode change keeps exactly the same query. */
+    fun cancelFiltering() {
+        filterGeneration++
+        filterJob?.cancel()
+        committedQuery = null
+    }
+
     fun filterApps(query: String) {
+        cancelFiltering()
+        val generation = filterGeneration
+        val selectedPackage = searchPackage
+        val commandsOnly = searchCommandsOnly
         val trimmed = query.trim()
-        suggestions = if (searchPackage != null && trimmed.isNotEmpty())
+        suggestions = if (selectedPackage != null && trimmed.isNotEmpty())
             (listOf(trimmed) + suggestions.filter { it.contains(trimmed, ignoreCase = true) })
                 .distinct().take(7)
         else emptyList()
         requestedQuery = query
-        if (searchPackage != null) {
-            val target = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle }
-            submitList(target + suggestions.map { AppModel.SearchSuggestion(it, query) })
+        // Resolve aliases and destinations on the UI thread; the worker only sees immutable data.
+        val apps = appsList.toList()
+        val aliases = if (trimmed.isNotEmpty() && selectedPackage == null && !commandsOnly)
+            apps.associateWith { searchAlias(it) } else emptyMap()
+        val destinations = if (commandsOnly && selectedPackage == null)
+            apps.filter { it is AppModel.App && searchTarget(it) != null }
+                .distinctBy { it.appPackage }.sortedBy { it.appLabel.lowercase(java.util.Locale.ROOT) }
+            else emptyList()
+        filterJob = iconScope.launch {
+            val items = withContext(Dispatchers.Default) {
+                when {
+                    commandsOnly && selectedPackage == null -> destinations
+                    selectedPackage != null -> apps.filter {
+                        it is AppModel.App && it.appPackage == selectedPackage && it.user == myUserHandle
+                    }
+                    trimmed.isBlank() -> apps
+                    else -> apps.filter { app ->
+                        ensureActive()
+                        app !is AppModel.PrivateSpaceHeader &&
+                            (appLabelMatches(app.appLabel, trimmed) || aliases[app]?.startsWith(trimmed, true) == true)
+                    }.map { app ->
+                        Triple(app, appSearchRank(app.appLabel, trimmed),
+                            app.appLabel.lowercase(java.util.Locale.ROOT))
+                    }.sortedWith(compareBy<Triple<AppModel, Int, String>> { it.second }.thenBy { it.third })
+                        .map { it.first }
+                }
+            }
+            if (generation != filterGeneration || searchPackage != selectedPackage ||
+                searchCommandsOnly != commandsOnly) return@launch
+            appFilteredList = items.toMutableList()
+            val webFallback = items.isEmpty() && query.isNotBlank() && webSuggestionsEnabled()
+            val displayed = if (webFallback) listOf(AppModel.SearchSuggestion(trimmed, query))
+                else if (selectedPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) }
+                else items
+            submitList(displayed) {
+                if (generation == filterGeneration && searchPackage == selectedPackage && searchCommandsOnly == commandsOnly) {
+                    committedQuery = query
+                    resultsChanged(query)
+                    if (webFallback) emptyAppResults(query)
+                }
+            }
         }
-        committedQuery = null
-        appFilter.filter(query)
     }
 
     fun showSuggestions(query: String, values: List<String>) {
@@ -124,8 +176,9 @@ class AppDrawerAdapter(
         suggestions = (listOf(query.trim()) + values).filter { it.isNotBlank() }.distinct().take(7)
         val items = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle } +
             suggestions.map { AppModel.SearchSuggestion(it, query) }
+        val generation = filterGeneration
         submitList(items) {
-            if (query == requestedQuery) resultsChanged(query)
+            if (generation == filterGeneration && query == requestedQuery) resultsChanged(query)
         }
     }
 
@@ -147,7 +200,6 @@ class AppDrawerAdapter(
         }
     }
 
-    private val appFilter = createAppFilter()
     private val myUserHandle = android.os.Process.myUserHandle()
 
     var appsList: MutableList<AppModel> = mutableListOf()
@@ -213,59 +265,17 @@ class AppDrawerAdapter(
         }
     }
 
-    override fun getFilter(): Filter = this.appFilter
-
-    private fun createAppFilter(): Filter {
-        return object : Filter() {
-            override fun performFiltering(charSearch: CharSequence?): FilterResults {
-                val query = charSearch?.toString()?.trim().orEmpty()
-                val appFilteredList = if (searchCommandsOnly && searchPackage == null) appsList.filter { app ->
-                    app is AppModel.App && searchTarget(app) != null
-                }.distinctBy { it.appPackage }.sortedBy { it.appLabel.lowercase(java.util.Locale.ROOT) }.toMutableList()
-                else if (searchPackage != null) appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == android.os.Process.myUserHandle() }.toMutableList()
-                else if (query.isBlank()) appsList.toMutableList()
-                else appsList.filter { app ->
-                    app !is AppModel.PrivateSpaceHeader && (appLabelMatches(app.appLabel, query) || searchAlias(app)?.startsWith(query, true) == true)
-                }.sortedWith(compareBy<AppModel> {
-                    when {
-                        it.appLabel.equals(query, true) -> 0
-                        it.appLabel.startsWith(query, true) -> 1
-                        it.appLabel.split(Regex("\\s+")).any { word -> word.startsWith(query, true) } -> 2
-                        else -> 3
-                    }
-                }.thenBy { it.appLabel.lowercase(java.util.Locale.ROOT) }).toMutableList()
-
-                val filterResults = FilterResults()
-                filterResults.values = appFilteredList
-                return filterResults
-            }
-
-            @Suppress("UNCHECKED_CAST")
-            override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
-                val query = constraint?.toString().orEmpty()
-                if (query != requestedQuery) return
-                results?.values?.let {
-                    val items = it as MutableList<AppModel>
-                    appFilteredList = items
-                    val webFallback = items.isEmpty() && query.isNotBlank() && webSuggestionsEnabled()
-                    val displayed = if (webFallback) listOf(AppModel.SearchSuggestion(query.trim(), query))
-                        else if (searchPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) } else items
-                    submitList(displayed) {
-                        if (query == requestedQuery) {
-                            committedQuery = query
-                            resultsChanged(query)
-                            if (webFallback) emptyAppResults(query)
-                        }
-                    }
-                }
-            }
+    override fun getFilter(): Filter = object : Filter() {
+        override fun performFiltering(constraint: CharSequence?) = FilterResults()
+        override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
+            filterApps(constraint?.toString().orEmpty())
         }
     }
 
     fun setAppList(appsList: MutableList<AppModel>) {
-        this.appsList = appsList
-        this.appFilteredList = appsList
-        submitList(appsList)
+        iconCache.evictAll()
+        this.appsList = appsList.toMutableList()
+        filterApps(requestedQuery)
     }
 
     fun launchOnlyResult(): Boolean {
@@ -537,7 +547,10 @@ class AppDrawerAdapter(
                 renameLayout.visibility = View.GONE
                 appTitle.visibility = View.VISIBLE
             }
-            appHide.setOnClickListener { appHideListener(appModel, bindingAdapterPosition) }
+            appHide.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) appHideListener(appModel, position)
+            }
         }
 
         private fun getAppName(context: Context, appPackage: String, user: UserHandle): String {

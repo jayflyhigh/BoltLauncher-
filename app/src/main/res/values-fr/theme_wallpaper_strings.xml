@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Fond d’écran</string>
+    <string name="keep_current">Conserver l’actuel</string>
+    <string name="theme_wallpaper_message">Conserver votre fond d’écran actuel ou choisir un fond uni assorti au nouveau thème ?</string>
+</resources>

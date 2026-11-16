@@ -50,6 +50,7 @@ android {
 
 dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar"])
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
     implementation libs.kotlin.stdlib
     implementation libs.core.ktx
     implementation libs.appcompat

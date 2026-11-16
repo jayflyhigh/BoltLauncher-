@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Bakgrunn</string>
+    <string name="keep_current">Behold gjeldende</string>
+    <string name="theme_wallpaper_message">Vil du beholde gjeldende bakgrunn eller bytte til en ensfarget bakgrunn som passer til det nye temaet?</string>
+</resources>

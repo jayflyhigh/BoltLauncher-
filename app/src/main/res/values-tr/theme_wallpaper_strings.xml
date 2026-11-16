@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wallpaper">Duvar kağıdı</string>
+    <string name="keep_current">Mevcut olanı koru</string>
+    <string name="theme_wallpaper_message">Mevcut duvar kağıdınız korunsun mu, yoksa yeni temaya uygun düz renkli bir arka plana mı geçilsin?</string>
+</resources>
