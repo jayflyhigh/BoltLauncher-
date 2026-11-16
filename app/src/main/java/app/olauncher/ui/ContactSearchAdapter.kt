@@ -64,7 +64,9 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
                     ensureActive()
                     terms.all { contact.name.contains(it, ignoreCase = true) ||
                         contact.numbers.any { number -> number.contains(it) } }
-                }
+                }.sortedWith(compareBy<Contact> {
+                    app.olauncher.helper.appSearchRank(it.name, query.trim())
+                }.thenBy { it.name.lowercase(Locale.ROOT) })
                 val diff = if (previous == next) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                     override fun getOldListSize() = previous.size
                     override fun getNewListSize() = next.size

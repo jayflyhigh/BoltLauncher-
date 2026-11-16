@@ -661,7 +661,7 @@ class AppDrawerFragment : BaseFragment() {
         contactsAdapter.filter(query) {
             val b = _binding ?: return@filter
             if (!contactsMode || b.search.query.toString() != query) return@filter
-            linearLayoutManager.reverseLayout = query.isNotBlank()
+            linearLayoutManager.reverseLayout = true
             linearLayoutManager.stackFromEnd = false
             b.recyclerView.scrollToPosition(0)
             b.recyclerView.animateSearchResults(query)
@@ -966,9 +966,8 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
     }
 
-    private fun canShowWebSuggestions(): Boolean =
-        dockExpanded && !contactsMode && !thunderMode && activeSearch == null &&
-            !adapter.searchCommandsOnly && flag == Constants.FLAG_LAUNCH_APP
+    // Suggestions belong to Search within apps, not the unified Search page.
+    private fun canShowWebSuggestions(): Boolean = false
 
     private fun updateSearchSuggestions(query: String) {
         suggestionJob?.cancel()
