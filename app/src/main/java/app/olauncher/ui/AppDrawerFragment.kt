@@ -1225,7 +1225,10 @@ class AppDrawerFragment : BaseFragment() {
             }
         }
 
+        // Repeated private-space/app observers often publish the same snapshot.
+        // Keep existing icons and search results when nothing actually changed.
         combinedAppsJob?.cancel()
+        if (combined == adapter.appsList) return
         combinedAppsJob = viewLifecycleOwner.lifecycleScope.launch {
             inAppSearch.loadAsync(combined)
             if (_binding != null) adapter.setAppList(combined)

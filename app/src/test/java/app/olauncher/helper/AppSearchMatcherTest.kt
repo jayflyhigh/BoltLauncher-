@@ -54,4 +54,15 @@ class AppSearchMatcherTest {
         // which must not vacuously match every label via the fallback path.
         assertFalse(appLabelMatches("Camera", "---"))
     }
+    @Test
+    fun `prepared matcher reuses cached labels with unchanged search semantics`() {
+        val labels = listOf("Café", "Google Maps", "Sam's App", "Camera", "---")
+        val cached = labels.associateWith { it.normalizeForSearch() }
+        for (query in listOf("cafe", "googlemaps", "sams app", "CAM", "  cam  ", "---", "", "xyz")) {
+            val matcher = AppLabelMatcher(query)
+            labels.forEach { label ->
+                org.junit.Assert.assertEquals(appLabelMatches(label, query), matcher.matches(label, cached.getValue(label)))
+            }
+        }
+    }
 }
