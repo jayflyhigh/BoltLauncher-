@@ -217,6 +217,13 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initHomeSwipe() {
+        binding.root.canSwitchSearch = {
+            isHomePage && flag == Constants.FLAG_LAUNCH_APP && !contactsMode && !thunderMode
+        }
+        binding.root.switchSearch = {
+            if (!dockExpanded) setDockExpanded(true)
+            switchSearchDestination()
+        }
         val threshold = 64f * resources.displayMetrics.density
         var notificationsOpened = false
         val detector = android.view.GestureDetector(requireContext(),
@@ -1306,6 +1313,8 @@ class AppDrawerFragment : BaseFragment() {
         commandKeys.forEach { it.animate().cancel() }
         commandKeys = emptyList()
         binding.root.setOnTouchListener(null)
+        binding.root.canSwitchSearch = null
+        binding.root.switchSearch = null
         binding.recyclerView.clearOnScrollListeners()
         binding.recyclerView.adapter = null
         super.onDestroyView()
