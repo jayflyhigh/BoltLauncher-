@@ -218,13 +218,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initHomeSwipe() {
-        binding.root.canSwitchSearch = {
+        binding.root.canSwipeSearch = {
             isHomePage && flag == Constants.FLAG_LAUNCH_APP && !dockExpanded && !contactsMode && !thunderMode
         }
-        binding.root.switchSearch = {
-            homeSearchCommandsOnly = !homeSearchCommandsOnly
-            updateHomeSearchHint()
-        }
+        binding.root.onSwipeUp = { openHomeSearch() }
         val threshold = 64f * resources.displayMetrics.density
         var notificationsOpened = false
         val detector = android.view.GestureDetector(requireContext(),
@@ -237,6 +234,10 @@ class AppDrawerFragment : BaseFragment() {
                 override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
                     if (!isHomePage || dockExpanded) return false
                     if (contactsMode) resetHomeSearch()
+                    else if (flag == Constants.FLAG_LAUNCH_APP) {
+                        homeSearchCommandsOnly = !homeSearchCommandsOnly
+                        updateHomeSearchHint()
+                    }
                     return true
                 }
 
@@ -274,17 +275,19 @@ class AppDrawerFragment : BaseFragment() {
         binding.homeSearch.contentDescription = hint
     }
 
+    private fun openHomeSearch() {
+        clearAppSearch()
+        setContactsMode(false)
+        adapter.searchCommandsOnly = homeSearchCommandsOnly
+        binding.search.queryHint = binding.homeSearch.text
+        setThunderMode(false)
+        adapter.filterApps(binding.search.query.toString())
+        setDockExpanded(true)
+    }
+
     private fun initDock() {
         updateHomeSearchHint()
-        binding.homeSearch.setOnClickListener {
-            clearAppSearch()
-            setContactsMode(false)
-            adapter.searchCommandsOnly = homeSearchCommandsOnly
-            binding.search.queryHint = binding.homeSearch.text
-            setThunderMode(false)
-            adapter.filterApps(binding.search.query.toString())
-            setDockExpanded(true)
-        }
+        binding.homeSearch.setOnClickListener { openHomeSearch() }
         binding.dockSearch.setOnClickListener { switchSearchDestination() }
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         searchTextView?.let {
@@ -1324,8 +1327,8 @@ class AppDrawerFragment : BaseFragment() {
         commandKeys.forEach { it.animate().cancel() }
         commandKeys = emptyList()
         binding.root.setOnTouchListener(null)
-        binding.root.canSwitchSearch = null
-        binding.root.switchSearch = null
+        binding.root.canSwipeSearch = null
+        binding.root.onSwipeUp = null
         binding.recyclerView.clearOnScrollListeners()
         binding.recyclerView.adapter = null
         super.onDestroyView()

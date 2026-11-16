@@ -1,24 +1,21 @@
 package app.olauncher.ui
 
 import android.content.Context
-import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.widget.LinearLayout
-import app.olauncher.R
 import kotlin.math.abs
 
-/** Observe the whole dock, including its input, without stealing taps or horizontal editing. */
+/** Open the selected home search with one upward swipe, leaving child taps intact. */
 class SearchGestureLayout @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
 ) : LinearLayout(context, attrs) {
-    var canSwitchSearch: (() -> Boolean)? = null
-    var switchSearch: (() -> Unit)? = null
+    var canSwipeSearch: (() -> Boolean)? = null
+    var onSwipeUp: (() -> Unit)? = null
     private var startX = 0f
     private var startY = 0f
     private var candidate = false
     private var consumed = false
-    private val bounds = Rect()
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
@@ -26,17 +23,14 @@ class SearchGestureLayout @JvmOverloads constructor(
                 startX = event.x
                 startY = event.y
                 consumed = false
-                val bar = findViewById<android.view.View>(R.id.homeSearch)
-                val onBar = bar?.isShown == true && bar.getGlobalVisibleRect(bounds) &&
-                    bounds.contains(event.rawX.toInt(), event.rawY.toInt())
-                candidate = onBar && canSwitchSearch?.invoke() == true
+                candidate = canSwipeSearch?.invoke() == true
             }
             MotionEvent.ACTION_POINTER_DOWN -> candidate = false
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.x - startX
                 val dy = event.y - startY
                 if (!consumed && candidate && -dy > 64f * resources.displayMetrics.density &&
-                    -dy > abs(dx) && canSwitchSearch?.invoke() == true) {
+                    -dy > abs(dx) && canSwipeSearch?.invoke() == true) {
                     consumed = true
                     candidate = false
                     // Cancel the original target so releasing a swipe cannot click or launch it.
@@ -44,7 +38,7 @@ class SearchGestureLayout @JvmOverloads constructor(
                     cancel.action = MotionEvent.ACTION_CANCEL
                     super.dispatchTouchEvent(cancel)
                     cancel.recycle()
-                    switchSearch?.invoke()
+                    onSwipeUp?.invoke()
                 }
             }
         }
