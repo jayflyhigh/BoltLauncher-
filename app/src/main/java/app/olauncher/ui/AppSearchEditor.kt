@@ -9,10 +9,11 @@ import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import app.olauncher.data.AppModel
 import app.olauncher.helper.InAppSearch
+import app.olauncher.helper.AppIconColor
 
 object AppSearchEditor {
     fun show(context: Context, apps: List<AppModel.App>, search: InAppSearch,
-             initial: InAppSearch.Target?, onChanged: () -> Unit): AlertDialog {
+             initial: InAppSearch.Target?, selectedApp: AppModel.App? = null, onChanged: () -> Unit): AlertDialog {
         val density = context.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
         val nested = mutableListOf<AlertDialog>()
@@ -21,8 +22,8 @@ object AppSearchEditor {
             setPadding(dp(20), dp(4), dp(20), dp(12))
         }
         fun label(text: String) { panel.addView(TextView(context).apply { this.text = text; setPadding(0, dp(14), 0, dp(6)) }) }
-        var chosen: AppModel.App? = initial?.app
-        var color = initial?.color ?: Color.rgb(255, 213, 79)
+        var chosen: AppModel.App? = selectedApp ?: initial?.app
+        var color = initial?.color ?: AppIconColor.primary(context, chosen)
         label("1. Choose an app")
         val appButton = Button(context).apply { isAllCaps = false; text = chosen?.appLabel ?: "Choose app" }
         panel.addView(appButton)
@@ -63,7 +64,7 @@ object AppSearchEditor {
                     chosen = apps[index]; appButton.text = chosen!!.appLabel
                     val saved = search.targets[chosen!!.appPackage]
                     url.setText(saved?.template.orEmpty()); alias.setText(saved?.code.orEmpty())
-                    color = saved?.color ?: Color.rgb(255, 213, 79); refreshColor()
+                    color = saved?.color ?: AppIconColor.primary(context, chosen); refreshColor()
                     error.visibility = View.GONE
                 }.setNegativeButton(android.R.string.cancel, null).create()
             nested.add(picker); picker.show()

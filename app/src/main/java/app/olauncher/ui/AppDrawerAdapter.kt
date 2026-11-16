@@ -47,6 +47,7 @@ class AppDrawerAdapter(
     private val searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit = {},
     private val searchAlias: (AppModel) -> String? = { null },
+    private val appSearchHold: (AppModel.App) -> Unit = {},
     private val webSuggestionsEnabled: () -> Boolean = { false },
     private val emptyAppResults: (String) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
@@ -204,7 +205,7 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode, searchTarget(appModel), searchClick, searchHold, searchCommandsOnly
+                    thunderMode, searchTarget(appModel), searchClick, searchHold, appSearchHold, searchCommandsOnly
                 )
             }
         } catch (e: Exception) {
@@ -332,6 +333,7 @@ class AppDrawerAdapter(
             target: app.olauncher.helper.InAppSearch.Target?,
             searchClick: (app.olauncher.helper.InAppSearch.Target) -> Unit,
             searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
+            appSearchHold: (AppModel.App) -> Unit,
             searchCommandsOnly: Boolean,
         ) = with(binding) {
             isSuggestion = appModel is AppModel.SearchSuggestion
@@ -427,16 +429,17 @@ class AppDrawerAdapter(
             appTitle.setOnClickListener { clickListener(appModel) }
             root.setOnClickListener(if (searchCommandsOnly) View.OnClickListener { clickListener(appModel) } else null)
 
-            val editSearch = if (searchCommandsOnly && target != null) View.OnLongClickListener {
-                searchHold(target)
+            val canEditAppSearch = flag == Constants.FLAG_LAUNCH_APP &&
+                appModel is AppModel.App && appModel.user == myUserHandle
+            val editSearch = if (canEditAppSearch) View.OnLongClickListener {
+                appSearchHold(appModel as AppModel.App)
                 true
             } else null
             root.setOnLongClickListener(editSearch)
             appIcon.setOnLongClickListener(editSearch)
             appTitle.setOnLongClickListener {
-                if (searchCommandsOnly && target != null) {
-                    searchHold(target)
-                    return@setOnLongClickListener true
+                if (editSearch != null) {
+                    return@setOnLongClickListener editSearch.onLongClick(it)
                 }
                 if (appModel.appPackage.isNotEmpty()) {
                     appDelete.alpha = when (
