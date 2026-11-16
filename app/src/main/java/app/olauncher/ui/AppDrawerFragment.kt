@@ -906,7 +906,14 @@ class AppDrawerFragment : BaseFragment() {
                     if (!inAppSearch.launchBrowser(binding.search.query.toString()))
                         requireContext().showToast("No browser available")
                 }
-                else if (adapter.committedQuery == binding.search.query.toString()) adapter.launchFirstInList()
+                else if (adapter.committedQuery == binding.search.query.toString()) {
+                    val text = binding.search.query.toString().trim()
+                    if (!thunderMode && flag == Constants.FLAG_LAUNCH_APP &&
+                        adapter.itemCount == 0 && text.isNotBlank()) {
+                        if (!inAppSearch.launchBrowser(text))
+                            requireContext().showToast("No browser available")
+                    } else adapter.launchFirstInList()
+                }
                 return true
             }
 
