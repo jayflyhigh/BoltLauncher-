@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.DiffUtil
 import app.olauncher.databinding.AdapterAppDrawerBinding
 import kotlinx.coroutines.*
 import java.util.Locale
@@ -57,17 +58,25 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
         val source = contacts
         val terms = query.trim().split(termSeparator).filter { it.isNotEmpty() }
         filterJob = photoScope.launch {
-            val filtered = withContext(Dispatchers.Default) {
-                if (terms.isEmpty()) source else source.filter { contact ->
+            val previous = results
+            val (filtered, changes) = withContext(Dispatchers.Default) {
+                val next = if (terms.isEmpty()) source else source.filter { contact ->
                     ensureActive()
                     terms.all { contact.name.contains(it, ignoreCase = true) ||
                         contact.numbers.any { number -> number.contains(it) } }
                 }
+                val diff = if (previous == next) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                    override fun getOldListSize() = previous.size
+                    override fun getNewListSize() = next.size
+                    override fun areItemsTheSame(old: Int, new: Int) = previous[old].uri == next[new].uri
+                    override fun areContentsTheSame(old: Int, new: Int) = previous[old] == next[new]
+                }, false)
+                next to diff
             }
             if (generation != filterGeneration || source !== contacts) return@launch
             if (results != filtered) {
                 results = filtered
-                notifyDataSetChanged()
+                changes?.dispatchUpdatesTo(this@ContactSearchAdapter)
             }
             committedQuery = query
             applied()

@@ -30,7 +30,8 @@ import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.databinding.AdapterAppDrawerBinding
 import app.olauncher.databinding.AdapterPrivateSpaceHeaderBinding
-import app.olauncher.helper.appLabelMatches
+import app.olauncher.helper.AppLabelMatcher
+import app.olauncher.helper.normalizeForSearch
 import app.olauncher.helper.appSearchRank
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isSystemApp
@@ -128,6 +129,7 @@ class AppDrawerAdapter(
         requestedQuery = query
         // Resolve aliases and destinations on the UI thread; the worker only sees immutable data.
         val apps = appsList.toList()
+        val labels = normalizedLabels
         val aliases = if (trimmed.isNotEmpty() && selectedPackage == null && !commandsOnly)
             apps.associateWith { searchAlias(it) } else emptyMap()
         val destinations = if (commandsOnly && selectedPackage == null)
@@ -136,6 +138,7 @@ class AppDrawerAdapter(
             else emptyList()
         filterJob = iconScope.launch {
             val items = withContext(Dispatchers.Default) {
+                val matcher = AppLabelMatcher(trimmed)
                 when {
                     commandsOnly && selectedPackage == null -> destinations
                     selectedPackage != null -> apps.filter {
@@ -145,7 +148,7 @@ class AppDrawerAdapter(
                     else -> apps.filter { app ->
                         ensureActive()
                         app !is AppModel.PrivateSpaceHeader &&
-                            (appLabelMatches(app.appLabel, trimmed) || aliases[app]?.startsWith(trimmed, true) == true)
+                            (matcher.matches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch()) || aliases[app]?.startsWith(trimmed, true) == true)
                     }.map { app ->
                         Triple(app, appSearchRank(app.appLabel, trimmed),
                             app.appLabel.lowercase(java.util.Locale.ROOT))
@@ -202,6 +205,7 @@ class AppDrawerAdapter(
 
     private val myUserHandle = android.os.Process.myUserHandle()
 
+    private var normalizedLabels: Map<String, String> = emptyMap()
     var appsList: MutableList<AppModel> = mutableListOf()
     var appFilteredList: MutableList<AppModel> = mutableListOf()
 
@@ -275,6 +279,7 @@ class AppDrawerAdapter(
     fun setAppList(appsList: MutableList<AppModel>) {
         iconCache.evictAll()
         this.appsList = appsList.toMutableList()
+        normalizedLabels = appsList.associate { it.appLabel to it.appLabel.normalizeForSearch() }
         filterApps(requestedQuery)
     }
 
