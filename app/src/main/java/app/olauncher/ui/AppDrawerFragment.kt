@@ -128,6 +128,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.visibility = View.INVISIBLE
         binding.dockSearch.visibility = View.GONE
         binding.dockKeys.visibility = View.INVISIBLE
+        binding.dockAllContacts.visibility = View.GONE
         commandKeys.forEach { key ->
             key.animate().cancel()
             key.translationX = 0f
@@ -314,7 +315,10 @@ class AppDrawerFragment : BaseFragment() {
                 override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
                     if (!isHomePage || dockExpanded) return false
                     if (contactsMode) resetHomeSearch()
-
+                    else if (flag == Constants.FLAG_LAUNCH_APP) {
+                        homeSearchCommandsOnly = !homeSearchCommandsOnly
+                        updateHomeSearchHint()
+                    }
                     return true
                 }
 
@@ -355,10 +359,8 @@ class AppDrawerFragment : BaseFragment() {
     private fun openHomeSearch() {
         clearAppSearch()
         setContactsMode(false)
-        homeSearchCommandsOnly = false
-        updateHomeSearchHint()
-        adapter.searchCommandsOnly = false
-        binding.search.queryHint = "Search"
+        adapter.searchCommandsOnly = homeSearchCommandsOnly
+        binding.search.queryHint = binding.homeSearch.text
         setThunderMode(false)
         configureResultSections(binding.search.query.toString())
         adapter.filterApps(binding.search.query.toString())
@@ -393,7 +395,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockContacts.visibility = View.INVISIBLE
         binding.homeSearch.setPadding((16 * resources.displayMetrics.density).toInt(), 0,
             (64 * resources.displayMetrics.density).toInt(), 0)
-        binding.dockContacts.setOnClickListener { showContactCommands() }
+        binding.dockAllContacts.setOnClickListener { showContactCommands() }
         setThunderMode(false)
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
@@ -472,6 +474,7 @@ class AppDrawerFragment : BaseFragment() {
         dockAnimator?.cancel()
         binding.dockSearch.tag = 0f
         binding.dockKeys.visibility = View.INVISIBLE
+        binding.dockAllContacts.visibility = View.GONE
         commandProgress = 0f
         commandKeys.forEachIndexed { index, key ->
             key.animate().cancel()
@@ -827,8 +830,10 @@ class AppDrawerFragment : BaseFragment() {
         configureSearchGeometry()
         binding.dock.setSearchProgress((binding.dockSearch.tag as? Float) ?: 0f)
         binding.dockKeys.visibility = View.VISIBLE
-        binding.dockContacts.isEnabled = expanded && isUnifiedSearch()
-        binding.dockContacts.visibility = if (expanded && isUnifiedSearch()) View.VISIBLE else View.INVISIBLE
+        binding.dockContacts.isEnabled = false
+        binding.dockContacts.visibility = View.INVISIBLE
+        binding.dockAllContacts.isEnabled = expanded && isUnifiedSearch()
+        binding.dockAllContacts.visibility = if (expanded && isUnifiedSearch()) View.VISIBLE else View.GONE
         binding.dockBolt.isEnabled = !expanded
         binding.dockKeys.translationZ = if (animateThunder || isUnifiedSearch()) 8f else 0f
         binding.search.visibility = View.VISIBLE
@@ -858,9 +863,9 @@ class AppDrawerFragment : BaseFragment() {
                 b.search.alpha = progress
                 b.dockSearch.alpha = progress
                 b.dockSearch.translationX = 0f
-                b.dockContacts.alpha = if (isUnifiedSearch()) progress else 0f
-                b.dockContacts.translationX = if (isUnifiedSearch())
-                    (b.dockBolt.left - b.dockContacts.left).toFloat() else 0f
+                b.dockContacts.alpha = 0f
+                b.dockContacts.translationX = 0f
+                b.dockAllContacts.alpha = if (isUnifiedSearch()) progress else 0f
                 b.dockBolt.alpha = if (animateThunder) 1f else 1f - progress
                 b.dockBolt.translationX = if (animateThunder)
                     (b.dockContacts.left - b.dockBolt.left) * progress else 0f
