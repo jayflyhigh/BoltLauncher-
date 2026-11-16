@@ -125,7 +125,9 @@ class AppDrawerFragment : BaseFragment() {
         dockAnimator?.cancel()
         ensureCommandKeys()
         binding.homeSearch.visibility = View.GONE
-        binding.search.visibility = View.INVISIBLE
+        // Keep the focused editor attached and visible to the IME while actions cover it.
+        binding.search.visibility = View.VISIBLE
+        binding.search.alpha = 0f
         binding.dockSearch.visibility = View.GONE
         binding.dockKeys.visibility = View.INVISIBLE
         binding.dockAllContacts.visibility = View.GONE
@@ -661,7 +663,7 @@ class AppDrawerFragment : BaseFragment() {
         contactsAdapter.filter(query) {
             val b = _binding ?: return@filter
             if (!contactsMode || b.search.query.toString() != query) return@filter
-            linearLayoutManager.reverseLayout = true
+            linearLayoutManager.reverseLayout = query.isNotBlank()
             linearLayoutManager.stackFromEnd = false
             b.recyclerView.scrollToPosition(0)
             b.recyclerView.animateSearchResults(query)
