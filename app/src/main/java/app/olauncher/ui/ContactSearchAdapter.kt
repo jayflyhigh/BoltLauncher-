@@ -22,6 +22,8 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
     private var selectedUri: Uri? = null
+    var committedQuery: String? = null
+        private set
     val selectedContact: Contact?
         get() = contacts.firstOrNull { it.uri == selectedUri }
 
@@ -44,10 +46,32 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
         override fun sizeOf(key: Uri, value: android.graphics.Bitmap) = value.byteCount
     }
 
-    fun filter(query: String) {
-        val terms = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        results = contacts.filter { contact -> terms.all { (contact.name.contains(it, ignoreCase = true) || contact.numbers.any { number -> number.contains(it) }) } }
-        notifyDataSetChanged()
+    private var filterJob: Job? = null
+    private var filterGeneration = 0L
+    private val termSeparator = Regex("\\s+")
+
+    fun filter(query: String, applied: () -> Unit = {}) {
+        filterJob?.cancel()
+        committedQuery = null
+        val generation = ++filterGeneration
+        val source = contacts
+        val terms = query.trim().split(termSeparator).filter { it.isNotEmpty() }
+        filterJob = photoScope.launch {
+            val filtered = withContext(Dispatchers.Default) {
+                if (terms.isEmpty()) source else source.filter { contact ->
+                    ensureActive()
+                    terms.all { contact.name.contains(it, ignoreCase = true) ||
+                        contact.numbers.any { number -> number.contains(it) } }
+                }
+            }
+            if (generation != filterGeneration || source !== contacts) return@launch
+            if (results != filtered) {
+                results = filtered
+                notifyDataSetChanged()
+            }
+            committedQuery = query
+            applied()
+        }
     }
 
     fun openFirst() { results.firstOrNull()?.let(open) }
@@ -56,8 +80,13 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
         Holder(AdapterAppDrawerBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(results[position])
-    override fun onViewRecycled(holder: Holder) { holder.photoJob?.cancel() }
+    override fun onViewRecycled(holder: Holder) {
+        holder.photoJob?.cancel()
+        super.onViewRecycled(holder)
+    }
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        filterGeneration++
+        committedQuery = null
         photoScope.coroutineContext.cancelChildren()
         super.onDetachedFromRecyclerView(recyclerView)
     }

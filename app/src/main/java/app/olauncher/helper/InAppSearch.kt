@@ -24,13 +24,22 @@ class InAppSearch(private val context: Context) {
     } catch (_: Exception) { emptyList() }
 
     fun load(apps: List<AppModel>) {
+        targets = buildTargets(apps)
+    }
+
+    suspend fun loadAsync(apps: List<AppModel>) {
+        val loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { buildTargets(apps) }
+        targets = loaded
+    }
+
+    private fun buildTargets(apps: List<AppModel>): Map<String, Target> {
         val installed = apps.filterIsInstance<AppModel.App>()
             .filter { it.user == android.os.Process.myUserHandle() }.associateBy { it.appPackage }
         seedDefaults(installed.keys)
         val browsers = context.packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER), 0
         ).map { it.activityInfo.packageName }.toSet() + "com.sec.android.app.sbrowser"
-        targets = configurations().mapNotNull { config ->
+        return configurations().mapNotNull { config ->
             val app = installed[config.optString("package")] ?: return@mapNotNull null
             if (app.appPackage in browsers) return@mapNotNull null
             val url = config.optString("url")
