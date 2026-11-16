@@ -12,7 +12,7 @@ import app.olauncher.helper.InAppSearch
 
 object AppSearchEditor {
     fun show(context: Context, apps: List<AppModel.App>, search: InAppSearch,
-             initial: InAppSearch.Target?, onChanged: () -> Unit): AlertDialog {
+             initial: InAppSearch.Target?, selectedApp: AppModel.App? = null, onChanged: () -> Unit): AlertDialog {
         val density = context.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
         val nested = mutableListOf<AlertDialog>()
@@ -21,7 +21,7 @@ object AppSearchEditor {
             setPadding(dp(20), dp(4), dp(20), dp(12))
         }
         fun label(text: String) { panel.addView(TextView(context).apply { this.text = text; setPadding(0, dp(14), 0, dp(6)) }) }
-        var chosen: AppModel.App? = initial?.app
+        var chosen: AppModel.App? = selectedApp ?: initial?.app
         var color = initial?.color ?: Color.rgb(255, 213, 79)
         label("1. Choose an app")
         val appButton = Button(context).apply { isAllCaps = false; text = chosen?.appLabel ?: "Choose app" }

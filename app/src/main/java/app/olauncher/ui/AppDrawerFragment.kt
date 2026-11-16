@@ -812,14 +812,17 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun showAppSearchEditor(initial: app.olauncher.helper.InAppSearch.Target? = activeSearch) {
+    private fun showAppSearchEditor(
+        initial: app.olauncher.helper.InAppSearch.Target? = activeSearch,
+        selectedApp: AppModel.App? = null,
+    ) {
         if (searchEditor?.isShowing == true) return
         cancelAutoLaunch()
         binding.search.hideKeyboard()
         val apps = adapter.appsList.filterIsInstance<AppModel.App>()
             .filter { it.user == Process.myUserHandle() }.distinctBy { it.appPackage }
             .sortedBy { it.appLabel.lowercase(java.util.Locale.ROOT) }
-        searchEditor = AppSearchEditor.show(requireContext(), apps, inAppSearch, initial) {
+        searchEditor = AppSearchEditor.show(requireContext(), apps, inAppSearch, initial, selectedApp) {
             val current = activeSearch
             if (current != null) {
                 val updated = inAppSearch.targets[current.app.appPackage]
@@ -1095,6 +1098,7 @@ class AppDrawerFragment : BaseFragment() {
             searchTarget = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage] else null },
             searchClick = { activateAppSearch(it, binding.search.query.toString()) },
             searchHold = { showAppSearchEditor(it) },
+            appSearchHold = { app -> showAppSearchEditor(inAppSearch.targets[app.appPackage], app) },
             searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
             webSuggestionsEnabled = { canShowWebSuggestions() },
             emptyAppResults = { query -> updateSearchSuggestions(query) },
