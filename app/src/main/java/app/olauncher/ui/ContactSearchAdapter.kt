@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.DiffUtil
@@ -131,6 +132,31 @@ class ContactSearchAdapter(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         init {
+            val density = binding.root.resources.displayMetrics.density
+            binding.root.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            binding.root.minimumHeight = (68 * density).toInt()
+            // Measure the name and number together so two name lines never overlap the number.
+            binding.root.removeView(binding.appTitle)
+            binding.root.removeView(binding.contactNumber)
+            val labels = LinearLayout(binding.root.context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, (9 * density).toInt(), 0, (9 * density).toInt())
+            }
+            binding.appTitle.apply {
+                maxLines = 2
+                setPaddingRelative(0, 0, 0, 0)
+            }
+            binding.contactNumber.setPaddingRelative(0, 0, 0, 0)
+            labels.addView(binding.appTitle, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            labels.addView(binding.contactNumber, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            binding.root.addView(labels, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER_VERTICAL).apply {
+                marginStart = (76 * density).toInt()
+                marginEnd = (24 * density).toInt()
+            })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
         fun bindSelection(contact: Contact) {
@@ -147,9 +173,6 @@ class ContactSearchAdapter(
             val number = contact.numbers.firstOrNull().orEmpty()
             binding.contactNumber.text = number
             binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
-            binding.appTitle.setPaddingRelative(binding.appTitle.paddingStart, 0,
-                binding.appTitle.paddingEnd,
-                if (number.isEmpty()) 0 else (20 * binding.root.resources.displayMetrics.density).toInt())
             binding.appTitle.text = contact.name
             binding.otherProfileIndicator.visibility = View.GONE
             binding.resultBolt.visibility = View.GONE
