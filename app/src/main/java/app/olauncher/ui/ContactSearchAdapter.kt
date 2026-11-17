@@ -18,7 +18,11 @@ import kotlinx.coroutines.*
 import java.util.Locale
 
 /** Contact rows share the app result layout and dock-key silhouette. */
-class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.Adapter<ContactSearchAdapter.Holder>() {
+class ContactSearchAdapter(
+    private val open: (Contact) -> Unit,
+    private val tap: (Contact) -> Unit,
+    private val hold: (Contact) -> Unit,
+) : RecyclerView.Adapter<ContactSearchAdapter.Holder>() {
     data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>)
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
@@ -143,7 +147,11 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
                 if (name.isEmpty()) "?" else String(Character.toChars(name.codePointAt(0))).uppercase(Locale.getDefault())
             }
             initial.visibility = View.VISIBLE
-            binding.root.setOnClickListener { open(contact) }
+            binding.root.setOnClickListener { tap(contact) }
+            binding.root.setOnLongClickListener {
+                hold(contact)
+                true
+            }
             contact.photo?.let { photo ->
                 photoCache.get(photo)?.let { bitmap ->
                     binding.appIcon.setImageBitmap(bitmap)

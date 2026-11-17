@@ -149,7 +149,10 @@ class AppDrawerFragment : BaseFragment() {
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
         binding.dockKeys.visibility = View.VISIBLE
         binding.search.visibility = View.VISIBLE
-        setDockExpanded(true, animate = false)
+        if (contactsMode) {
+            if (contactCommand == null) showContactCommands()
+            else animateContactSearch(true)
+        } else setDockExpanded(true, animate = false)
     }
 
     private lateinit var contactsAdapter: ContactSearchAdapter
@@ -601,6 +604,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.postDelayed(task, 500L)
     }
 
+    private fun openContactPage(contact: ContactSearchAdapter.Contact) {
+        cancelAutoLaunch()
+        try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri)) }
+        catch (_: android.content.ActivityNotFoundException) {
+            requireContext().showToast("No contacts app available")
+        }
+    }
+
     private fun runContactCommand(
         contact: ContactSearchAdapter.Contact,
         command: ContactCommand? = contactCommand
@@ -608,8 +619,7 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         contactLaunchQuery = binding.search.query.toString()
         if (command == null || command == ContactCommand.SEARCH) {
-            try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, contact.uri)) }
-            catch (_: android.content.ActivityNotFoundException) { requireContext().showToast("No contacts app available") }
+            openContactPage(contact)
             return
         }
         if (contact.numbers.isEmpty()) { requireContext().showToast("This contact has no phone number"); return }
@@ -1206,15 +1216,21 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initAdapter() {
-        contactsAdapter = ContactSearchAdapter { contact ->
-            if (isUnifiedSearch()) {
+        contactsAdapter = ContactSearchAdapter(
+            open = { contact ->
+                if (contactsMode && contactCommand != null && contactCommand != ContactCommand.SEARCH) {
+                    runContactCommand(contact)
+                } else {
+                    contactsAdapter.toggleSelection(contact)
+                    showSelectedContactActions()
+                }
+            },
+            tap = { contact ->
                 contactsAdapter.toggleSelection(contact)
                 showSelectedContactActions()
-            } else if (contactsMode && contactCommand == null) {
-                contactsAdapter.toggleSelection(contact)
-                updateContactEditKey()
-            } else runContactCommand(contact)
-        }
+            },
+            hold = { contact -> openContactPage(contact) },
+        )
         adapter = AppDrawerAdapter(
             flag,
             prefs.appLabelAlignment,
