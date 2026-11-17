@@ -361,6 +361,7 @@ class AppDrawerAdapter(
         private var iconJob: Job? = null
         private var hasSearchBadge = false
         private var isSuggestion = false
+        private var isSearchDestination = false
         private var renameWatcher: TextWatcher? = null
 
         fun applyThunderStyle(enabled: Boolean) = with(binding) {
@@ -369,7 +370,7 @@ class AppDrawerAdapter(
             searchBadge.isVisible = hasSearchBadge && !enabled
             resultBolt.isVisible = enabled
             val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
-            appTitle.setPaddingRelative(((if (isSuggestion) 24 else 76) * root.resources.displayMetrics.density).toInt(), appTitle.paddingTop, endPadding, appTitle.paddingBottom)
+            appTitle.setPaddingRelative(((if (isSuggestion || isSearchDestination) 24 else 76) * root.resources.displayMetrics.density).toInt(), appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
         fun cancelIconLoad() {
@@ -399,6 +400,7 @@ class AppDrawerAdapter(
             onlyResult: Boolean,
         ) = with(binding) {
             isSuggestion = appModel is AppModel.SearchSuggestion
+            isSearchDestination = searchCommandsOnly
             hasSearchBadge = !thunderMode && target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
@@ -456,8 +458,8 @@ class AppDrawerAdapter(
 
             cancelIconLoad()
             appIcon.setImageDrawable(null)
-            appIcon.isVisible = appModel.appPackage.isNotEmpty()
-            if (appModel.appPackage.isNotEmpty()) {
+            appIcon.isVisible = !searchCommandsOnly && appModel.appPackage.isNotEmpty()
+            if (!searchCommandsOnly && appModel.appPackage.isNotEmpty()) {
                 val key = IconKey(appModel.appPackage, appModel.user, root.resources.displayMetrics.densityDpi)
                 val cached = iconCache.get(key)
                 appIcon.setImageDrawable(cached?.newDrawable(root.resources)
