@@ -23,7 +23,6 @@ import android.widget.Filter
 import android.widget.Filterable
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.R
 import app.olauncher.data.AppModel
@@ -55,7 +54,7 @@ class AppDrawerAdapter(
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
-) : ListAdapter<AppModel, RecyclerView.ViewHolder>(DIFF_CALLBACK), Filterable {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Filterable {
 
     companion object {
         private const val THUNDER_STYLE = "thunder_style"
@@ -106,6 +105,40 @@ class AppDrawerAdapter(
         private set
     private var thunderMode = false
 
+    private var displayedItems: List<AppModel> = emptyList()
+    val currentList: List<AppModel> get() = displayedItems
+    private fun getItem(position: Int) = displayedItems[position]
+    override fun getItemCount() = displayedItems.size
+    private var diffJob: Job? = null
+    private var diffGeneration = 0L
+
+    /** Unlike AsyncListDiffer's queue, obsolete diffs stop consuming worker time. */
+    private fun submitList(items: List<AppModel>, committed: () -> Unit) {
+        diffJob?.cancel()
+        val generation = ++diffGeneration
+        val previous = displayedItems
+        diffJob = iconScope.launch {
+            val changes = withContext(Dispatchers.Default) {
+                if (previous == items) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+                    override fun getOldListSize(): Int { ensureActive(); return previous.size }
+                    override fun getNewListSize(): Int { ensureActive(); return items.size }
+                    override fun areItemsTheSame(old: Int, new: Int): Boolean {
+                        ensureActive()
+                        return DIFF_CALLBACK.areItemsTheSame(previous[old], items[new])
+                    }
+                    override fun areContentsTheSame(old: Int, new: Int): Boolean {
+                        ensureActive()
+                        return DIFF_CALLBACK.areContentsTheSame(previous[old], items[new])
+                    }
+                }, false)
+            }
+            if (generation != diffGeneration) return@launch
+            displayedItems = items
+            changes?.dispatchUpdatesTo(this@AppDrawerAdapter)
+            committed()
+        }
+    }
+
     private var filterGeneration = 0L
     private var filterJob: Job? = null
 
@@ -113,6 +146,8 @@ class AppDrawerAdapter(
     fun cancelFiltering() {
         filterGeneration++
         filterJob?.cancel()
+        diffJob?.cancel()
+        diffGeneration++
         committedQuery = null
     }
 
@@ -150,6 +185,7 @@ class AppDrawerAdapter(
                         app !is AppModel.PrivateSpaceHeader &&
                             (matcher.matches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch()) || aliases[app]?.startsWith(trimmed, true) == true)
                     }.map { app ->
+                        ensureActive()
                         Triple(app, appSearchRank(app.appLabel, trimmed),
                             app.appLabel.lowercase(java.util.Locale.ROOT))
                     }.sortedWith(compareBy<Triple<AppModel, Int, String>> { it.second }.thenBy { it.third })
@@ -158,13 +194,13 @@ class AppDrawerAdapter(
             }
             if (generation != filterGeneration || searchPackage != selectedPackage ||
                 searchCommandsOnly != commandsOnly) return@launch
-            appFilteredList = items.toMutableList()
             val webFallback = items.isEmpty() && query.isNotBlank() && webSuggestionsEnabled()
             val displayed = if (webFallback) listOf(AppModel.SearchSuggestion(trimmed, query))
                 else if (selectedPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) }
                 else items
             submitList(displayed) {
                 if (generation == filterGeneration && searchPackage == selectedPackage && searchCommandsOnly == commandsOnly) {
+                    appFilteredList = items.toMutableList()
                     committedQuery = query
                     resultsChanged(query)
                     if (webFallback) emptyAppResults(query)
@@ -177,6 +213,9 @@ class AppDrawerAdapter(
         if (query != requestedQuery || (searchPackage == null &&
             (!webSuggestionsEnabled() || appFilteredList.isNotEmpty()))) return
         suggestions = (listOf(query.trim()) + values).filter { it.isNotBlank() }.distinct().take(7)
+        // The pending filter will include these suggestions. Do not replace its
+        // commit with a suggestion-only update before the query is ready.
+        if (committedQuery != query) return
         val items = appsList.filter { it is AppModel.App && it.appPackage == searchPackage && it.user == myUserHandle } +
             suggestions.map { AppModel.SearchSuggestion(it, query) }
         val generation = filterGeneration

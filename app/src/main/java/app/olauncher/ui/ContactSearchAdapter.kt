@@ -78,8 +78,14 @@ class ContactSearchAdapter(
                 val diff = if (previous == next) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                     override fun getOldListSize() = previous.size
                     override fun getNewListSize() = next.size
-                    override fun areItemsTheSame(old: Int, new: Int) = previous[old].uri == next[new].uri
-                    override fun areContentsTheSame(old: Int, new: Int) = previous[old] == next[new]
+                    override fun areItemsTheSame(old: Int, new: Int): Boolean {
+                        ensureActive()
+                        return previous[old].uri == next[new].uri
+                    }
+                    override fun areContentsTheSame(old: Int, new: Int): Boolean {
+                        ensureActive()
+                        return previous[old] == next[new]
+                    }
                 }, false)
                 next to diff
             }
