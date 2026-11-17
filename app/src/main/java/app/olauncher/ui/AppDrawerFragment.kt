@@ -100,8 +100,9 @@ class AppDrawerFragment : BaseFragment() {
             unifiedReversed = reversed
             unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = if (reversed) androidx.recyclerview.widget.ConcatAdapter(
-                adapter, appsHeader, contactsAdapter, contactsHeader)
-            else androidx.recyclerview.widget.ConcatAdapter(appsHeader, adapter, contactsHeader, contactsAdapter)
+                adapter, appsHeader, contactsAdapter, contactsHeader, destinationsAdapter, destinationsHeader)
+            else androidx.recyclerview.widget.ConcatAdapter(destinationsHeader, destinationsAdapter,
+                appsHeader, adapter, contactsHeader, contactsAdapter)
             binding.recyclerView.adapter = unifiedAdapter
         }
         linearLayoutManager.reverseLayout = reversed
@@ -113,7 +114,12 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateSectionHeaders() {
         appsHeader.show(isUnifiedSearch() && adapter.appFilteredList.isNotEmpty())
         contactsHeader.show(isUnifiedSearch() && contactsAdapter.itemCount > 0)
-
+        val destinations = if (isUnifiedSearch() && binding.search.query.isNotBlank())
+            inAppSearch.targets.values.map { it.app }.distinctBy { it.appPackage }.toMutableList<AppModel>()
+        else mutableListOf()
+        if (destinationsAdapter.appsList != destinations) destinationsAdapter.setAppList(destinations)
+        else if (destinationsAdapter.committedQuery == null) destinationsAdapter.filterApps("")
+        destinationsHeader.show(destinations.isNotEmpty())
     }
 
     private fun filterUnifiedContacts(query: String) {
@@ -1513,7 +1519,7 @@ class AppDrawerFragment : BaseFragment() {
             searchClick = { activateAppSearch(it, binding.search.query.toString()) },
             searchHold = { showAppSearchEditor(it) },
             appSearchHold = { app -> showAppSearchEditor(inAppSearch.targets[app.appPackage], app) },
-            searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
+            searchAlias = { null },
             webSuggestionsEnabled = { canShowWebSuggestions() },
             emptyAppResults = { query -> updateSearchSuggestions(query) },
             resultsChanged = { query ->
