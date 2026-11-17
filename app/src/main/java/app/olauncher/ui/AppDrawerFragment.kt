@@ -124,6 +124,7 @@ class AppDrawerFragment : BaseFragment() {
         contactSelectionBar = true
         dockAnimator?.cancel()
         ensureCommandKeys()
+        updateContactEditKey()
         binding.homeSearch.visibility = View.GONE
         // Keep the focused editor attached and visible to the IME while actions cover it.
         binding.search.visibility = View.VISIBLE
@@ -425,6 +426,10 @@ class AppDrawerFragment : BaseFragment() {
                 })
                 setOnClickListener {
                     val command = commands[index]
+                    if (command == ContactCommand.ADD) {
+                        contactsAdapter.selectedContact?.let { editContact(it) } ?: addContact()
+                        return@setOnClickListener
+                    }
                     if (contactSelectionBar) {
                         val selected = contactsAdapter.selectedContact
                         if (command == ContactCommand.ADD) addContact()
@@ -477,6 +482,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockKeys.visibility = View.INVISIBLE
         binding.dockAllContacts.visibility = View.GONE
         commandProgress = 0f
+        updateContactEditKey()
         commandKeys.forEachIndexed { index, key ->
             key.animate().cancel()
             key.translationZ = 0f
@@ -627,6 +633,24 @@ class AppDrawerFragment : BaseFragment() {
                 .setItems(contact.numbers.toTypedArray()) { _, index -> launchNumber(contact.numbers[index]) }
                 .setNegativeButton(android.R.string.cancel, null)
                 .setOnDismissListener { contactDialog = null }.show()
+        }
+    }
+
+    private fun updateContactEditKey() {
+        val key = commandKeys.getOrNull(ContactCommand.ADD.ordinal) ?: return
+        val selected = contactsAdapter.selectedContact
+        key.setImageResource(if (selected == null) R.drawable.contact_add else R.drawable.ic_rename)
+        key.contentDescription = if (selected == null) "Add a contact" else "Edit ${selected.name}"
+    }
+
+    private fun editContact(contact: ContactSearchAdapter.Contact) {
+        cancelAutoLaunch()
+        val intent = android.content.Intent(android.content.Intent.ACTION_EDIT).apply {
+            setDataAndType(contact.uri, android.provider.ContactsContract.Contacts.CONTENT_ITEM_TYPE)
+        }
+        try { startActivity(intent) }
+        catch (_: android.content.ActivityNotFoundException) {
+            requireContext().showToast("No contacts app available")
         }
     }
 
@@ -1186,8 +1210,10 @@ class AppDrawerFragment : BaseFragment() {
             if (isUnifiedSearch()) {
                 contactsAdapter.toggleSelection(contact)
                 showSelectedContactActions()
-            } else if (contactsMode && contactCommand == null) contactsAdapter.toggleSelection(contact)
-            else runContactCommand(contact)
+            } else if (contactsMode && contactCommand == null) {
+                contactsAdapter.toggleSelection(contact)
+                updateContactEditKey()
+            } else runContactCommand(contact)
         }
         adapter = AppDrawerAdapter(
             flag,
