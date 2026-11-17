@@ -46,6 +46,18 @@ class ContactSearchAdapter(
         selectedUri = null
         results.indexOfFirst { it.uri == previous }.takeIf { it >= 0 }?.let { notifyItemChanged(it, SELECTION) }
     }
+
+    fun clearContacts() {
+        filterGeneration++
+        filterJob?.cancel()
+        contacts = emptyList()
+        results = emptyList()
+        selectedUri = null
+        committedQuery = null
+        photoScope.coroutineContext.cancelChildren()
+        photoCache.evictAll()
+        notifyDataSetChanged()
+    }
     private val photoScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     // Bound by bitmap bytes so large address books cannot retain unlimited photos.
     private val photoCache = object : android.util.LruCache<Uri, android.graphics.Bitmap>(4 * 1024 * 1024) {
@@ -222,33 +234,35 @@ class ContactSearchAdapter(
 
     companion object {
         private const val SELECTION = "contact_selection"
-        fun load(context: Context): List<Contact> {
+        suspend fun load(context: Context): app.olauncher.helper.ContactLoadResult<Contact> =
+            withContext(Dispatchers.IO) { app.olauncher.helper.readContactsSafely {
+            val cancellation = currentCoroutineContext()
             val columns = arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.LOOKUP_KEY,
                 ContactsContract.Contacts.DISPLAY_NAME_PRIMARY, ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
-            return try {
                 val numbers = mutableMapOf<Long, MutableList<String>>()
                 context.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                     arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID, ContactsContract.CommonDataKinds.Phone.NUMBER,
                         ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER),
-                    null, null, null)?.use { cursor ->
+                    null, null, null).let { requireNotNull(it) { "Null phone cursor" } }.use { cursor ->
                     while (cursor.moveToNext()) {
+                        cancellation.ensureActive()
                         (cursor.getString(2)?.takeIf { it.isNotBlank() } ?: cursor.getString(1))?.takeIf { it.isNotBlank() }?.let {
                             numbers.getOrPut(cursor.getLong(0)) { mutableListOf() }.add(it)
                         }
                     }
                 }
                 context.contentResolver.query(ContactsContract.Contacts.CONTENT_URI, columns, null, null,
-                    "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE LOCALIZED ASC")?.use { cursor ->
+                    "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} COLLATE LOCALIZED ASC").let { requireNotNull(it) { "Null contacts cursor" } }.use { cursor ->
                     buildList {
                         while (cursor.moveToNext()) {
+                        cancellation.ensureActive()
                             val name = cursor.getString(2)?.trim().orEmpty()
                             if (name.isNotEmpty()) add(Contact(name,
                                 ContactsContract.Contacts.getLookupUri(cursor.getLong(0), cursor.getString(1)),
                                 cursor.getString(3)?.let(Uri::parse), numbers[cursor.getLong(0)]?.distinct().orEmpty()))
                         }
                     }
-                } ?: emptyList()
-            } catch (_: SecurityException) { emptyList() }
-        }
+                }
+            } }
     }
 }

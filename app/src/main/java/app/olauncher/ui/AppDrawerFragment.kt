@@ -1,6 +1,8 @@
 package app.olauncher.ui
 
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -181,6 +183,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var contactsAdapter: ContactSearchAdapter
     private var contactsLoad: kotlinx.coroutines.Job? = null
+    private var contactsGeneration = 0L
     private var contactsDirty = true
     private var contactsObserverRegistered = false
     private var positionedContactQuery: String? = null
@@ -189,7 +192,8 @@ class AppDrawerFragment : BaseFragment() {
     ) {
         override fun onChange(selfChange: Boolean) {
             contactsDirty = true
-            if (_binding != null && (contactsMode || isUnifiedSearch())) loadContacts()
+            if (_binding != null && viewLifecycleOwner.lifecycle.currentState.isAtLeast(
+                    androidx.lifecycle.Lifecycle.State.STARTED) && (contactsMode || isUnifiedSearch())) loadContacts()
         }
     }
     private val contactsPermission = registerForActivityResult(
@@ -201,10 +205,7 @@ class AppDrawerFragment : BaseFragment() {
             loadContacts()
         }
         else if (!granted && _binding != null) {
-            contactsAdapter.contacts = emptyList()
-            contactsAdapter.clearSelection()
-            if (contactsMode) filterContacts(binding.search.query.toString())
-            else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
+            clearContactsForPermission()
             requireContext().showToast("Allow contacts access to search contacts")
         }
     }
@@ -764,21 +765,66 @@ class AppDrawerFragment : BaseFragment() {
         contactsObserverRegistered = true
     }
 
+    private fun hasContactsPermission() = androidx.core.content.ContextCompat.checkSelfPermission(
+        requireContext(), android.Manifest.permission.READ_CONTACTS) ==
+        android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    private fun clearContactsForPermission() {
+        contactsGeneration++
+        contactsLoad?.cancel()
+        contactsLoad = null
+        contactsDirty = true
+        contactsAdapter.clearContacts()
+        dismissSelectedContactActions()
+        if (contactsMode) filterContacts(binding.search.query.toString())
+        else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
+    }
+
     private fun loadContacts() {
+        if (!hasContactsPermission()) {
+            clearContactsForPermission()
+            return
+        }
         if (contactsLoad?.isActive == true || !contactsDirty) return
         val context = requireContext().applicationContext
+        val viewBinding = binding
+        val generation = ++contactsGeneration
         contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
-            // Coalesce changes received during a provider read into one further refresh.
-            do {
-                contactsDirty = false
-                val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
-                if (_binding == null) return@launch
-                if (contactsAdapter.contacts != contacts) {
-                    contactsAdapter.contacts = contacts
-                    if (contactsMode) filterContacts(binding.search.query.toString())
-                    else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
+            try {
+                do {
+                    contactsDirty = false
+                    val result = ContactSearchAdapter.load(context)
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    if (_binding !== viewBinding || generation != contactsGeneration) return@launch
+                    if (!hasContactsPermission() || result is app.olauncher.helper.ContactLoadResult.PermissionDenied) {
+                        clearContactsForPermission()
+                        return@launch
+                    }
+                    when (result) {
+                        is app.olauncher.helper.ContactLoadResult.Success -> {
+                            // A provider notification during this read invalidates its snapshot.
+                            if (contactsDirty) continue
+                            if (contactsAdapter.contacts != result.contacts) {
+                                contactsAdapter.contacts = result.contacts
+                                if (contactsMode) filterContacts(binding.search.query.toString())
+                                else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
+                            }
+                        }
+                        is app.olauncher.helper.ContactLoadResult.Failure -> {
+                            android.util.Log.w("BoltContacts", "Contacts provider read failed: ${result.exceptionType}")
+                            contactsDirty = true
+                            return@launch
+                        }
+                        app.olauncher.helper.ContactLoadResult.PermissionDenied -> Unit
+                    }
+                } while (contactsDirty)
+            } finally {
+                if (generation == contactsGeneration) {
+                    contactsLoad = null
+                    // Cancellation must permit another read when the screen returns.
+                    if (!kotlinx.coroutines.currentCoroutineContext().isActive) contactsDirty = true
                 }
-            } while (contactsDirty)
+            }
         }
     }
 
@@ -1615,6 +1661,11 @@ class AppDrawerFragment : BaseFragment() {
     override fun onStart() {
         super.onStart()
         cachedIsCjkKeyboard = null
+        if (!hasContactsPermission()) clearContactsForPermission()
+        else if (contactsMode || isUnifiedSearch()) {
+            observeContacts()
+            loadContacts()
+        }
         val controller = androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.root)
         controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (prefs.showStatusBar) controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
@@ -1623,6 +1674,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onStop() {
+        contactsGeneration++
+        contactsLoad?.cancel()
+        contactsLoad = null
+        contactsDirty = true
         cancelAutoLaunch()
         binding.search.hideKeyboard()
         if (isHomePage) resetHomeSearch(animate = false)
@@ -1632,7 +1687,9 @@ class AppDrawerFragment : BaseFragment() {
     override fun onDestroyView() {
         cancelAutoLaunch()
         suggestionJob?.cancel()
+        contactsGeneration++
         contactsLoad?.cancel()
+        contactsLoad = null
         if (contactsObserverRegistered) {
             requireContext().contentResolver.unregisterContentObserver(contactsObserver)
             contactsObserverRegistered = false
