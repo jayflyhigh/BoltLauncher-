@@ -79,7 +79,11 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun configureResultSections(query: String): Boolean {
         val previousAdapter = binding.recyclerView.adapter
-        if (!isUnifiedSearch()) {
+        // Keep the same app/contacts container for the WEB destination picker.
+        // Replacing it detaches adapters, cancels work and recycles all visible rows.
+        val usesSearchSections = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
+            !thunderMode && activeSearch == null
+        if (!usesSearchSections) {
             unifiedReversed = null
             unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = null
@@ -653,7 +657,9 @@ class AppDrawerFragment : BaseFragment() {
                 ContactCommand.MESSAGE -> android.content.Intent(android.content.Intent.ACTION_SENDTO,
                     android.net.Uri.fromParts("smsto", number, null))
                 ContactCommand.WHATSAPP -> android.content.Intent(android.content.Intent.ACTION_VIEW,
-                    android.net.Uri.parse("https://wa.me/" + number.filter { it.isDigit() })).setPackage("com.whatsapp")
+                    android.net.Uri.parse("https://wa.me/" + number.filter { it.isDigit() }))
+                    .setPackage("com.whatsapp")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 ContactCommand.ADD, ContactCommand.SEARCH -> return
             }
             try { startActivity(intent) }
@@ -951,24 +957,25 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun switchSearchDestination() {
         if (!dockExpanded || contactsMode || thunderMode) return
-        val input = searchTextView as? android.widget.EditText
-        val start = input?.selectionStart ?: -1
-        val end = input?.selectionEnd ?: -1
+        cancelAutoLaunch()
+        suggestionJob?.cancel()
         val commandsOnly = !adapter.searchCommandsOnly
-        // Do not replace the query, change focus, or issue an IME request here.
-        // This also preserves a deliberately hidden keyboard.
-        clearAppSearch()
+        if (activeSearch != null) clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
+        val query = binding.search.query.toString()
         binding.search.queryHint = "Search"
-        setThunderMode(false)
+        configureResultSections(query)
         configureSearchGeometry()
-        configureResultSections(binding.search.query.toString())
-        adapter.filterApps(binding.search.query.toString())
-        if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
-        setDockExpanded(true, animate = false)
-        if (input != null && start >= 0 && end >= 0) {
-            input.setSelection(start.coerceAtMost(input.length()), end.coerceAtMost(input.length()))
-        }
+        binding.dockAllContacts.isEnabled = !commandsOnly
+        binding.dockAllContacts.visibility = if (commandsOnly) View.GONE else View.VISIBLE
+        if (commandsOnly) {
+            contactsAdapter.filter("", showAll = false) {
+                if (_binding != null) updateSectionHeaders()
+            }
+        } else filterUnifiedContacts(query)
+        adapter.filterApps(query)
+        // No dock animation, focus change, keyboard request, or query replacement:
+        // only the results and the contacts affordance change.
     }
 
     private fun showHomeSettings() {
