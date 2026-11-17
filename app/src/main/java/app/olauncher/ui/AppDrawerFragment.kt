@@ -134,6 +134,7 @@ class AppDrawerFragment : BaseFragment() {
             return
         }
         contactSelectionBar = true
+        registerContactSelectionBack()
         dockAnimator?.cancel()
         ensureCommandKeys()
         updateContactEditKey()
@@ -154,9 +155,36 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private var contactSelectionBack: android.window.OnBackInvokedCallback? = null
+
+    private fun registerContactSelectionBack() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && contactSelectionBack == null) {
+            val callback = android.window.OnBackInvokedCallback { deselectContact() }
+            requireActivity().onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
+            contactSelectionBack = callback
+        }
+    }
+
+    private fun unregisterContactSelectionBack() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            contactSelectionBack?.let {
+                requireActivity().onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it)
+            }
+        }
+        contactSelectionBack = null
+    }
+
+    private fun deselectContact(): Boolean {
+        if (!contactSelectionBar) return false
+        dismissSelectedContactActions()
+        return true
+    }
+
     private fun dismissSelectedContactActions(restoreSearch: Boolean = true) {
         if (!contactSelectionBar) return
         contactSelectionBar = false
+        unregisterContactSelectionBack()
         contactsAdapter.clearSelection()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
         if (!restoreSearch) return
@@ -771,6 +799,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun setThunderMode(enabled: Boolean) {
+        unregisterContactSelectionBack()
         cancelAutoLaunch()
         suggestionJob?.cancel()
         thunderMode = enabled
@@ -860,6 +889,7 @@ class AppDrawerFragment : BaseFragment() {
     fun resetHomeSearch(animate: Boolean = true) {
         if (_binding == null) return
         contactSelectionBar = false
+        unregisterContactSelectionBack()
         clearAppSearch()
         dockAnimator?.cancel()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
@@ -966,6 +996,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun switchSearchDestination() {
         if (!dockExpanded || contactsMode || thunderMode) return
+        unregisterContactSelectionBack()
         cancelAutoLaunch()
         suggestionJob?.cancel()
         val commandsOnly = !adapter.searchCommandsOnly
@@ -1175,12 +1206,13 @@ class AppDrawerFragment : BaseFragment() {
                         true
                     } else undoSearchAlias()
                 }
+                dismissContactSelection = { deselectContact() }
                 submitEmpty = { toggleEmptySearchDestination() }
             }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
-                if (contactSelectionBar) return true
+                if (deselectContact()) return true
                 if (launchAppSearch()) return true
                 if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
                 else if (contactsMode) {
@@ -1556,6 +1588,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
+        unregisterContactSelectionBack()
         cancelAutoLaunch()
         suggestionJob?.cancel()
         contactsLoad?.cancel()
@@ -1566,7 +1599,7 @@ class AppDrawerFragment : BaseFragment() {
         combinedAppsJob?.cancel()
         adapter.cancelFiltering()
         destinationsAdapter.cancelFiltering()
-        (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null }
+        (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null; dismissContactSelection = null }
         binding.search.setOnQueryTextListener(null)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
         contactDialog?.dismiss()

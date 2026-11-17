@@ -63,10 +63,27 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
         postInvalidateDelayed(500L - elapsed % 500L)
     }
 
+    var dismissContactSelection: (() -> Boolean)? = null
+    private var consumingBack = false
+
+    override fun onKeyPreIme(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                consumingBack = dismissContactSelection?.invoke() == true
+            }
+            if (consumingBack) {
+                if (event.action == KeyEvent.ACTION_UP) consumingBack = false
+                return true
+            }
+        }
+        return super.onKeyPreIme(keyCode, event)
+    }
+
     var submitEmpty: (() -> Boolean)? = null
     private var consumingEnter = false
 
-    private fun submitEmptyQuery(): Boolean = text.isNullOrEmpty() && submitEmpty?.invoke() == true
+    private fun submitEmptyQuery(): Boolean = dismissContactSelection?.invoke() == true ||
+        (text.isNullOrEmpty() && submitEmpty?.invoke() == true)
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_ENTER) {
