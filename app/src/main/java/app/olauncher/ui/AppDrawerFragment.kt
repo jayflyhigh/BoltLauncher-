@@ -135,6 +135,13 @@ class AppDrawerFragment : BaseFragment() {
         }
         contactSelectionBar = true
         registerContactSelectionBack()
+        searchTextView?.requestFocus()
+        binding.root.post {
+            if (_binding != null && contactSelectionBar) {
+                unregisterContactSelectionBack()
+                registerContactSelectionBack()
+            }
+        }
         dockAnimator?.cancel()
         ensureCommandKeys()
         updateContactEditKey()
@@ -190,6 +197,7 @@ class AppDrawerFragment : BaseFragment() {
         if (!restoreSearch) return
         binding.dockKeys.visibility = View.VISIBLE
         binding.search.visibility = View.VISIBLE
+        searchTextView?.requestFocus()
         if (contactsMode) {
             if (contactCommand == null) showContactCommands()
             else animateContactSearch(true)
@@ -273,6 +281,7 @@ class AppDrawerFragment : BaseFragment() {
 
         initViews()
         initSearch()
+        binding.root.onBackBeforeIme = { deselectContact() }
         initAdapter()
         contactsDirty = true
         positionedContactQuery = null
@@ -297,10 +306,31 @@ class AppDrawerFragment : BaseFragment() {
         val initialTop = root.paddingTop
         val initialRight = root.paddingRight
         val initialBottom = root.paddingBottom
+        var imeWasVisible = false
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            // Some keyboards consume Back instead of forwarding it to the window.
+            // Restore the focused input and deselect if that happens during selection.
+            if (imeWasVisible && !keyboardVisible && contactSelectionBar &&
+                viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                root.post {
+                    if (_binding != null && contactSelectionBar) {
+                        deselectContact()
+                        binding.search.showKeyboard()
+                    }
+                }
+            }
+            if (!imeWasVisible && keyboardVisible && contactSelectionBar) {
+                root.post {
+                    if (_binding != null && contactSelectionBar) {
+                        unregisterContactSelectionBack()
+                        registerContactSelectionBack()
+                    }
+                }
+            }
+            imeWasVisible = keyboardVisible
             // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
             val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
@@ -1617,6 +1647,7 @@ class AppDrawerFragment : BaseFragment() {
         unifiedReversed = null
         contactSelectionBar = false
         binding.root.setOnTouchListener(null)
+        binding.root.onBackBeforeIme = null
         binding.root.canSwipeSearch = null
         binding.root.onSwipeUp = null
         binding.recyclerView.clearOnScrollListeners()

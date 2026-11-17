@@ -2,6 +2,7 @@ package app.olauncher.ui
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.widget.LinearLayout
 import kotlin.math.abs
@@ -10,6 +11,22 @@ import kotlin.math.abs
 class SearchGestureLayout @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
 ) : LinearLayout(context, attrs) {
+    var onBackBeforeIme: (() -> Boolean)? = null
+    private var consumingBack = false
+
+    override fun dispatchKeyEventPreIme(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                consumingBack = onBackBeforeIme?.invoke() == true
+            }
+            if (consumingBack) {
+                if (event.action == KeyEvent.ACTION_UP) consumingBack = false
+                return true
+            }
+        }
+        return super.dispatchKeyEventPreIme(event)
+    }
+
     var canSwipeSearch: (() -> Boolean)? = null
     var onSwipeUp: (() -> Unit)? = null
     private var startX = 0f
