@@ -38,7 +38,6 @@ import app.olauncher.helper.isSystemAnimationsDisabled
 import app.olauncher.helper.isTablet
 import app.olauncher.helper.openUrl
 import app.olauncher.helper.rateApp
-import app.olauncher.helper.resetLauncherViaFakeActivity
 import app.olauncher.helper.setPlainWallpaper
 import app.olauncher.helper.shareApp
 import app.olauncher.helper.showLauncherSelector
@@ -204,10 +203,12 @@ class MainActivity : AppCompatActivity() {
             openLauncherChooser(it)
         }
         viewModel.resetLauncherLiveData.observe(this) {
-            if (isDefaultLauncher() || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
-                resetLauncherViaFakeActivity()
-            else
-                showLauncherSelector(Constants.REQUEST_CODE_LAUNCHER_SELECTOR)
+            // Never clear a home role the user has already granted.
+            if (!isDefaultLauncher()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                    showLauncherSelector(Constants.REQUEST_CODE_LAUNCHER_SELECTOR)
+                else startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+            }
         }
         viewModel.checkForMessages.observe(this) {
             checkForMessages()
@@ -347,7 +348,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun backToHomeScreen() {
-        if (viewModel.isPrivateSpaceToggling) return
+        if (viewModel.isPrivateSpaceToggling || supportFragmentManager.isStateSaved || isDestroyed) return
         messageDialog?.dismiss()
         if (navController.currentDestination?.id != R.id.mainFragment)
             navController.popBackStack(R.id.mainFragment, false)
@@ -370,12 +371,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restartLauncherOrCheckTheme(forceRestart: Boolean = false) {
-        if (forceRestart || prefs.launcherRestartTimestamp.hasBeenHours(4)) {
+        // Recreate only for a real theme change, never on a periodic timer.
+        if (forceRestart) {
             prefs.launcherRestartTimestamp = System.currentTimeMillis()
-            cacheDir.deleteRecursively()
             recreate()
-        } else
-            checkTheme()
+        } else checkTheme()
     }
 
     private fun checkTheme() {
@@ -416,8 +416,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             Constants.REQUEST_CODE_LAUNCHER_SELECTOR -> {
-                if (resultCode == Activity.RESULT_OK)
-                    resetLauncherViaFakeActivity()
+                // RoleManager has already applied the user's choice. Resetting
+                // the launcher here revokes it and brings the chooser back.
+                viewModel.isOlauncherDefault()
             }
         }
     }

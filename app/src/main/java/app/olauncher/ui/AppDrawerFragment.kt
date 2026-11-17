@@ -51,7 +51,6 @@ class AppDrawerFragment : BaseFragment() {
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
     private var positionedAppQuery: String? = null
-    private var homeSearchCommandsOnly = false
 
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
@@ -80,7 +79,11 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun configureResultSections(query: String): Boolean {
         val previousAdapter = binding.recyclerView.adapter
-        if (!isUnifiedSearch()) {
+        // Keep the same app/contacts container for the WEB destination picker.
+        // Replacing it detaches adapters, cancels work and recycles all visible rows.
+        val usesSearchSections = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
+            !thunderMode && activeSearch == null
+        if (!usesSearchSections) {
             unifiedReversed = null
             unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = null
@@ -142,11 +145,12 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun dismissSelectedContactActions() {
+    private fun dismissSelectedContactActions(restoreSearch: Boolean = true) {
         if (!contactSelectionBar) return
         contactSelectionBar = false
         contactsAdapter.clearSelection()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
+        if (!restoreSearch) return
         binding.dockKeys.visibility = View.VISIBLE
         binding.search.visibility = View.VISIBLE
         if (contactsMode) {
@@ -157,10 +161,25 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var contactsAdapter: ContactSearchAdapter
     private var contactsLoad: kotlinx.coroutines.Job? = null
+    private var contactsDirty = true
+    private var contactsObserverRegistered = false
+    private var positionedContactQuery: String? = null
+    private val contactsObserver = object : android.database.ContentObserver(
+        android.os.Handler(android.os.Looper.getMainLooper())
+    ) {
+        override fun onChange(selfChange: Boolean) {
+            contactsDirty = true
+            if (_binding != null && (contactsMode || isUnifiedSearch())) loadContacts()
+        }
+    }
     private val contactsPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted && _binding != null) loadContacts()
+        if (granted && _binding != null) {
+            contactsDirty = true
+            observeContacts()
+            loadContacts()
+        }
         else if (!granted && _binding != null) {
             contactsAdapter.contacts = emptyList()
             contactsAdapter.clearSelection()
@@ -218,6 +237,9 @@ class AppDrawerFragment : BaseFragment() {
         initViews()
         initSearch()
         initAdapter()
+        contactsDirty = true
+        positionedContactQuery = null
+        observeContacts()
         initObservers()
         initClickListeners()
         initDock()
@@ -320,12 +342,11 @@ class AppDrawerFragment : BaseFragment() {
 
                 override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
                     if (!isHomePage || dockExpanded) return false
-                    if (contactsMode) resetHomeSearch()
-                    else if (flag == Constants.FLAG_LAUNCH_APP) {
-                        homeSearchCommandsOnly = !homeSearchCommandsOnly
-                        updateHomeSearchHint()
+                    if (contactsMode) {
+                        resetHomeSearch()
+                        return true
                     }
-                    return true
+                    return false
                 }
 
                 override fun onLongPress(event: android.view.MotionEvent) {
@@ -357,7 +378,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun updateHomeSearchHint() {
-        val hint = if (homeSearchCommandsOnly) "Search within apps" else "Search"
+        val hint = "Search"
         binding.homeSearch.text = hint
         binding.homeSearch.contentDescription = hint
     }
@@ -365,7 +386,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun openHomeSearch() {
         clearAppSearch()
         setContactsMode(false)
-        adapter.searchCommandsOnly = homeSearchCommandsOnly
+        adapter.searchCommandsOnly = false
         binding.search.queryHint = binding.homeSearch.text
         setThunderMode(false)
         configureResultSections(binding.search.query.toString())
@@ -386,7 +407,13 @@ class AppDrawerFragment : BaseFragment() {
     private fun initDock() {
         updateHomeSearchHint()
         binding.homeSearch.setOnClickListener { openHomeSearch() }
-        binding.dockSearch.setOnClickListener { switchSearchDestination() }
+        binding.dockSearch.setOnClickListener {
+            cancelAutoLaunch()
+            if (activeSearch != null) launchAppSearch()
+            else if (binding.search.query.isEmpty()) switchSearchDestination()
+            else if (!inAppSearch.launchBrowser(binding.search.query.toString()))
+                requireContext().showToast("No browser available")
+        }
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         searchTextView?.let {
             binding.homeSearch.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, it.textSize)
@@ -448,7 +475,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun showContactCommands() {
         val keepSearchFocused = binding.search.hasFocus()
-        dismissSelectedContactActions()
+        dismissSelectedContactActions(restoreSearch = false)
         clearAppSearch()
         binding.homeSearch.visibility = View.GONE
         binding.dockSearch.visibility = View.GONE
@@ -490,7 +517,7 @@ class AppDrawerFragment : BaseFragment() {
             key.animate().cancel()
             key.translationZ = 0f
             key.visibility = View.VISIBLE
-            key.isEnabled = false
+            key.isEnabled = true
             key.alpha = if (index == 0) 1f else 0f
             key.translationX = if (index == 0)
                 0f else 12f * resources.displayMetrics.density
@@ -630,7 +657,9 @@ class AppDrawerFragment : BaseFragment() {
                 ContactCommand.MESSAGE -> android.content.Intent(android.content.Intent.ACTION_SENDTO,
                     android.net.Uri.fromParts("smsto", number, null))
                 ContactCommand.WHATSAPP -> android.content.Intent(android.content.Intent.ACTION_VIEW,
-                    android.net.Uri.parse("https://wa.me/" + number.filter { it.isDigit() })).setPackage("com.whatsapp")
+                    android.net.Uri.parse("https://wa.me/" + number.filter { it.isDigit() }))
+                    .setPackage("com.whatsapp")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                 ContactCommand.ADD, ContactCommand.SEARCH -> return
             }
             try { startActivity(intent) }
@@ -698,22 +727,37 @@ class AppDrawerFragment : BaseFragment() {
             if (!contactsMode || b.search.query.toString() != query) return@filter
             linearLayoutManager.reverseLayout = query.isNotBlank()
             linearLayoutManager.stackFromEnd = false
-            b.recyclerView.scrollToPosition(0)
+            if (positionedContactQuery != query) b.recyclerView.scrollToPosition(0)
+            positionedContactQuery = query
             b.recyclerView.animateSearchResults(query)
             scheduleContactLaunch(query)
         }
     }
 
+    private fun observeContacts() {
+        if (contactsObserverRegistered || androidx.core.content.ContextCompat.checkSelfPermission(
+                requireContext(), android.Manifest.permission.READ_CONTACTS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        requireContext().contentResolver.registerContentObserver(
+            android.provider.ContactsContract.Contacts.CONTENT_URI, true, contactsObserver)
+        contactsObserverRegistered = true
+    }
+
     private fun loadContacts() {
-        contactsLoad?.cancel()
+        if (contactsLoad?.isActive == true || !contactsDirty) return
         val context = requireContext().applicationContext
         contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
-            val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
-            if (_binding != null) {
-                contactsAdapter.contacts = contacts
-                if (contactsMode) filterContacts(binding.search.query.toString())
-                else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
-            }
+            // Coalesce changes received during a provider read into one further refresh.
+            do {
+                contactsDirty = false
+                val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
+                if (_binding == null) return@launch
+                if (contactsAdapter.contacts != contacts) {
+                    contactsAdapter.contacts = contacts
+                    if (contactsMode) filterContacts(binding.search.query.toString())
+                    else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
+                }
+            } while (contactsDirty)
         }
     }
 
@@ -729,16 +773,7 @@ class AppDrawerFragment : BaseFragment() {
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         binding.dock.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_search_bar)
         binding.search.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        val iconPadding = (13 * resources.displayMetrics.density).toInt()
-        binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
-        binding.dockSearch.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        if (activeSearch == null) {
-            binding.dockSearch.contentDescription = if (adapter.searchCommandsOnly)
-                "Search destination: Search within Apps. Tap to switch; hold to edit" else
-                "Search destination: Apps. Tap to switch; hold to edit Search within Apps"
-            binding.dockSearch.setImageResource(if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
-            binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-        }
+        if (activeSearch == null) showWebBadge()
         // Both controls share the search bar surface; yellow identifies Bolt at rest.
         binding.dockBolt.imageTintList = android.content.res.ColorStateList.valueOf(
             if (enabled) android.graphics.Color.BLACK else 0xFFFFD54F.toInt()
@@ -835,7 +870,7 @@ class AppDrawerFragment : BaseFragment() {
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
         val startMargin = if (contact && contactCommand != ContactCommand.SEARCH && commandKeys.isNotEmpty())
             commandKeys[0].right + (6 * density).toInt()
-        else if (contactCommand == ContactCommand.SEARCH || (!thunderMode && !contactsMode && activeSearch == null))
+        else if (contactCommand == ContactCommand.SEARCH)
             (4 * density).toInt()
         else (56 * density).toInt()
         val endMargin = ((if (!contact && isUnifiedSearch()) 56 else 4) * density).toInt()
@@ -846,7 +881,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.search.setPadding(0, 0, 0, 0)
         binding.dockSearch.visibility = if (dockExpanded && !contact && !contactsMode && !thunderMode &&
-            activeSearch != null) View.VISIBLE else View.GONE
+            flag == Constants.FLAG_LAUNCH_APP) View.VISIBLE else View.GONE
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -873,7 +908,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockKeys.translationZ = if (animateThunder || isUnifiedSearch()) 8f else 0f
         binding.search.visibility = View.VISIBLE
         binding.search.clipBounds = null
-        binding.search.alpha = 1f
+        binding.search.alpha = (binding.dockSearch.tag as? Float) ?: 0f
         binding.search.translationX = 0f
         binding.homeSearch.visibility = View.VISIBLE
         binding.homeSearch.isClickable = !expanded
@@ -922,24 +957,25 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun switchSearchDestination() {
         if (!dockExpanded || contactsMode || thunderMode) return
-        val input = searchTextView as? android.widget.EditText
-        val start = input?.selectionStart ?: -1
-        val end = input?.selectionEnd ?: -1
+        cancelAutoLaunch()
+        suggestionJob?.cancel()
         val commandsOnly = !adapter.searchCommandsOnly
-        // Do not replace the query, change focus, or issue an IME request here.
-        // This also preserves a deliberately hidden keyboard.
-        clearAppSearch()
+        if (activeSearch != null) clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search"
-        setThunderMode(false)
+        val query = binding.search.query.toString()
+        binding.search.queryHint = "Search"
+        configureResultSections(query)
         configureSearchGeometry()
-        configureResultSections(binding.search.query.toString())
-        adapter.filterApps(binding.search.query.toString())
-        if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
-        setDockExpanded(true, animate = false)
-        if (input != null && start >= 0 && end >= 0) {
-            input.setSelection(start.coerceAtMost(input.length()), end.coerceAtMost(input.length()))
-        }
+        binding.dockAllContacts.isEnabled = !commandsOnly
+        binding.dockAllContacts.visibility = if (commandsOnly) View.GONE else View.VISIBLE
+        if (commandsOnly) {
+            contactsAdapter.filter("", showAll = false) {
+                if (_binding != null) updateSectionHeaders()
+            }
+        } else filterUnifiedContacts(query)
+        adapter.filterApps(query)
+        // No dock animation, focus change, keyboard request, or query replacement:
+        // only the results and the contacts affordance change.
     }
 
     private fun showHomeSettings() {
@@ -959,12 +995,37 @@ class AppDrawerFragment : BaseFragment() {
             }.show()
     }
 
+    private fun showSearchBadge(code: String, color: Int, description: String) {
+        val size = (52 * resources.displayMetrics.density).toInt()
+        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = app.olauncher.helper.InAppSearch.foreground(color)
+            textSize = size * .46f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        val textWidth = paint.measureText(code)
+        if (textWidth > size * .86f) paint.textSize *= size * .86f / textWidth
+        android.graphics.Canvas(bitmap).drawText(code, size / 2f,
+            size / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
+        binding.dockSearch.setPadding(0, 0, 0, 0)
+        binding.dockSearch.setImageBitmap(bitmap)
+        binding.dockSearch.imageTintList = null
+        binding.dockSearch.background = app.olauncher.helper.InAppSearch.background(color, resources.displayMetrics.density)
+        binding.dockSearch.contentDescription = description
+    }
+
+    private fun showWebBadge() {
+        showSearchBadge("WEB", android.graphics.Color.BLACK,
+            "Search the web. With no query, show search destinations. Hold to edit destinations")
+    }
+
     private fun clearAppSearch() {
         suggestionJob?.cancel()
         adapter.searchCommandsOnly = false
         activeSearch = null
         adapter.searchPackage = null
-        binding.dockSearch.contentDescription = "Search destination: Apps. Tap to switch; hold to edit Search within Apps"
+        showWebBadge()
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
     }
 
@@ -974,24 +1035,8 @@ class AppDrawerFragment : BaseFragment() {
         setThunderMode(false)
         activeSearch = target
         adapter.searchPackage = target.app.appPackage
-        val size = (52 * resources.displayMetrics.density).toInt()
-        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
-        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = app.olauncher.helper.InAppSearch.foreground(target.color)
-            textSize = size * .46f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-        val code = inAppSearch.alias(target)
-        val textWidth = paint.measureText(code)
-        if (textWidth > size * .86f) paint.textSize *= size * .86f / textWidth
-        android.graphics.Canvas(bitmap).drawText(code, size / 2f,
-            size / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
-        binding.dockSearch.setPadding(0, 0, 0, 0)
-        binding.dockSearch.setImageBitmap(bitmap)
-        binding.dockSearch.imageTintList = null
-        binding.dockSearch.background = app.olauncher.helper.InAppSearch.background(target.color, resources.displayMetrics.density)
-        binding.dockSearch.contentDescription = "Search in ${target.app.appLabel}, alias ${inAppSearch.alias(target)}"
+        showSearchBadge(inAppSearch.alias(target), target.color,
+            "Search in ${target.app.appLabel}, alias ${inAppSearch.alias(target)}")
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(target); true }
         binding.search.queryHint = "Search in ${target.app.appLabel}....."
         binding.search.setQuery(query, false)
@@ -1093,7 +1138,7 @@ class AppDrawerFragment : BaseFragment() {
         val commandsOnly = adapter.searchCommandsOnly
         clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search"
+        binding.search.queryHint = "Search"
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
         adapter.filterApps(binding.search.query.toString())
         setThunderMode(false)
@@ -1101,6 +1146,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
         return true
     }
+
 
     private fun toggleEmptySearchDestination(): Boolean {
         if (!dockExpanded || contactsMode || thunderMode || activeSearch != null ||
@@ -1503,6 +1549,10 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         suggestionJob?.cancel()
         contactsLoad?.cancel()
+        if (contactsObserverRegistered) {
+            requireContext().contentResolver.unregisterContentObserver(contactsObserver)
+            contactsObserverRegistered = false
+        }
         combinedAppsJob?.cancel()
         adapter.cancelFiltering()
         (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null }
