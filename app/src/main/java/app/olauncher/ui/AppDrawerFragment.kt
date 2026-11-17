@@ -404,8 +404,9 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun ensureCommandKeys() {
         if (commandKeys.isNotEmpty()) return
-        val slotWidth = binding.dockKeys.width / 5
-        val icons = listOf(R.drawable.dock_search) + ContactCommand.entries.filter { it != ContactCommand.SEARCH }.map { it.icon }
+        val commands = ContactCommand.entries.filter { it != ContactCommand.SEARCH }
+        val slotWidth = binding.dockKeys.width / commands.size
+        val icons = commands.map { it.icon }
         commandKeys = icons.mapIndexed { index, _ ->
             android.widget.ImageButton(requireContext()).apply {
                 setBackgroundResource(R.drawable.dock_key)
@@ -416,28 +417,22 @@ class AppDrawerFragment : BaseFragment() {
                 )
                 val padding = (13 * resources.displayMetrics.density).toInt()
                 setPadding(padding, padding, padding, padding)
-                contentDescription = if (index == 0) "Search contacts" else ContactCommand.entries[index - 1].hint.trimEnd('.')
+                contentDescription = commands[index].hint.trimEnd('.')
                 visibility = View.GONE
                 binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(slotWidth - (8 * resources.displayMetrics.density).toInt(), binding.dockContacts.height).apply {
                     leftMargin = index * slotWidth + (4 * resources.displayMetrics.density).toInt()
                     topMargin = binding.dockContacts.top
                 })
                 setOnClickListener {
+                    val command = commands[index]
                     if (contactSelectionBar) {
-                        if (index == 0) {
-                            dismissSelectedContactActions()
-                            showContactCommands()
-                        } else {
-                            val selected = contactsAdapter.selectedContact
-                            val command = ContactCommand.entries[index - 1]
-                            if (command == ContactCommand.ADD) addContact()
-                            else if (selected != null) runContactCommand(selected, command)
-                        }
+                        val selected = contactsAdapter.selectedContact
+                        if (command == ContactCommand.ADD) addContact()
+                        else if (selected != null) runContactCommand(selected, command)
                         return@setOnClickListener
                     }
-                    if (contactCommand != null) animateContactSearch(false)
-                    else if (index == 0) selectContactCommand(ContactCommand.SEARCH)
-                    else selectContactCommand(ContactCommand.entries[index - 1])
+                    if (contactCommand != null) showContactCommands()
+                    else selectContactCommand(command)
                 }
             }
         }
@@ -460,6 +455,7 @@ class AppDrawerFragment : BaseFragment() {
         // Making it invisible detaches the input connection and dismisses the keyboard.
         binding.search.visibility = if (keepSearchFocused) View.VISIBLE else View.INVISIBLE
         binding.search.alpha = 0f
+        binding.search.clipBounds = null
         binding.search.setQuery("", false)
         // Do not expose cached contacts after permission has been revoked.
         if (androidx.core.content.ContextCompat.checkSelfPermission(requireContext(),
@@ -531,7 +527,7 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.hideKeyboard()
             binding.search.clearFocus()
         }
-        val selectedIndex = if (selected == ContactCommand.SEARCH) 0 else selected.ordinal + 1
+        val selectedIndex = if (selected == ContactCommand.SEARCH) -1 else selected.ordinal
         binding.search.visibility = View.VISIBLE
         commandKeys.forEach { it.animate().cancel(); it.isEnabled = false }
         if (expanded) binding.search.showKeyboard()
@@ -803,9 +799,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.dock.setSearchProgress(null)
         val density = resources.displayMetrics.density
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
-        val startMargin = if (contact && commandKeys.isNotEmpty())
+        val startMargin = if (contact && contactCommand != ContactCommand.SEARCH && commandKeys.isNotEmpty())
             commandKeys[0].right + (6 * density).toInt()
-        else if (!thunderMode && !contactsMode && activeSearch == null)
+        else if (contactCommand == ContactCommand.SEARCH || (!thunderMode && !contactsMode && activeSearch == null))
             (4 * density).toInt()
         else (56 * density).toInt()
         val endMargin = ((if (!contact && isUnifiedSearch()) 56 else 4) * density).toInt()
@@ -1082,7 +1078,12 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         (binding.search.findViewById<android.view.View>(R.id.search_src_text) as? AliasSearchInput)
             ?.apply {
-                undoAlias = { undoSearchAlias() }
+                undoAlias = {
+                    if (contactsMode && dockExpanded && binding.search.query.isEmpty()) {
+                        showContactCommands()
+                        true
+                    } else undoSearchAlias()
+                }
                 submitEmpty = { toggleEmptySearchDestination() }
             }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
@@ -1129,6 +1130,12 @@ class AppDrawerFragment : BaseFragment() {
                     }
                     if (newText != lastAutoLaunchedQuery) lastAutoLaunchedQuery = null
                     if (contactsMode) {
+                        if (contactCommand == null && newText.isNotEmpty()) {
+                            contactCommand = ContactCommand.SEARCH
+                            contactLaunchQuery = null
+                            binding.search.queryHint = ContactCommand.SEARCH.hint
+                            animateContactSearch(true)
+                        }
                         if (contactCommand != ContactCommand.ADD) filterContacts(newText)
                     } else {
                         configureResultSections(newText)

@@ -121,6 +121,12 @@ class ContactSearchAdapter(private val open: (Contact) -> Unit) : RecyclerView.A
                 cornerRadius = 30f * binding.root.resources.displayMetrics.density
                 setStroke((2f * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1), Color.rgb(255, 214, 0))
             } else null
+            val number = contact.numbers.firstOrNull().orEmpty()
+            binding.contactNumber.text = number
+            binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
+            binding.appTitle.setPaddingRelative(binding.appTitle.paddingStart, 0,
+                binding.appTitle.paddingEnd,
+                if (number.isEmpty()) 0 else (20 * binding.root.resources.displayMetrics.density).toInt())
             binding.appTitle.text = contact.name
             binding.otherProfileIndicator.visibility = View.GONE
             binding.resultBolt.visibility = View.GONE
