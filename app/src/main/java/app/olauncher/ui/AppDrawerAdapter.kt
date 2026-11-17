@@ -157,6 +157,7 @@ class AppDrawerAdapter(
         val generation = filterGeneration
         val selectedPackage = searchPackage
         val commandsOnly = searchCommandsOnly
+        val thunder = thunderMode
         val trimmed = query.trim()
         suggestions = if (selectedPackage != null && trimmed.isNotEmpty())
             (listOf(trimmed) + suggestions.filter { it.contains(trimmed, ignoreCase = true) })
@@ -197,13 +198,15 @@ class AppDrawerAdapter(
             if (generation != filterGeneration || searchPackage != selectedPackage ||
                 searchCommandsOnly != commandsOnly) return@launch
             val webFallback = items.isEmpty() && query.isNotBlank() && webSuggestionsEnabled()
-            val displayed = if (webFallback) listOf(AppModel.SearchSuggestion(trimmed, query))
+            val displayed = if (thunder) items
+                else if (webFallback) listOf(AppModel.SearchSuggestion(trimmed, query))
                 else if (selectedPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) }
                 else items
             submitList(displayed) {
                 if (generation == filterGeneration && searchPackage == selectedPackage && searchCommandsOnly == commandsOnly) {
                     appFilteredList = items.toMutableList()
                     committedQuery = query
+                    if (thunder) notifyItemRangeChanged(0, itemCount)
                     resultsChanged(query)
                     if (webFallback) emptyAppResults(query)
                 }
@@ -238,7 +241,7 @@ class AppDrawerAdapter(
         payloads: MutableList<Any>,
     ) {
         if (holder is ViewHolder && payloads.isNotEmpty() && payloads.all { it == THUNDER_STYLE }) {
-            holder.applyThunderStyle(thunderMode)
+            onBindViewHolder(holder, position)
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -302,7 +305,8 @@ class AppDrawerAdapter(
                     appRenameListener,
                     iconScope,
                     iconCache,
-                    thunderMode, searchTarget(appModel), searchClick, searchHold, appSearchHold, searchCommandsOnly
+                    thunderMode, searchTarget(appModel), searchClick, searchHold, appSearchHold, searchCommandsOnly,
+                    requestedQuery, currentList.size == 1
                 )
             }
         } catch (e: Exception) {
@@ -391,9 +395,11 @@ class AppDrawerAdapter(
             searchHold: (app.olauncher.helper.InAppSearch.Target) -> Unit,
             appSearchHold: (AppModel.App) -> Unit,
             searchCommandsOnly: Boolean,
+            query: String,
+            onlyResult: Boolean,
         ) = with(binding) {
             isSuggestion = appModel is AppModel.SearchSuggestion
-            hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
+            hasSearchBadge = !thunderMode && target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
                 searchBadge.text = target.code
@@ -478,6 +484,25 @@ class AppDrawerAdapter(
                 if (searchCommandsOnly) append("Search in ")
                 append(appModel.appLabel)
                 if (appModel.isNew) append(" ✦")
+            }
+            if (thunderMode) {
+                val title = appTitle.text.toString()
+                appTitle.text = android.text.SpannableString(title).apply {
+                    val yellow = android.graphics.Color.rgb(255, 214, 0)
+                    if (onlyResult && query.isNotBlank()) {
+                        setSpan(android.text.style.ForegroundColorSpan(yellow), 0, length,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    } else {
+                        query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.forEach { term ->
+                            var start = title.indexOf(term, ignoreCase = true)
+                            while (start >= 0) {
+                                setSpan(android.text.style.ForegroundColorSpan(yellow), start, start + term.length,
+                                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                                start = title.indexOf(term, start + term.length, ignoreCase = true)
+                            }
+                        }
+                    }
+                }
             }
             appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             otherProfileIndicator.isVisible = appModel.user != myUserHandle

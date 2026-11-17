@@ -808,7 +808,59 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private var pendingThunderFlash: Runnable? = null
+    private var thunderFlashAnimator: android.animation.ValueAnimator? = null
+    private var thunderFlash: android.graphics.drawable.Drawable? = null
+
+    private fun clearThunderFlash() {
+        pendingThunderFlash?.let { _binding?.root?.removeCallbacks(it) }
+        pendingThunderFlash = null
+        thunderFlashAnimator?.cancel()
+        thunderFlashAnimator = null
+        thunderFlash?.let { _binding?.root?.overlay?.remove(it) }
+        thunderFlash = null
+    }
+
+    private fun showThunderFlash() {
+        val root = _binding?.root ?: return
+        if (requireContext().isSystemAnimationsDisabled() || requireContext().isEinkDisplay()) return
+        val flash = object : android.graphics.drawable.Drawable() {
+            private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            private var opacity = 255
+            override fun draw(canvas: android.graphics.Canvas) {
+                val w = bounds.width().toFloat()
+                val h = bounds.height().toFloat()
+                paint.color = android.graphics.Color.argb(opacity / 7, 255, 214, 0)
+                canvas.drawRect(bounds, paint)
+                val path = android.graphics.Path().apply {
+                    moveTo(w * .57f, h * .24f)
+                    lineTo(w * .35f, h * .53f)
+                    lineTo(w * .49f, h * .53f)
+                    lineTo(w * .42f, h * .76f)
+                    lineTo(w * .66f, h * .44f)
+                    lineTo(w * .52f, h * .44f)
+                    close()
+                }
+                paint.color = android.graphics.Color.argb(opacity, 255, 235, 125)
+                canvas.drawPath(path, paint)
+            }
+            override fun setAlpha(alpha: Int) { opacity = alpha; invalidateSelf() }
+            override fun setColorFilter(filter: android.graphics.ColorFilter?) {}
+            @Suppress("DEPRECATION")
+            override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+        }
+        flash.setBounds(0, 0, root.width, root.height)
+        thunderFlash = flash
+        root.overlay.add(flash)
+        thunderFlashAnimator = android.animation.ValueAnimator.ofInt(255, 0).apply {
+            duration = 150L
+            addUpdateListener { flash.alpha = it.animatedValue as Int }
+            start()
+        }
+    }
+
     private fun cancelAutoLaunch() {
+        clearThunderFlash()
         pendingAutoLaunch?.let { _binding?.root?.removeCallbacks(it) }
         pendingAutoLaunch = null
     }
@@ -828,6 +880,7 @@ class AppDrawerFragment : BaseFragment() {
                     return
                 }
                 if (isSearchComposing()) {
+                    clearThunderFlash()
                     b.root.postDelayed(this, 500L)
                     return
                 }
@@ -837,6 +890,13 @@ class AppDrawerFragment : BaseFragment() {
             }
         }
         pendingAutoLaunch = task
+        pendingThunderFlash = Runnable {
+            pendingThunderFlash = null
+            if (thunderMode && adapter.committedQuery == query &&
+                binding.search.query.toString() == query && adapter.itemCount == 1 &&
+                !isSearchComposing() && viewLifecycleOwner.lifecycle.currentState.isAtLeast(
+                    androidx.lifecycle.Lifecycle.State.RESUMED)) showThunderFlash()
+        }.also { binding.root.postDelayed(it, 350L) }
         binding.root.postDelayed(task, 500L)
     }
 
@@ -1409,9 +1469,9 @@ class AppDrawerFragment : BaseFragment() {
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
                     updateSectionHeaders()
-                    linearLayoutManager.reverseLayout = activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
+                    linearLayoutManager.reverseLayout = thunderMode || activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
                     linearLayoutManager.stackFromEnd = false
-                    if (positionedAppQuery != query) binding.recyclerView.scrollToPosition(0)
+                    if (thunderMode || positionedAppQuery != query) binding.recyclerView.scrollToPosition(0)
                     positionedAppQuery = query
                     if (activeSearch == null) binding.recyclerView.animateSearchResults(query)
                     scheduleAutoLaunch(query)
