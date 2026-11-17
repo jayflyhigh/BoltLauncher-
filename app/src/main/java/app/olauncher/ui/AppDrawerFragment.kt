@@ -1469,9 +1469,9 @@ class AppDrawerFragment : BaseFragment() {
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
                     updateSectionHeaders()
-                    linearLayoutManager.reverseLayout = activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
+                    linearLayoutManager.reverseLayout = thunderMode || activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
                     linearLayoutManager.stackFromEnd = false
-                    if (positionedAppQuery != query) binding.recyclerView.scrollToPosition(0)
+                    if (thunderMode || positionedAppQuery != query) binding.recyclerView.scrollToPosition(0)
                     positionedAppQuery = query
                     if (activeSearch == null) binding.recyclerView.animateSearchResults(query)
                     scheduleAutoLaunch(query)
