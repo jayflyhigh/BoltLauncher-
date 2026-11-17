@@ -134,6 +134,8 @@ class AppDrawerFragment : BaseFragment() {
             return
         }
         contactSelectionBar = true
+        selectedContactQuery = binding.search.query.toString()
+        searchTextView?.requestFocus()
         dockAnimator?.cancel()
         ensureCommandKeys()
         updateContactEditKey()
@@ -154,6 +156,14 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private var selectedContactQuery: String? = null
+
+    private fun deselectContact(): Boolean {
+        if (!contactSelectionBar) return false
+        dismissSelectedContactActions()
+        return true
+    }
+
     private fun dismissSelectedContactActions(restoreSearch: Boolean = true) {
         if (!contactSelectionBar) return
         contactSelectionBar = false
@@ -162,6 +172,7 @@ class AppDrawerFragment : BaseFragment() {
         if (!restoreSearch) return
         binding.dockKeys.visibility = View.VISIBLE
         binding.search.visibility = View.VISIBLE
+        searchTextView?.requestFocus()
         if (contactsMode) {
             if (contactCommand == null) showContactCommands()
             else animateContactSearch(true)
@@ -245,6 +256,7 @@ class AppDrawerFragment : BaseFragment() {
 
         initViews()
         initSearch()
+        binding.root.onBackBeforeIme = { deselectContact() }
         initAdapter()
         contactsDirty = true
         positionedContactQuery = null
@@ -830,7 +842,7 @@ class AppDrawerFragment : BaseFragment() {
 
     fun collapseSearch(): Boolean {
         if (_binding != null && contactSelectionBar) {
-            dismissSelectedContactActions()
+            deselectContact()
             return true
         }
         if (_binding != null && contactsMode) {
@@ -1175,12 +1187,13 @@ class AppDrawerFragment : BaseFragment() {
                         true
                     } else undoSearchAlias()
                 }
+                dismissContactSelection = { deselectContact() }
                 submitEmpty = { toggleEmptySearchDestination() }
             }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
-                if (contactSelectionBar) return true
+                if (deselectContact()) return true
                 if (launchAppSearch()) return true
                 if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
                 else if (contactsMode) {
@@ -1209,6 +1222,7 @@ class AppDrawerFragment : BaseFragment() {
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
                     cancelAutoLaunch()
+                    if (contactSelectionBar && newText == selectedContactQuery) return true
                     if (contactSelectionBar) dismissSelectedContactActions()
                     contactsAdapter.clearSelection()
                     suggestionJob?.cancel()
@@ -1566,7 +1580,7 @@ class AppDrawerFragment : BaseFragment() {
         combinedAppsJob?.cancel()
         adapter.cancelFiltering()
         destinationsAdapter.cancelFiltering()
-        (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null }
+        (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null; dismissContactSelection = null }
         binding.search.setOnQueryTextListener(null)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
         contactDialog?.dismiss()
@@ -1584,6 +1598,7 @@ class AppDrawerFragment : BaseFragment() {
         unifiedReversed = null
         contactSelectionBar = false
         binding.root.setOnTouchListener(null)
+        binding.root.onBackBeforeIme = null
         binding.root.canSwipeSearch = null
         binding.root.onSwipeUp = null
         binding.recyclerView.clearOnScrollListeners()
