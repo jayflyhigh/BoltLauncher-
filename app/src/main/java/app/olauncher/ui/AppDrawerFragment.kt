@@ -47,6 +47,7 @@ class AppDrawerFragment : BaseFragment() {
     private var searchEditor: androidx.appcompat.app.AlertDialog? = null
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
+    private lateinit var destinationsAdapter: AppDrawerAdapter
     private lateinit var linearLayoutManager: LinearLayoutManager
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
@@ -72,6 +73,7 @@ class AppDrawerFragment : BaseFragment() {
     private var unifiedAdapter: androidx.recyclerview.widget.ConcatAdapter? = null
     private val appsHeader = SearchSectionAdapter("Apps")
     private val contactsHeader = SearchSectionAdapter("Contacts")
+    private val destinationsHeader = SearchSectionAdapter("Search within Apps")
     private var contactsMode = false
 
     private fun isUnifiedSearch() = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
@@ -96,8 +98,9 @@ class AppDrawerFragment : BaseFragment() {
             unifiedReversed = reversed
             unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = if (reversed) androidx.recyclerview.widget.ConcatAdapter(
-                adapter, appsHeader, contactsAdapter, contactsHeader)
-            else androidx.recyclerview.widget.ConcatAdapter(appsHeader, adapter, contactsHeader, contactsAdapter)
+                adapter, appsHeader, contactsAdapter, contactsHeader, destinationsAdapter, destinationsHeader)
+            else androidx.recyclerview.widget.ConcatAdapter(destinationsHeader, destinationsAdapter,
+                appsHeader, adapter, contactsHeader, contactsAdapter)
             binding.recyclerView.adapter = unifiedAdapter
         }
         linearLayoutManager.reverseLayout = reversed
@@ -109,6 +112,12 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateSectionHeaders() {
         appsHeader.show(isUnifiedSearch() && adapter.appFilteredList.isNotEmpty())
         contactsHeader.show(isUnifiedSearch() && contactsAdapter.itemCount > 0)
+        val destinations = if (isUnifiedSearch() && binding.search.query.isNotBlank())
+            inAppSearch.targets.values.map { it.app }.distinctBy { it.appPackage }.toMutableList<AppModel>()
+        else mutableListOf()
+        if (destinationsAdapter.appsList != destinations) destinationsAdapter.setAppList(destinations)
+        else if (destinationsAdapter.committedQuery == null) destinationsAdapter.filterApps("")
+        destinationsHeader.show(destinations.isNotEmpty())
     }
 
     private fun filterUnifiedContacts(query: String) {
@@ -1086,7 +1095,9 @@ class AppDrawerFragment : BaseFragment() {
                 else resetHomeSearch()
             }
             adapter.notifyItemRangeChanged(0, adapter.itemCount)
+            destinationsAdapter.notifyItemRangeChanged(0, destinationsAdapter.itemCount)
             adapter.filterApps(binding.search.query.toString())
+            updateSectionHeaders()
         }
     }
 
@@ -1401,19 +1412,23 @@ class AppDrawerFragment : BaseFragment() {
             }
         )
 
-        linearLayoutManager = object : LinearLayoutManager(requireContext()) {
-            override fun scrollVerticallyBy(
-                dx: Int,
-                recycler: Recycler,
-                state: RecyclerView.State,
-            ): Int {
-                val scrollRange = super.scrollVerticallyBy(dx, recycler, state)
-                val overScroll = dx - scrollRange
-                if (overScroll < -10 && binding.recyclerView.scrollState == RecyclerView.SCROLL_STATE_DRAGGING)
-                    checkMessageAndExit()
-                return scrollRange
-            }
-        }
+        destinationsAdapter = AppDrawerAdapter(
+            flag = Constants.FLAG_LAUNCH_APP,
+            appLabelGravity = prefs.appLabelAlignment,
+            appClickListener = { app -> inAppSearch.targets[app.appPackage]?.let { sendSearchTo(it) } },
+            appInfoListener = {},
+            appDeleteListener = {},
+            appHideListener = { _, _ -> },
+            appRenameListener = { _, _ -> },
+            searchTarget = { app -> inAppSearch.targets[app.appPackage] },
+            searchClick = { activateAppSearch(it, binding.search.query.toString()) },
+            searchHold = { showAppSearchEditor(it) },
+            appSearchHold = { app -> showAppSearchEditor(inAppSearch.targets[app.appPackage], app) },
+            reverseDestinations = true,
+        ).apply { searchCommandsOnly = true }
+        // Never close search or mutate adapters from scrollVerticallyBy: it runs
+        // inside RecyclerView's layout/scroll critical section.
+        linearLayoutManager = LinearLayoutManager(requireContext())
 
         binding.recyclerView.layoutManager = linearLayoutManager
         binding.recyclerView.adapter = adapter
@@ -1512,11 +1527,6 @@ class AppDrawerFragment : BaseFragment() {
             }
         }
 
-    private fun checkMessageAndExit() {
-        if (!closeDrawer()) return
-        if (flag == Constants.FLAG_LAUNCH_APP)
-            viewModel.checkForMessages.call()
-    }
 
     // Pops only the drawer. A plain popBackStack() from a late overscroll frame could pop the
     // home screen too, leaving a drawer that auto-launch and back can't close (#766)
@@ -1555,6 +1565,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         combinedAppsJob?.cancel()
         adapter.cancelFiltering()
+        destinationsAdapter.cancelFiltering()
         (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null }
         binding.search.setOnQueryTextListener(null)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
