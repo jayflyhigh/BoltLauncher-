@@ -54,6 +54,7 @@ class AppDrawerAdapter(
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
+    private val reverseDestinations: Boolean = false,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>(), Filterable {
 
     companion object {
@@ -170,6 +171,7 @@ class AppDrawerAdapter(
         val destinations = if (commandsOnly && selectedPackage == null)
             apps.filter { it is AppModel.App && searchTarget(it) != null }
                 .distinctBy { it.appPackage }.sortedBy { it.appLabel.lowercase(java.util.Locale.ROOT) }
+                .let { if (reverseDestinations) it.asReversed() else it }
             else emptyList()
         filterJob = iconScope.launch {
             val items = withContext(Dispatchers.Default) {
