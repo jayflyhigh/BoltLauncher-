@@ -36,14 +36,14 @@ class ContactSearchAdapter(
         val previous = selectedUri
         selectedUri = if (previous == contact.uri) null else contact.uri
         results.forEachIndexed { index, result ->
-            if (result.uri == previous || result.uri == selectedUri) notifyItemChanged(index)
+            if (result.uri == previous || result.uri == selectedUri) notifyItemChanged(index, SELECTION)
         }
     }
 
     fun clearSelection() {
         val previous = selectedUri ?: return
         selectedUri = null
-        results.indexOfFirst { it.uri == previous }.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+        results.indexOfFirst { it.uri == previous }.takeIf { it >= 0 }?.let { notifyItemChanged(it, SELECTION) }
     }
     private val photoScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     // Bound by bitmap bytes so large address books cannot retain unlimited photos.
@@ -60,7 +60,8 @@ class ContactSearchAdapter(
         committedQuery = null
         val generation = ++filterGeneration
         val source = contacts
-        val terms = query.trim().split(termSeparator).filter { it.isNotEmpty() }
+        val trimmed = query.trim()
+        val terms = trimmed.split(termSeparator).filter { it.isNotEmpty() }
         filterJob = photoScope.launch {
             val previous = results
             val (filtered, changes) = withContext(Dispatchers.Default) {
@@ -68,9 +69,12 @@ class ContactSearchAdapter(
                     ensureActive()
                     terms.all { contact.name.contains(it, ignoreCase = true) ||
                         contact.numbers.any { number -> number.contains(it) } }
-                }.sortedWith(compareBy<Contact> {
-                    app.olauncher.helper.appSearchRank(it.name, query.trim())
-                }.thenBy { it.name.lowercase(Locale.ROOT) })
+                }.map { contact ->
+                    ensureActive()
+                    Triple(contact, app.olauncher.helper.appSearchRank(contact.name, trimmed),
+                        contact.name.lowercase(Locale.ROOT))
+                }.sortedWith(compareBy<Triple<Contact, Int, String>> { it.second }.thenBy { it.third })
+                    .map { it.first }
                 val diff = if (previous == next) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                     override fun getOldListSize() = previous.size
                     override fun getNewListSize() = next.size
@@ -95,6 +99,12 @@ class ContactSearchAdapter(
         Holder(AdapterAppDrawerBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(results[position])
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty() && payloads.all { it == SELECTION }) {
+            holder.bindSelection(results[position])
+        } else super.onBindViewHolder(holder, position, payloads)
+    }
+
     override fun onViewRecycled(holder: Holder) {
         holder.photoJob?.cancel()
         super.onViewRecycled(holder)
@@ -117,14 +127,17 @@ class ContactSearchAdapter(
         init {
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
-        fun bind(contact: Contact) {
-            photoJob?.cancel()
+        fun bindSelection(contact: Contact) {
             binding.root.isSelected = contact.uri == selectedUri
             binding.root.foreground = if (binding.root.isSelected) GradientDrawable().apply {
                 setColor(Color.TRANSPARENT)
                 cornerRadius = 30f * binding.root.resources.displayMetrics.density
                 setStroke((2f * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1), Color.rgb(255, 214, 0))
             } else null
+        }
+        fun bind(contact: Contact) {
+            photoJob?.cancel()
+            bindSelection(contact)
             val number = contact.numbers.firstOrNull().orEmpty()
             binding.contactNumber.text = number
             binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
@@ -179,6 +192,7 @@ class ContactSearchAdapter(
     }
 
     companion object {
+        private const val SELECTION = "contact_selection"
         fun load(context: Context): List<Contact> {
             val columns = arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.LOOKUP_KEY,
                 ContactsContract.Contacts.DISPLAY_NAME_PRIMARY, ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)

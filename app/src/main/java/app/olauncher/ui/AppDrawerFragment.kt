@@ -142,11 +142,12 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun dismissSelectedContactActions() {
+    private fun dismissSelectedContactActions(restoreSearch: Boolean = true) {
         if (!contactSelectionBar) return
         contactSelectionBar = false
         contactsAdapter.clearSelection()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
+        if (!restoreSearch) return
         binding.dockKeys.visibility = View.VISIBLE
         binding.search.visibility = View.VISIBLE
         if (contactsMode) {
@@ -157,10 +158,25 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var contactsAdapter: ContactSearchAdapter
     private var contactsLoad: kotlinx.coroutines.Job? = null
+    private var contactsDirty = true
+    private var contactsObserverRegistered = false
+    private var positionedContactQuery: String? = null
+    private val contactsObserver = object : android.database.ContentObserver(
+        android.os.Handler(android.os.Looper.getMainLooper())
+    ) {
+        override fun onChange(selfChange: Boolean) {
+            contactsDirty = true
+            if (_binding != null && (contactsMode || isUnifiedSearch())) loadContacts()
+        }
+    }
     private val contactsPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted && _binding != null) loadContacts()
+        if (granted && _binding != null) {
+            contactsDirty = true
+            observeContacts()
+            loadContacts()
+        }
         else if (!granted && _binding != null) {
             contactsAdapter.contacts = emptyList()
             contactsAdapter.clearSelection()
@@ -218,6 +234,9 @@ class AppDrawerFragment : BaseFragment() {
         initViews()
         initSearch()
         initAdapter()
+        contactsDirty = true
+        positionedContactQuery = null
+        observeContacts()
         initObservers()
         initClickListeners()
         initDock()
@@ -448,7 +467,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun showContactCommands() {
         val keepSearchFocused = binding.search.hasFocus()
-        dismissSelectedContactActions()
+        dismissSelectedContactActions(restoreSearch = false)
         clearAppSearch()
         binding.homeSearch.visibility = View.GONE
         binding.dockSearch.visibility = View.GONE
@@ -490,7 +509,7 @@ class AppDrawerFragment : BaseFragment() {
             key.animate().cancel()
             key.translationZ = 0f
             key.visibility = View.VISIBLE
-            key.isEnabled = false
+            key.isEnabled = true
             key.alpha = if (index == 0) 1f else 0f
             key.translationX = if (index == 0)
                 0f else 12f * resources.displayMetrics.density
@@ -698,22 +717,37 @@ class AppDrawerFragment : BaseFragment() {
             if (!contactsMode || b.search.query.toString() != query) return@filter
             linearLayoutManager.reverseLayout = query.isNotBlank()
             linearLayoutManager.stackFromEnd = false
-            b.recyclerView.scrollToPosition(0)
+            if (positionedContactQuery != query) b.recyclerView.scrollToPosition(0)
+            positionedContactQuery = query
             b.recyclerView.animateSearchResults(query)
             scheduleContactLaunch(query)
         }
     }
 
+    private fun observeContacts() {
+        if (contactsObserverRegistered || androidx.core.content.ContextCompat.checkSelfPermission(
+                requireContext(), android.Manifest.permission.READ_CONTACTS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        requireContext().contentResolver.registerContentObserver(
+            android.provider.ContactsContract.Contacts.CONTENT_URI, true, contactsObserver)
+        contactsObserverRegistered = true
+    }
+
     private fun loadContacts() {
-        contactsLoad?.cancel()
+        if (contactsLoad?.isActive == true || !contactsDirty) return
         val context = requireContext().applicationContext
         contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
-            val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
-            if (_binding != null) {
-                contactsAdapter.contacts = contacts
-                if (contactsMode) filterContacts(binding.search.query.toString())
-                else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
-            }
+            // Coalesce changes received during a provider read into one further refresh.
+            do {
+                contactsDirty = false
+                val contacts = withContext(Dispatchers.IO) { ContactSearchAdapter.load(context) }
+                if (_binding == null) return@launch
+                if (contactsAdapter.contacts != contacts) {
+                    contactsAdapter.contacts = contacts
+                    if (contactsMode) filterContacts(binding.search.query.toString())
+                    else if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
+                }
+            } while (contactsDirty)
         }
     }
 
@@ -873,7 +907,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockKeys.translationZ = if (animateThunder || isUnifiedSearch()) 8f else 0f
         binding.search.visibility = View.VISIBLE
         binding.search.clipBounds = null
-        binding.search.alpha = 1f
+        binding.search.alpha = (binding.dockSearch.tag as? Float) ?: 0f
         binding.search.translationX = 0f
         binding.homeSearch.visibility = View.VISIBLE
         binding.homeSearch.isClickable = !expanded
@@ -1503,6 +1537,10 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         suggestionJob?.cancel()
         contactsLoad?.cancel()
+        if (contactsObserverRegistered) {
+            requireContext().contentResolver.unregisterContentObserver(contactsObserver)
+            contactsObserverRegistered = false
+        }
         combinedAppsJob?.cancel()
         adapter.cancelFiltering()
         (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null }
