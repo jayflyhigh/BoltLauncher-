@@ -1226,7 +1226,7 @@ class AppDrawerFragment : BaseFragment() {
                     if (contactSelectionBar) dismissSelectedContactActions()
                     contactsAdapter.clearSelection()
                     suggestionJob?.cancel()
-                    if (activeSearch == null && !contactsMode && flag == Constants.FLAG_LAUNCH_APP && newText.contains(' ') && !isSearchComposing()) {
+                    if (!thunderMode && activeSearch == null && !contactsMode && flag == Constants.FLAG_LAUNCH_APP && newText.contains(' ') && !isSearchComposing()) {
                         val confirmed = inAppSearch.confirmed(newText)
                         if (confirmed != null) {
                             activateAppSearch(confirmed.first, confirmed.second)
