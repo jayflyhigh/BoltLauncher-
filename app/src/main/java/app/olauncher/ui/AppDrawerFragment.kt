@@ -135,14 +135,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         contactSelectionBar = true
         selectedContactQuery = binding.search.query.toString()
-        registerContactSelectionBack()
         searchTextView?.requestFocus()
-        binding.root.post {
-            if (_binding != null && contactSelectionBar) {
-                unregisterContactSelectionBack()
-                registerContactSelectionBack()
-            }
-        }
         dockAnimator?.cancel()
         ensureCommandKeys()
         updateContactEditKey()
@@ -163,56 +156,17 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private var contactSelectionBack: android.window.OnBackInvokedCallback? = null
-
-    private fun registerContactSelectionBack() {
-        if (android.os.Build.VERSION.SDK_INT >= 33 && contactSelectionBack == null) {
-            val callback = android.window.OnBackInvokedCallback { deselectContact() }
-            requireActivity().onBackInvokedDispatcher.registerOnBackInvokedCallback(
-                android.window.OnBackInvokedDispatcher.PRIORITY_OVERLAY, callback)
-            contactSelectionBack = callback
-        }
-    }
-
-    private fun unregisterContactSelectionBack() {
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            contactSelectionBack?.let {
-                requireActivity().onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it)
-            }
-        }
-        contactSelectionBack = null
-    }
-
-    private var preserveContactKeyboardUntil = 0L
     private var selectedContactQuery: String? = null
-
-    private fun shouldPreserveContactKeyboard(): Boolean =
-        contactSelectionBar || android.os.SystemClock.uptimeMillis() < preserveContactKeyboardUntil
-
-    private fun restoreContactKeyboard() {
-        if (_binding == null || !shouldPreserveContactKeyboard() ||
-            !viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return
-        binding.search.visibility = View.VISIBLE
-        searchTextView?.requestFocus()
-        androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.root)
-            .show(androidx.core.view.WindowInsetsCompat.Type.ime())
-        binding.search.showKeyboard()
-    }
 
     private fun deselectContact(): Boolean {
         if (!contactSelectionBar) return false
-        // Gboard can finish hiding after Back has already cleared the selection.
-        // Keep this one Back transaction protected until its IME animation ends.
-        preserveContactKeyboardUntil = android.os.SystemClock.uptimeMillis() + 1000L
         dismissSelectedContactActions()
-        restoreContactKeyboard()
         return true
     }
 
     private fun dismissSelectedContactActions(restoreSearch: Boolean = true) {
         if (!contactSelectionBar) return
         contactSelectionBar = false
-        unregisterContactSelectionBack()
         contactsAdapter.clearSelection()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
         if (!restoreSearch) return
@@ -327,30 +281,10 @@ class AppDrawerFragment : BaseFragment() {
         val initialTop = root.paddingTop
         val initialRight = root.paddingRight
         val initialBottom = root.paddingBottom
-        var imeWasVisible = false
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
-            // A keyboard's navigation down-arrow can hide the IME without sending
-            // Back to the app. Also handle a hide that finishes after deselection.
-            if (!keyboardVisible && shouldPreserveContactKeyboard()) {
-                root.post {
-                    if (_binding != null && shouldPreserveContactKeyboard()) {
-                        if (contactSelectionBar) deselectContact()
-                        restoreContactKeyboard()
-                    }
-                }
-            }
-            if (!imeWasVisible && keyboardVisible && contactSelectionBar) {
-                root.post {
-                    if (_binding != null && contactSelectionBar) {
-                        unregisterContactSelectionBack()
-                        registerContactSelectionBack()
-                    }
-                }
-            }
-            imeWasVisible = keyboardVisible
             // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
             val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
@@ -407,7 +341,6 @@ class AppDrawerFragment : BaseFragment() {
                     if (animation == activeIme) {
                         root.translationY = 0f
                         activeIme = null
-                        if (shouldPreserveContactKeyboard()) root.post { restoreContactKeyboard() }
                     }
                 }
             })
@@ -850,7 +783,6 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun setThunderMode(enabled: Boolean) {
-        unregisterContactSelectionBack()
         cancelAutoLaunch()
         suggestionJob?.cancel()
         thunderMode = enabled
@@ -913,7 +845,6 @@ class AppDrawerFragment : BaseFragment() {
             deselectContact()
             return true
         }
-        preserveContactKeyboardUntil = 0L
         if (_binding != null && contactsMode) {
             val keyboardVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
                 ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
@@ -939,10 +870,8 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     fun resetHomeSearch(animate: Boolean = true) {
-        preserveContactKeyboardUntil = 0L
         if (_binding == null) return
         contactSelectionBar = false
-        unregisterContactSelectionBack()
         clearAppSearch()
         dockAnimator?.cancel()
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
@@ -1049,7 +978,6 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun switchSearchDestination() {
         if (!dockExpanded || contactsMode || thunderMode) return
-        unregisterContactSelectionBack()
         cancelAutoLaunch()
         suggestionJob?.cancel()
         val commandsOnly = !adapter.searchCommandsOnly
@@ -1635,7 +1563,6 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onStop() {
-        preserveContactKeyboardUntil = 0L
         cancelAutoLaunch()
         binding.search.hideKeyboard()
         if (isHomePage) resetHomeSearch(animate = false)
@@ -1643,7 +1570,6 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
-        unregisterContactSelectionBack()
         cancelAutoLaunch()
         suggestionJob?.cancel()
         contactsLoad?.cancel()

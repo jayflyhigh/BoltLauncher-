@@ -31,9 +31,11 @@
         android:theme="@style/AppTheme"
         tools:ignore="UnusedAttribute">
 
+        <!-- Route Back through the focused view's pre-IME handler so a contact
+             selection consumes it before Gboard can dismiss or animate the IME. -->
         <activity
             android:name=".MainActivity"
-            android:enableOnBackInvokedCallback="true"
+            android:enableOnBackInvokedCallback="false"
             android:configChanges="uiMode"
             android:excludeFromRecents="true"
             android:exported="true"
