@@ -51,7 +51,6 @@ class AppDrawerFragment : BaseFragment() {
     private var searchTextView: TextView? = null
     private var cachedIsCjkKeyboard: Boolean? = null
     private var positionedAppQuery: String? = null
-    private var homeSearchCommandsOnly = false
 
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
@@ -339,12 +338,11 @@ class AppDrawerFragment : BaseFragment() {
 
                 override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
                     if (!isHomePage || dockExpanded) return false
-                    if (contactsMode) resetHomeSearch()
-                    else if (flag == Constants.FLAG_LAUNCH_APP) {
-                        homeSearchCommandsOnly = !homeSearchCommandsOnly
-                        updateHomeSearchHint()
+                    if (contactsMode) {
+                        resetHomeSearch()
+                        return true
                     }
-                    return true
+                    return false
                 }
 
                 override fun onLongPress(event: android.view.MotionEvent) {
@@ -376,7 +374,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun updateHomeSearchHint() {
-        val hint = if (homeSearchCommandsOnly) "Search within apps" else "Search"
+        val hint = "Search"
         binding.homeSearch.text = hint
         binding.homeSearch.contentDescription = hint
     }
@@ -384,7 +382,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun openHomeSearch() {
         clearAppSearch()
         setContactsMode(false)
-        adapter.searchCommandsOnly = homeSearchCommandsOnly
+        adapter.searchCommandsOnly = false
         binding.search.queryHint = binding.homeSearch.text
         setThunderMode(false)
         configureResultSections(binding.search.query.toString())
@@ -405,7 +403,13 @@ class AppDrawerFragment : BaseFragment() {
     private fun initDock() {
         updateHomeSearchHint()
         binding.homeSearch.setOnClickListener { openHomeSearch() }
-        binding.dockSearch.setOnClickListener { switchSearchDestination() }
+        binding.dockSearch.setOnClickListener {
+            cancelAutoLaunch()
+            if (activeSearch != null) launchAppSearch()
+            else if (binding.search.query.isEmpty()) switchSearchDestination()
+            else if (!inAppSearch.launchBrowser(binding.search.query.toString()))
+                requireContext().showToast("No browser available")
+        }
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         searchTextView?.let {
             binding.homeSearch.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, it.textSize)
@@ -763,16 +767,7 @@ class AppDrawerFragment : BaseFragment() {
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
         binding.dock.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_search_bar)
         binding.search.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        val iconPadding = (13 * resources.displayMetrics.density).toInt()
-        binding.dockSearch.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
-        binding.dockSearch.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        if (activeSearch == null) {
-            binding.dockSearch.contentDescription = if (adapter.searchCommandsOnly)
-                "Search destination: Search within Apps. Tap to switch; hold to edit" else
-                "Search destination: Apps. Tap to switch; hold to edit Search within Apps"
-            binding.dockSearch.setImageResource(if (adapter.searchCommandsOnly) R.drawable.dock_search else R.drawable.dock_apps)
-            binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-        }
+        if (activeSearch == null) showWebBadge()
         // Both controls share the search bar surface; yellow identifies Bolt at rest.
         binding.dockBolt.imageTintList = android.content.res.ColorStateList.valueOf(
             if (enabled) android.graphics.Color.BLACK else 0xFFFFD54F.toInt()
@@ -869,7 +864,7 @@ class AppDrawerFragment : BaseFragment() {
         val params = binding.search.layoutParams as android.widget.FrameLayout.LayoutParams
         val startMargin = if (contact && contactCommand != ContactCommand.SEARCH && commandKeys.isNotEmpty())
             commandKeys[0].right + (6 * density).toInt()
-        else if (contactCommand == ContactCommand.SEARCH || (!thunderMode && !contactsMode && activeSearch == null))
+        else if (contactCommand == ContactCommand.SEARCH)
             (4 * density).toInt()
         else (56 * density).toInt()
         val endMargin = ((if (!contact && isUnifiedSearch()) 56 else 4) * density).toInt()
@@ -880,7 +875,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.search.setPadding(0, 0, 0, 0)
         binding.dockSearch.visibility = if (dockExpanded && !contact && !contactsMode && !thunderMode &&
-            activeSearch != null) View.VISIBLE else View.GONE
+            flag == Constants.FLAG_LAUNCH_APP) View.VISIBLE else View.GONE
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -964,7 +959,7 @@ class AppDrawerFragment : BaseFragment() {
         // This also preserves a deliberately hidden keyboard.
         clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search"
+        binding.search.queryHint = "Search"
         setThunderMode(false)
         configureSearchGeometry()
         configureResultSections(binding.search.query.toString())
@@ -993,12 +988,37 @@ class AppDrawerFragment : BaseFragment() {
             }.show()
     }
 
+    private fun showSearchBadge(code: String, color: Int, description: String) {
+        val size = (52 * resources.displayMetrics.density).toInt()
+        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = app.olauncher.helper.InAppSearch.foreground(color)
+            textSize = size * .46f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        val textWidth = paint.measureText(code)
+        if (textWidth > size * .86f) paint.textSize *= size * .86f / textWidth
+        android.graphics.Canvas(bitmap).drawText(code, size / 2f,
+            size / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
+        binding.dockSearch.setPadding(0, 0, 0, 0)
+        binding.dockSearch.setImageBitmap(bitmap)
+        binding.dockSearch.imageTintList = null
+        binding.dockSearch.background = app.olauncher.helper.InAppSearch.background(color, resources.displayMetrics.density)
+        binding.dockSearch.contentDescription = description
+    }
+
+    private fun showWebBadge() {
+        showSearchBadge("WEB", android.graphics.Color.BLACK,
+            "Search the web. With no query, show search destinations. Hold to edit destinations")
+    }
+
     private fun clearAppSearch() {
         suggestionJob?.cancel()
         adapter.searchCommandsOnly = false
         activeSearch = null
         adapter.searchPackage = null
-        binding.dockSearch.contentDescription = "Search destination: Apps. Tap to switch; hold to edit Search within Apps"
+        showWebBadge()
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
     }
 
@@ -1008,24 +1028,8 @@ class AppDrawerFragment : BaseFragment() {
         setThunderMode(false)
         activeSearch = target
         adapter.searchPackage = target.app.appPackage
-        val size = (52 * resources.displayMetrics.density).toInt()
-        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
-        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = app.olauncher.helper.InAppSearch.foreground(target.color)
-            textSize = size * .46f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-        val code = inAppSearch.alias(target)
-        val textWidth = paint.measureText(code)
-        if (textWidth > size * .86f) paint.textSize *= size * .86f / textWidth
-        android.graphics.Canvas(bitmap).drawText(code, size / 2f,
-            size / 2f - (paint.ascent() + paint.descent()) / 2f, paint)
-        binding.dockSearch.setPadding(0, 0, 0, 0)
-        binding.dockSearch.setImageBitmap(bitmap)
-        binding.dockSearch.imageTintList = null
-        binding.dockSearch.background = app.olauncher.helper.InAppSearch.background(target.color, resources.displayMetrics.density)
-        binding.dockSearch.contentDescription = "Search in ${target.app.appLabel}, alias ${inAppSearch.alias(target)}"
+        showSearchBadge(inAppSearch.alias(target), target.color,
+            "Search in ${target.app.appLabel}, alias ${inAppSearch.alias(target)}")
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(target); true }
         binding.search.queryHint = "Search in ${target.app.appLabel}....."
         binding.search.setQuery(query, false)
@@ -1127,7 +1131,7 @@ class AppDrawerFragment : BaseFragment() {
         val commandsOnly = adapter.searchCommandsOnly
         clearAppSearch()
         adapter.searchCommandsOnly = commandsOnly
-        binding.search.queryHint = if (commandsOnly) "Search within apps" else "Search"
+        binding.search.queryHint = "Search"
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
         adapter.filterApps(binding.search.query.toString())
         setThunderMode(false)
@@ -1135,6 +1139,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
         return true
     }
+
 
     private fun toggleEmptySearchDestination(): Boolean {
         if (!dockExpanded || contactsMode || thunderMode || activeSearch != null ||
