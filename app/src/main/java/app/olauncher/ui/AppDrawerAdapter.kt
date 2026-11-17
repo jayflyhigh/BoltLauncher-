@@ -157,6 +157,7 @@ class AppDrawerAdapter(
         val generation = filterGeneration
         val selectedPackage = searchPackage
         val commandsOnly = searchCommandsOnly
+        val thunder = thunderMode
         val trimmed = query.trim()
         suggestions = if (selectedPackage != null && trimmed.isNotEmpty())
             (listOf(trimmed) + suggestions.filter { it.contains(trimmed, ignoreCase = true) })
@@ -197,7 +198,10 @@ class AppDrawerAdapter(
             if (generation != filterGeneration || searchPackage != selectedPackage ||
                 searchCommandsOnly != commandsOnly) return@launch
             val webFallback = items.isEmpty() && query.isNotBlank() && webSuggestionsEnabled()
-            val displayed = if (webFallback) listOf(AppModel.SearchSuggestion(trimmed, query))
+            val displayed = if (thunder) items.singleOrNull()
+                ?.takeIf { query.isNotBlank() && it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
+                ?.let { listOf(it) } ?: emptyList()
+                else if (webFallback) listOf(AppModel.SearchSuggestion(trimmed, query))
                 else if (selectedPackage != null) items + suggestions.map { AppModel.SearchSuggestion(it, query) }
                 else items
             submitList(displayed) {
@@ -393,7 +397,7 @@ class AppDrawerAdapter(
             searchCommandsOnly: Boolean,
         ) = with(binding) {
             isSuggestion = appModel is AppModel.SearchSuggestion
-            hasSearchBadge = target != null && flag == Constants.FLAG_LAUNCH_APP
+            hasSearchBadge = !thunderMode && target != null && flag == Constants.FLAG_LAUNCH_APP
             searchBadge.isVisible = hasSearchBadge
             if (target != null) {
                 searchBadge.text = target.code
