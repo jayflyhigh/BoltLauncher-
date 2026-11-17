@@ -999,8 +999,14 @@ class AppDrawerFragment : BaseFragment() {
             commandKeys[0].right + (6 * density).toInt()
         else if (contactCommand == ContactCommand.SEARCH)
             (4 * density).toInt()
-        else (56 * density).toInt()
-        val endMargin = ((if (!contact && isUnifiedSearch()) 56 else 4) * density).toInt()
+        else ((if (activeSearch == null && !thunderMode && !contactsMode) 4 else 56) * density).toInt()
+        val endMargin = ((if (!contact && isUnifiedSearch()) 112
+            else if (!contact && !contactsMode && !thunderMode && activeSearch == null) 56 else 4) * density).toInt()
+        val iconParams = binding.dockSearch.layoutParams as android.widget.FrameLayout.LayoutParams
+        iconParams.gravity = (if (activeSearch == null) android.view.Gravity.END else android.view.Gravity.START) or android.view.Gravity.CENTER_VERTICAL
+        iconParams.marginStart = if (activeSearch == null) 0 else (4 * density).toInt()
+        iconParams.marginEnd = ((if (isUnifiedSearch()) 60 else 4) * density).toInt()
+        binding.dockSearch.layoutParams = iconParams
         if (params.marginStart != startMargin || params.marginEnd != endMargin) {
             params.marginStart = startMargin
             params.marginEnd = endMargin
@@ -1143,8 +1149,13 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun showWebBadge() {
-        showSearchBadge("WEB", android.graphics.Color.BLACK,
-            "Search the web. With no query, show search destinations. Hold to edit destinations")
+        val padding = (13 * resources.displayMetrics.density).toInt()
+        binding.dockSearch.setPadding(padding, padding, padding, padding)
+        binding.dockSearch.setImageResource(R.drawable.dock_web)
+        binding.dockSearch.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+        binding.dockSearch.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        binding.dockSearch.contentDescription =
+            "Search the web. With no query, show search destinations. Hold to edit destinations"
     }
 
     private fun clearAppSearch() {
@@ -1508,7 +1519,7 @@ class AppDrawerFragment : BaseFragment() {
             searchClick = { activateAppSearch(it, binding.search.query.toString()) },
             searchHold = { showAppSearchEditor(it) },
             appSearchHold = { app -> showAppSearchEditor(inAppSearch.targets[app.appPackage], app) },
-            searchAlias = { app -> if (app is AppModel.App && app.user == Process.myUserHandle()) inAppSearch.targets[app.appPackage]?.let { inAppSearch.alias(it) } else null },
+            searchAlias = { null },
             webSuggestionsEnabled = { canShowWebSuggestions() },
             emptyAppResults = { query -> updateSearchSuggestions(query) },
             resultsChanged = { query ->
