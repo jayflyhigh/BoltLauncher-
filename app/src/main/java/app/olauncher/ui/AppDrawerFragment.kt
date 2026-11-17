@@ -134,6 +134,7 @@ class AppDrawerFragment : BaseFragment() {
             return
         }
         contactSelectionBar = true
+        selectedContactQuery = binding.search.query.toString()
         registerContactSelectionBack()
         searchTextView?.requestFocus()
         binding.root.post {
@@ -182,9 +183,29 @@ class AppDrawerFragment : BaseFragment() {
         contactSelectionBack = null
     }
 
+    private var preserveContactKeyboardUntil = 0L
+    private var selectedContactQuery: String? = null
+
+    private fun shouldPreserveContactKeyboard(): Boolean =
+        contactSelectionBar || android.os.SystemClock.uptimeMillis() < preserveContactKeyboardUntil
+
+    private fun restoreContactKeyboard() {
+        if (_binding == null || !shouldPreserveContactKeyboard() ||
+            !viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return
+        binding.search.visibility = View.VISIBLE
+        searchTextView?.requestFocus()
+        androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.root)
+            .show(androidx.core.view.WindowInsetsCompat.Type.ime())
+        binding.search.showKeyboard()
+    }
+
     private fun deselectContact(): Boolean {
         if (!contactSelectionBar) return false
+        // Gboard can finish hiding after Back has already cleared the selection.
+        // Keep this one Back transaction protected until its IME animation ends.
+        preserveContactKeyboardUntil = android.os.SystemClock.uptimeMillis() + 1000L
         dismissSelectedContactActions()
+        restoreContactKeyboard()
         return true
     }
 
@@ -311,14 +332,13 @@ class AppDrawerFragment : BaseFragment() {
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
-            // Some keyboards consume Back instead of forwarding it to the window.
-            // Restore the focused input and deselect if that happens during selection.
-            if (imeWasVisible && !keyboardVisible && contactSelectionBar &&
-                viewLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            // A keyboard's navigation down-arrow can hide the IME without sending
+            // Back to the app. Also handle a hide that finishes after deselection.
+            if (!keyboardVisible && shouldPreserveContactKeyboard()) {
                 root.post {
-                    if (_binding != null && contactSelectionBar) {
-                        deselectContact()
-                        binding.search.showKeyboard()
+                    if (_binding != null && shouldPreserveContactKeyboard()) {
+                        if (contactSelectionBar) deselectContact()
+                        restoreContactKeyboard()
                     }
                 }
             }
@@ -387,6 +407,7 @@ class AppDrawerFragment : BaseFragment() {
                     if (animation == activeIme) {
                         root.translationY = 0f
                         activeIme = null
+                        if (shouldPreserveContactKeyboard()) root.post { restoreContactKeyboard() }
                     }
                 }
             })
@@ -889,9 +910,10 @@ class AppDrawerFragment : BaseFragment() {
 
     fun collapseSearch(): Boolean {
         if (_binding != null && contactSelectionBar) {
-            dismissSelectedContactActions()
+            deselectContact()
             return true
         }
+        preserveContactKeyboardUntil = 0L
         if (_binding != null && contactsMode) {
             val keyboardVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
                 ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
@@ -917,6 +939,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     fun resetHomeSearch(animate: Boolean = true) {
+        preserveContactKeyboardUntil = 0L
         if (_binding == null) return
         contactSelectionBar = false
         unregisterContactSelectionBack()
@@ -1271,6 +1294,7 @@ class AppDrawerFragment : BaseFragment() {
             override fun onQueryTextChange(newText: String): Boolean {
                 try {
                     cancelAutoLaunch()
+                    if (contactSelectionBar && newText == selectedContactQuery) return true
                     if (contactSelectionBar) dismissSelectedContactActions()
                     contactsAdapter.clearSelection()
                     suggestionJob?.cancel()
@@ -1611,6 +1635,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onStop() {
+        preserveContactKeyboardUntil = 0L
         cancelAutoLaunch()
         binding.search.hideKeyboard()
         if (isHomePage) resetHomeSearch(animate = false)
