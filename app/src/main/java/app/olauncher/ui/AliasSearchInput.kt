@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
+import android.view.inputmethod.TextAttribute
 import androidx.appcompat.widget.SearchView
 
 /** Receives empty/start-of-query Backspace from both software and physical keyboards. */
@@ -82,7 +83,7 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
     /** Called only for a single printable key; the fragment guards contacts mode and selection. */
     var contactShortcutKey: ((Char) -> Boolean)? = null
     private fun handleContactShortcut(text: CharSequence?): Boolean =
-        text?.singleOrNull()?.takeIf { !it.isWhitespace() && !it.isISOControl() }
+        text?.trim()?.singleOrNull()?.takeUnless { it.isISOControl() }
             ?.let { contactShortcutKey?.invoke(it) } == true
 
     var submitEmpty: (() -> Boolean)? = null
@@ -128,6 +129,16 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
                 if (handleContactShortcut(text)) return true
                 return super.commitText(text, newCursorPosition)
             }
+            override fun commitText(
+                text: CharSequence,
+                newCursorPosition: Int,
+                textAttribute: TextAttribute?,
+            ): Boolean {
+                // Swipe keyboards can commit a shortcut together with an automatic space.
+                if (handleContactShortcut(text)) return true
+                return super.commitText(text, newCursorPosition, textAttribute)
+            }
+
             override fun performEditorAction(editorAction: Int): Boolean {
                 if ((editorAction == EditorInfo.IME_ACTION_SEARCH ||
                         editorAction == EditorInfo.IME_ACTION_DONE ||

@@ -33,6 +33,17 @@ class ContactSearchAdapter(
     val selectedContact: Contact?
         get() = contacts.firstOrNull { it.uri == selectedUri }
 
+    val firstResult: Contact? get() = results.firstOrNull()
+
+    var enterHighlightedResult: Contact? = null
+        set(value) {
+            if (field == value) return
+            val previous = field
+            field = value
+            previous?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+            value?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+        }
+
     fun toggleSelection(contact: Contact) {
         val previous = selectedUri
         selectedUri = if (previous == contact.uri) null else contact.uri
@@ -52,6 +63,7 @@ class ContactSearchAdapter(
         filterJob?.cancel()
         contacts = emptyList()
         results = emptyList()
+        enterHighlightedResult = null
         selectedUri = null
         committedQuery = null
         photoScope.coroutineContext.cancelChildren()
@@ -112,7 +124,7 @@ class ContactSearchAdapter(
         }
     }
 
-    fun openFirst() { results.firstOrNull()?.let(open) }
+    fun openFirst() { firstResult?.let(open) }
     override fun getItemCount() = results.size
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         Holder(AdapterAppDrawerBinding.inflate(LayoutInflater.from(parent.context), parent, false))
@@ -185,7 +197,12 @@ class ContactSearchAdapter(
             val number = contact.numbers.firstOrNull().orEmpty()
             binding.contactNumber.text = number
             binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
-            binding.appTitle.text = contact.name
+            binding.appTitle.text = if (contact == enterHighlightedResult && contact.name.isNotEmpty()) {
+                android.text.SpannableString(contact.name).apply {
+                    setSpan(android.text.style.ForegroundColorSpan(Color.rgb(255, 214, 0)),
+                        0, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            } else contact.name
             binding.otherProfileIndicator.visibility = View.GONE
             binding.resultBolt.visibility = View.GONE
             binding.appHideLayout.visibility = View.GONE
