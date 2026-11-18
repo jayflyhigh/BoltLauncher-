@@ -23,6 +23,6 @@ object SearchCommandUrl {
         alias.isNotBlank() && alias.none { it.isISOControl() } && otherAliases.none { it.equals(alias.trim(), true) }
 
     fun confirmed(text: String, aliases: Collection<String>): Pair<String, String>? =
-        aliases.sortedByDescending { it.length }.firstOrNull { text.startsWith("$it ", true) }
+        aliases.sortedByDescending { it.length }.firstOrNull { text.startsWith("$it.", true) }
             ?.let { it to text.substring(it.length + 1) }
 }
