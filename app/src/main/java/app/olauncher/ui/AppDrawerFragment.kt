@@ -1119,7 +1119,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateAliasHint(query: String) {
         if (_binding == null) return
         val target = if (dockExpanded && !contactsMode && !thunderMode &&
-            !adapter.searchCommandsOnly && activeSearch == null && query.isNotEmpty()) inAppSearch.find(query) else null
+            activeSearch == null && query.isNotEmpty()) inAppSearch.find(query) else null
         if (target == null) {
             binding.aliasHint?.visibility = View.GONE
             return
@@ -1130,7 +1130,7 @@ class AppDrawerFragment : BaseFragment() {
         label.visibility = View.INVISIBLE
         label.post {
             if (_binding == null || binding.search.query.toString() != query ||
-                contactsMode || thunderMode || adapter.searchCommandsOnly || activeSearch != null) {
+                contactsMode || thunderMode || activeSearch != null) {
                 label.visibility = View.GONE
                 return@post
             }
