@@ -79,6 +79,12 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
         return super.onKeyPreIme(keyCode, event)
     }
 
+    /** Called only for a single printable key; the fragment guards contacts mode and selection. */
+    var contactShortcutKey: ((Char) -> Boolean)? = null
+    private fun handleContactShortcut(text: CharSequence?): Boolean =
+        text?.singleOrNull()?.takeIf { !it.isWhitespace() && !it.isISOControl() }
+            ?.let { contactShortcutKey?.invoke(it) } == true
+
     var submitEmpty: (() -> Boolean)? = null
     /** Contacts mode always owns Enter, including Gboard's IME action. */
     var submitContacts: (() -> Boolean)? = null
@@ -88,6 +94,10 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
         (text.isNullOrEmpty() && submitEmpty?.invoke() == true)
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
+            event.keyCode != KeyEvent.KEYCODE_ENTER && event.keyCode != KeyEvent.KEYCODE_DEL &&
+            !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed &&
+            event.unicodeChar > 0 && handleContactShortcut(event.unicodeChar.toChar().toString())) return true
         if (event.keyCode == KeyEvent.KEYCODE_ENTER) {
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (event.repeatCount == 0) consumingEnter =
@@ -114,6 +124,10 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val connection = super.onCreateInputConnection(outAttrs) ?: return null
         return object : InputConnectionWrapper(connection, false) {
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                if (handleContactShortcut(text)) return true
+                return super.commitText(text, newCursorPosition)
+            }
             override fun performEditorAction(editorAction: Int): Boolean {
                 if ((editorAction == EditorInfo.IME_ACTION_SEARCH ||
                         editorAction == EditorInfo.IME_ACTION_DONE ||
