@@ -73,7 +73,7 @@ class AppDrawerFragment : BaseFragment() {
         contactShortcutPrefs.getString(command.name, null)?.singleOrNull()
 
     private fun activateContactShortcut(char: Char): Boolean {
-        if (!contactsMode || !dockExpanded || contactDialog?.isShowing == true ||
+        if ((!contactsMode && !contactSelectionBar) || contactDialog?.isShowing == true ||
             searchEditor?.isShowing == true) return false
         val selected = contactsAdapter.selectedContact ?: return false
         val command = ContactCommand.entries.firstOrNull {
