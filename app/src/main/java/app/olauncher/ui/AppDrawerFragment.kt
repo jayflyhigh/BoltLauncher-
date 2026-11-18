@@ -58,26 +58,36 @@ class AppDrawerFragment : BaseFragment() {
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
 
-    private enum class ContactCommand(val icon: Int, val hint: String) {
-        CALL(R.drawable.contact_call, "Call....."),
-        MESSAGE(R.drawable.contact_message, "Message....."),
-        WHATSAPP(R.drawable.contact_whatsapp, "WhatsApp message....."),
-        ADD(R.drawable.contact_add, "Add a contact......."),
+    private enum class ContactCommand(val icon: Int, val hint: String, val defaultKey: Char? = null) {
+        CALL(R.drawable.contact_call, "Call.....", 'p'),
+        MESSAGE(R.drawable.contact_message, "Message.....", 'm'),
+        WHATSAPP(R.drawable.contact_whatsapp, "WhatsApp message.....", 'w'),
+        ADD(R.drawable.contact_add, "Add a contact.......", 'e'),
         SEARCH(R.drawable.dock_search, "Search contacts")
     }
+    private val contactActions = ContactCommand.entries.filter { it != ContactCommand.SEARCH }
     private var contactCommand: ContactCommand? = null
     private val contactShortcutPrefs by lazy {
         requireContext().getSharedPreferences("contact_keyboard_shortcuts", Context.MODE_PRIVATE)
     }
-    private fun assignedContactKey(command: ContactCommand): Char? =
-        contactShortcutPrefs.getString(command.name, null)?.singleOrNull()
+    private fun assignedContactKey(command: ContactCommand): Char? {
+        // An empty stored value explicitly disables the shortcut.
+        val storedKey = contactShortcutPrefs.getString(command.name, null)
+        if (storedKey != null) return storedKey.singleOrNull()
+
+        val defaultKey = command.defaultKey ?: return null
+        val taken = contactActions.any { other ->
+            contactShortcutPrefs.getString(other.name, null)?.singleOrNull()?.lowercaseChar() == defaultKey
+        }
+        return defaultKey.takeUnless { taken }
+    }
 
     private fun activateContactShortcut(char: Char): Boolean {
         if ((!contactsMode && !contactSelectionBar) || contactDialog?.isShowing == true ||
             searchEditor?.isShowing == true) return false
         val selected = contactsAdapter.selectedContact ?: return false
-        val command = ContactCommand.entries.firstOrNull {
-            it != ContactCommand.SEARCH && assignedContactKey(it)?.lowercaseChar() == char.lowercaseChar()
+        val command = contactActions.firstOrNull {
+            assignedContactKey(it)?.lowercaseChar() == char.lowercaseChar()
         } ?: return false
         when (command) {
             ContactCommand.ADD -> editContact(selected)
@@ -104,13 +114,16 @@ class AppDrawerFragment : BaseFragment() {
             setPadding(padding, 0, padding, 0)
             addView(input)
         }
+        val action = if (command == ContactCommand.ADD) "Edit"
+            else command.name.lowercase().replaceFirstChar { it.uppercase() }
         val dialog = androidx.appcompat.app.AlertDialog.Builder(context)
-            .setTitle("Keyboard shortcut: " + command.name.lowercase().replaceFirstChar { it.uppercase() })
+            .setTitle("Keyboard shortcut: " + action)
             .setMessage("Press this key while a contact is selected to use this action. It won't affect normal search typing.")
             .setView(container)
             .setNegativeButton("Cancel", null)
             .setNeutralButton("Remove key") { _, _ ->
-                contactShortcutPrefs.edit().remove(command.name).apply()
+                contactShortcutPrefs.edit().putString(command.name, "").apply()
+                updateContactActionButtons()
             }
             .setPositiveButton("Save", null)
             .create()
@@ -122,19 +135,20 @@ class AppDrawerFragment : BaseFragment() {
                     return@setOnClickListener
                 }
                 val editor = contactShortcutPrefs.edit()
-                ContactCommand.entries.forEach { other ->
-                    if (other != command && assignedContactKey(other)?.equals(key, ignoreCase = true) == true) {
-                        editor.remove(other.name)
+                contactActions.forEach { other ->
+                    if (other != command && assignedContactKey(other)?.lowercaseChar() == key.lowercaseChar()) {
+                        editor.putString(other.name, "")
                     }
                 }
                 editor.putString(command.name, key.toString()).apply()
+                updateContactActionButtons()
                 dialog.dismiss()
             }
         }
         dialog.show()
     }
 
-    private var commandKeys = emptyList<android.widget.ImageButton>()
+    private var commandKeys = emptyList<ContactActionButton>()
     private var commandProgress = 0f
     private var contactLaunchQuery: String? = null
     private var contactDialog: androidx.appcompat.app.AlertDialog? = null
@@ -210,7 +224,7 @@ class AppDrawerFragment : BaseFragment() {
         searchTextView?.requestFocus()
         dockAnimator?.cancel()
         ensureCommandKeys()
-        updateContactEditKey()
+        updateContactActionButtons()
         binding.homeSearch.visibility = View.GONE
         // Keep the focused editor attached and visible to the IME while actions cover it.
         binding.search.visibility = View.VISIBLE
@@ -544,31 +558,27 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun ensureCommandKeys() {
         if (commandKeys.isNotEmpty()) return
-        val commands = ContactCommand.entries.filter { it != ContactCommand.SEARCH }
-        val slotWidth = binding.dockKeys.width / commands.size
-        val icons = commands.map { it.icon }
-        commandKeys = icons.mapIndexed { index, _ ->
-            android.widget.ImageButton(requireContext()).apply {
+        val slotWidth = binding.dockKeys.width / contactActions.size
+        commandKeys = contactActions.mapIndexed { index, command ->
+            ContactActionButton(requireContext()).apply {
                 setBackgroundResource(R.drawable.dock_key)
-                setImageResource(icons[index])
+                setImageResource(command.icon)
                 imageTintList = android.content.res.ColorStateList.valueOf(
-                    if (icons[index] == R.drawable.contact_whatsapp) android.graphics.Color.rgb(37, 211, 102)
+                    if (command == ContactCommand.WHATSAPP) android.graphics.Color.rgb(37, 211, 102)
                     else android.graphics.Color.WHITE
                 )
                 val padding = (13 * resources.displayMetrics.density).toInt()
                 setPadding(padding, padding, padding, padding)
-                contentDescription = commands[index].hint.trimEnd('.')
                 visibility = View.GONE
                 binding.dock.addView(this, android.widget.FrameLayout.LayoutParams(slotWidth - (8 * resources.displayMetrics.density).toInt(), binding.dockContacts.height).apply {
                     leftMargin = index * slotWidth + (4 * resources.displayMetrics.density).toInt()
                     topMargin = binding.dockContacts.top
                 })
                 setOnLongClickListener {
-                    showContactShortcutKeyMenu(commands[index])
+                    showContactShortcutKeyMenu(command)
                     true
                 }
                 setOnClickListener {
-                    val command = commands[index]
                     if (command == ContactCommand.ADD) {
                         contactsAdapter.selectedContact?.let { editContact(it) } ?: addContact()
                         return@setOnClickListener
@@ -631,7 +641,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockKeys.visibility = View.INVISIBLE
         binding.dockAllContacts.visibility = View.GONE
         commandProgress = 0f
-        updateContactEditKey()
+        updateContactActionButtons()
         commandKeys.forEachIndexed { index, key ->
             key.animate().cancel()
             key.translationZ = 0f
@@ -794,11 +804,23 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun updateContactEditKey() {
-        val key = commandKeys.getOrNull(ContactCommand.ADD.ordinal) ?: return
+    private fun updateContactActionButtons() {
         val selected = contactsAdapter.selectedContact
-        key.setImageResource(if (selected == null) R.drawable.contact_add else R.drawable.ic_rename)
-        key.contentDescription = if (selected == null) "Add a contact" else "Edit ${selected.name}"
+        commandKeys.forEachIndexed { index, button ->
+            val command = contactActions[index]
+            val action = if (command == ContactCommand.ADD && selected != null) {
+                getString(R.string.contact_action_edit, selected.name)
+            } else {
+                command.hint.trimEnd('.')
+            }
+            if (command == ContactCommand.ADD) {
+                button.setImageResource(if (selected == null) command.icon else R.drawable.ic_rename)
+            }
+            val label = if (selected != null) assignedContactKey(command)?.toString() else null
+            button.shortcutLabel = label
+            button.contentDescription = if (label == null) action else
+                getString(R.string.contact_action_with_shortcut, action, label)
+        }
     }
 
     private fun editContact(contact: ContactSearchAdapter.Contact) {
