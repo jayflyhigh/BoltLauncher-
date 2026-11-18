@@ -66,6 +66,74 @@ class AppDrawerFragment : BaseFragment() {
         SEARCH(R.drawable.dock_search, "Search contacts")
     }
     private var contactCommand: ContactCommand? = null
+    private val contactShortcutPrefs by lazy {
+        requireContext().getSharedPreferences("contact_keyboard_shortcuts", Context.MODE_PRIVATE)
+    }
+    private fun assignedContactKey(command: ContactCommand): Char? =
+        contactShortcutPrefs.getString(command.name, null)?.singleOrNull()
+
+    private fun activateContactShortcut(char: Char): Boolean {
+        if (!contactsMode || !dockExpanded || contactDialog?.isShowing == true ||
+            searchEditor?.isShowing == true) return false
+        val selected = contactsAdapter.selectedContact ?: return false
+        val command = ContactCommand.entries.firstOrNull {
+            it != ContactCommand.SEARCH && assignedContactKey(it)?.lowercaseChar() == char.lowercaseChar()
+        } ?: return false
+        when (command) {
+            ContactCommand.ADD -> editContact(selected)
+            ContactCommand.CALL, ContactCommand.MESSAGE, ContactCommand.WHATSAPP ->
+                runContactCommand(selected, command)
+            ContactCommand.SEARCH -> return false
+        }
+        return true
+    }
+
+    private fun showContactShortcutKeyMenu(command: ContactCommand) {
+        val context = requireContext()
+        val input = android.widget.EditText(context).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            filters = arrayOf(android.text.InputFilter.LengthFilter(1))
+            setSingleLine(true)
+            hint = "One letter, number, or symbol"
+            setText(assignedContactKey(command)?.toString().orEmpty())
+            selectAll()
+        }
+        val padding = (20 * resources.displayMetrics.density).toInt()
+        val container = android.widget.FrameLayout(context).apply {
+            setPadding(padding, 0, padding, 0)
+            addView(input)
+        }
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle("Keyboard shortcut: " + command.name.lowercase().replaceFirstChar { it.uppercase() })
+            .setMessage("Press this key while a contact is selected to use this action. It won't affect normal search typing.")
+            .setView(container)
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton("Remove key") { _, _ ->
+                contactShortcutPrefs.edit().remove(command.name).apply()
+            }
+            .setPositiveButton("Save", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val key = input.text.toString().singleOrNull()
+                if (key == null || key.isWhitespace() || key.isISOControl()) {
+                    input.error = "Choose one printable key"
+                    return@setOnClickListener
+                }
+                val editor = contactShortcutPrefs.edit()
+                ContactCommand.entries.forEach { other ->
+                    if (other != command && assignedContactKey(other)?.equals(key, ignoreCase = true) == true) {
+                        editor.remove(other.name)
+                    }
+                }
+                editor.putString(command.name, key.toString()).apply()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
     private var commandKeys = emptyList<android.widget.ImageButton>()
     private var commandProgress = 0f
     private var contactLaunchQuery: String? = null
@@ -495,6 +563,10 @@ class AppDrawerFragment : BaseFragment() {
                     leftMargin = index * slotWidth + (4 * resources.displayMetrics.density).toInt()
                     topMargin = binding.dockContacts.top
                 })
+                setOnLongClickListener {
+                    showContactShortcutKeyMenu(commands[index])
+                    true
+                }
                 setOnClickListener {
                     val command = commands[index]
                     if (command == ContactCommand.ADD) {
@@ -1418,6 +1490,7 @@ class AppDrawerFragment : BaseFragment() {
                 dismissContactSelection = { deselectContact() || returnFromSecondarySearch() }
                 submitEmpty = { toggleEmptySearchDestination() }
                 submitContacts = { submitContactsOnly() }
+                contactShortcutKey = { key -> activateContactShortcut(key) }
             }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
