@@ -1121,10 +1121,10 @@ class AppDrawerFragment : BaseFragment() {
         val target = if (dockExpanded && !contactsMode && !thunderMode &&
             !adapter.searchCommandsOnly && activeSearch == null && query.isNotEmpty()) inAppSearch.find(query) else null
         if (target == null) {
-            binding.aliasHint.visibility = View.GONE
+            binding.aliasHint?.visibility = View.GONE
             return
         }
-        val label = binding.aliasHint
+        val label = binding.aliasHint ?: return
         label.text = "Press . to search in ${target.app.appLabel}"
         val editor = searchTextView ?: return
         label.visibility = View.INVISIBLE
