@@ -108,6 +108,18 @@ class AppDrawerAdapter(
 
     private var displayedItems: List<AppModel> = emptyList()
     val currentList: List<AppModel> get() = displayedItems
+    val firstLaunchableResult: AppModel?
+        get() = currentList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
+
+    var enterHighlightedResult: AppModel? = null
+        set(value) {
+            if (field == value) return
+            val previous = field
+            field = value
+            previous?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+            value?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+        }
+
     private fun getItem(position: Int) = displayedItems[position]
     override fun getItemCount() = displayedItems.size
     private var diffJob: Job? = null
@@ -154,6 +166,7 @@ class AppDrawerAdapter(
 
     fun filterApps(query: String) {
         cancelFiltering()
+        enterHighlightedResult = null
         val generation = filterGeneration
         val selectedPackage = searchPackage
         val commandsOnly = searchCommandsOnly
@@ -306,7 +319,7 @@ class AppDrawerAdapter(
                     iconScope,
                     iconCache,
                     thunderMode, searchTarget(appModel), searchClick, searchHold, appSearchHold, searchCommandsOnly,
-                    requestedQuery, currentList.size == 1
+                    requestedQuery, currentList.size == 1, !thunderMode && appModel == enterHighlightedResult
                 )
             }
         } catch (e: Exception) {
@@ -336,8 +349,7 @@ class AppDrawerAdapter(
     }
 
     fun launchFirstInList() {
-        val first = currentList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
-        if (first != null) appClickListener(first)
+        firstLaunchableResult?.let(appClickListener)
     }
 
     class PrivateSpaceHeaderViewHolder(private val binding: AdapterPrivateSpaceHeaderBinding) :
@@ -398,6 +410,7 @@ class AppDrawerAdapter(
             searchCommandsOnly: Boolean,
             query: String,
             onlyResult: Boolean,
+            enterHighlighted: Boolean,
         ) = with(binding) {
             isSuggestion = appModel is AppModel.SearchSuggestion
             isSearchDestination = searchCommandsOnly
@@ -487,11 +500,11 @@ class AppDrawerAdapter(
                 append(appModel.appLabel)
                 if (appModel.isNew) append(" ✦")
             }
-            if (thunderMode) {
+            if (thunderMode || enterHighlighted) {
                 val title = appTitle.text.toString()
                 appTitle.text = android.text.SpannableString(title).apply {
                     val yellow = android.graphics.Color.rgb(255, 214, 0)
-                    if (onlyResult && query.isNotBlank()) {
+                    if (enterHighlighted || (onlyResult && query.isNotBlank())) {
                         setSpan(android.text.style.ForegroundColorSpan(yellow), 0, length,
                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     } else {

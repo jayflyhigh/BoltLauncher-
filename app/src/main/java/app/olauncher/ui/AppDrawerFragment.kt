@@ -164,6 +164,7 @@ class AppDrawerFragment : BaseFragment() {
         !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
 
     private fun configureResultSections(query: String): Boolean {
+        updateEnterHighlight(query)
         val previousAdapter = binding.recyclerView.adapter
         // Keep the same app/contacts container for the WEB destination picker.
         // Replacing it detaches adapters, cancels work and recycles all visible rows.
@@ -206,11 +207,25 @@ class AppDrawerFragment : BaseFragment() {
         destinationsHeader.show(destinations.isNotEmpty())
     }
 
+    private fun unifiedContactEnterTarget(query: String): ContactSearchAdapter.Contact? =
+        if (isUnifiedSearch() && adapter.committedQuery == query && adapter.appFilteredList.isEmpty() &&
+            contactsAdapter.committedQuery == query) contactsAdapter.firstResult else null
+
+    private fun updateEnterHighlight(query: String) {
+        val showHighlight = dockExpanded && isUnifiedSearch() && !contactSelectionBar &&
+            query.isNotBlank() && adapter.committedQuery == query
+        adapter.enterHighlightedResult = if (showHighlight && adapter.appFilteredList.isNotEmpty())
+            adapter.firstLaunchableResult else null
+        contactsAdapter.enterHighlightedResult = if (showHighlight) unifiedContactEnterTarget(query) else null
+    }
+
     private fun filterUnifiedContacts(query: String) {
         contactsAdapter.filter(query, showAll = false) {
             if (_binding == null || !isUnifiedSearch() || binding.search.query.toString() != query) return@filter
             updateSectionHeaders()
+            updateEnterHighlight(query)
         }
+        updateEnterHighlight(query)
     }
 
     private fun showSelectedContactActions() {
@@ -221,6 +236,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         contactSelectionBar = true
         selectedContactQuery = binding.search.query.toString()
+        updateEnterHighlight(binding.search.query.toString())
         searchTextView?.requestFocus()
         dockAnimator?.cancel()
         ensureCommandKeys()
@@ -254,6 +270,7 @@ class AppDrawerFragment : BaseFragment() {
         if (!contactSelectionBar) return
         contactSelectionBar = false
         contactsAdapter.clearSelection()
+        updateEnterHighlight(binding.search.query.toString())
         commandKeys.forEach { it.animate().cancel(); it.visibility = View.GONE }
         if (!restoreSearch) return
         binding.dockKeys.visibility = View.VISIBLE
@@ -1532,8 +1549,7 @@ class AppDrawerFragment : BaseFragment() {
                     val text = binding.search.query.toString().trim()
                     if (!thunderMode && flag == Constants.FLAG_LAUNCH_APP &&
                         adapter.appFilteredList.isEmpty() && text.isNotBlank()) {
-                        if (isUnifiedSearch() && contactsAdapter.committedQuery == binding.search.query.toString() &&
-                            contactsAdapter.itemCount > 0) {
+                        if (unifiedContactEnterTarget(binding.search.query.toString()) != null) {
                             contactsAdapter.openFirst()
                             return true
                         }
@@ -1734,6 +1750,7 @@ class AppDrawerFragment : BaseFragment() {
             resultsChanged = { query ->
                 if (_binding != null && query == binding.search.query.toString()) {
                     if (contactsMode) return@AppDrawerAdapter
+                    updateEnterHighlight(query)
                     updateSectionHeaders()
                     linearLayoutManager.reverseLayout = thunderMode || activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
                     linearLayoutManager.stackFromEnd = false
@@ -1833,7 +1850,10 @@ class AppDrawerFragment : BaseFragment() {
         if (combined == adapter.appsList) return
         combinedAppsJob = viewLifecycleOwner.lifecycleScope.launch {
             inAppSearch.loadAsync(combined)
-            if (_binding != null) adapter.setAppList(combined)
+            if (_binding != null) {
+                adapter.setAppList(combined)
+                updateEnterHighlight(binding.search.query.toString())
+            }
         }
     }
 
