@@ -1384,6 +1384,18 @@ class AppDrawerFragment : BaseFragment() {
     }
 
 
+    /** A contact search can never submit as an app search or change destination pages. */
+    private fun submitContactsOnly(): Boolean {
+        if (!contactsMode || _binding == null) return false
+        cancelAutoLaunch()
+        if (deselectContact()) return true
+        val query = binding.search.query.toString()
+        if (query.isNotBlank() && contactsAdapter.committedQuery == query) {
+            contactsAdapter.openFirst()
+        }
+        return true
+    }
+
     private fun toggleEmptySearchDestination(): Boolean {
         if (!dockExpanded || contactsMode || thunderMode || activeSearch != null ||
             flag != Constants.FLAG_LAUNCH_APP || binding.search.query.isNotEmpty()) return false
@@ -1405,10 +1417,12 @@ class AppDrawerFragment : BaseFragment() {
                 }
                 dismissContactSelection = { deselectContact() || returnFromSecondarySearch() }
                 submitEmpty = { toggleEmptySearchDestination() }
+                submitContacts = { submitContactsOnly() }
             }
         binding.search.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean {
                 cancelAutoLaunch()
+                if (submitContactsOnly()) return true
                 if (deselectContact()) return true
                 if (launchAppSearch()) return true
                 if (contactsMode && contactCommand == ContactCommand.ADD) addContact()
@@ -1808,7 +1822,12 @@ class AppDrawerFragment : BaseFragment() {
         combinedAppsJob?.cancel()
         adapter.cancelFiltering()
         destinationsAdapter.cancelFiltering()
-        (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null; dismissContactSelection = null }
+        (searchTextView as? AliasSearchInput)?.apply {
+            undoAlias = null
+            submitEmpty = null
+            submitContacts = null
+            dismissContactSelection = null
+        }
         binding.aliasHint?.visibility = View.GONE
         binding.search.setOnQueryTextListener(null)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
