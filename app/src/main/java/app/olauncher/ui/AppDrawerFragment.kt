@@ -435,8 +435,13 @@ class AppDrawerFragment : BaseFragment() {
     private fun initDock() {
         updateHomeSearchHint()
         binding.homeSearch.setOnClickListener { openHomeSearch() }
+        binding.dockSearch.isClickable = true
+        // The full-width dockKeys overlays the search dock for animation. Keep the
+        // Web button's touch target above it so taps reach this listener.
+        binding.dockSearch.elevation = 24f * resources.displayMetrics.density
         binding.dockSearch.setOnClickListener {
             cancelAutoLaunch()
+            if (contactsMode || thunderMode || !dockExpanded) return@setOnClickListener
             when {
                 // Back arrow always returns to regular results, without closing the IME.
                 adapter.searchCommandsOnly -> switchSearchDestination()
@@ -462,7 +467,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockContacts.visibility = View.INVISIBLE
         binding.homeSearch.setPadding((16 * resources.displayMetrics.density).toInt(), 0,
             (64 * resources.displayMetrics.density).toInt(), 0)
-        binding.dockAllContacts.setOnClickListener { showContactCommands() }
+        binding.dockAllContacts.setOnClickListener {
+            if (!contactsMode && !adapter.searchCommandsOnly && !thunderMode) showContactCommands()
+        }
         setThunderMode(false)
         searchTextView?.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
     }
@@ -513,9 +520,15 @@ class AppDrawerFragment : BaseFragment() {
         clearAppSearch()
         binding.homeSearch.visibility = View.GONE
         binding.dockSearch.visibility = View.GONE
+        binding.aliasHint?.visibility = View.GONE
         binding.dockKeys.translationZ = 0f
         ensureCommandKeys()
         cancelAutoLaunch()
+        // Contact search is isolated: no destination picker, search aliases,
+        // app results, or browser fallbacks may become active here.
+        adapter.searchCommandsOnly = false
+        adapter.searchPackage = null
+        destinationsAdapter.cancelFiltering()
         setContactsMode(true)
         setThunderMode(false)
         contactCommand = null
@@ -747,8 +760,11 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         configureResultSections(binding.search.query.toString())
         binding.search.queryHint = if (enabled) "Search contacts" else "Search"
-        if (enabled) filterContacts(binding.search.query.toString())
-        else {
+        if (enabled) {
+            binding.aliasHint?.visibility = View.GONE
+            binding.dockSearch.visibility = View.GONE
+            filterContacts(binding.search.query.toString())
+        } else {
             adapter.filterApps(binding.search.query.toString())
             if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
         }
@@ -1034,6 +1050,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockAllContacts.layoutParams = contactsParams
         binding.dockSearch.visibility = if (dockExpanded && !contact && !contactsMode && !thunderMode &&
             flag == Constants.FLAG_LAUNCH_APP) View.VISIBLE else View.GONE
+        if (binding.dockSearch.visibility == View.VISIBLE) binding.dockSearch.isEnabled = true
         updateAliasHint(binding.search.query.toString())
     }
 
