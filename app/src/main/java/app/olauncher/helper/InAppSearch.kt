@@ -112,11 +112,10 @@ class InAppSearch(private val context: Context) {
     fun launchBrowser(query: String): Boolean {
         if (query.isBlank()) return true
         return try {
-            val browser = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)
-                .resolveActivity(context.packageManager)?.packageName
+            // Let Android resolve ACTION_VIEW through the user's actual default browser.
+            // CATEGORY_APP_BROWSER can resolve to a different app or chooser.
             val intent = Intent(Intent.ACTION_VIEW,
                 Uri.parse(SearchCommandUrl.build("https://www.google.com/search?q={query}", query)))
-            if (browser != null && browser != "android") intent.setPackage(browser)
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             true
         } catch (_: android.content.ActivityNotFoundException) { false }

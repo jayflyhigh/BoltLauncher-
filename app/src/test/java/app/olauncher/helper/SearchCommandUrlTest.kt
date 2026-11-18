@@ -35,8 +35,11 @@ class SearchCommandUrlTest {
         assertFalse(SearchCommandUrl.validAlias(" \t", emptyList()))
     }
     @Test fun `confirmation picks full longest alias and preserves original query`() {
-        assertEquals("my app" to "red flowers", SearchCommandUrl.confirmed("MY APP red flowers", listOf("my", "my app")))
-        assertEquals("yt" to "", SearchCommandUrl.confirmed("YT ", listOf("yt")))
+        assertEquals("my app" to "red flowers", SearchCommandUrl.confirmed("MY APP.red flowers", listOf("my", "my app")))
+        assertEquals("yt" to "", SearchCommandUrl.confirmed("YT.", listOf("yt")))
         assertNull(SearchCommandUrl.confirmed("yt", listOf("yt")))
+        assertNull(SearchCommandUrl.confirmed("yt ", listOf("yt")))
+        assertNull(SearchCommandUrl.confirmed("yt. ", listOf("other")))
+        assertEquals("yt" to "cats", SearchCommandUrl.confirmed("yt.cats", listOf("yt")))
     }
 }
