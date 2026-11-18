@@ -1783,7 +1783,7 @@ class AppDrawerFragment : BaseFragment() {
         adapter.cancelFiltering()
         destinationsAdapter.cancelFiltering()
         (searchTextView as? AliasSearchInput)?.apply { undoAlias = null; submitEmpty = null; dismissContactSelection = null }
-        binding.aliasHint.visibility = View.GONE
+        binding.aliasHint?.visibility = View.GONE
         binding.search.setOnQueryTextListener(null)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
         contactDialog?.dismiss()
