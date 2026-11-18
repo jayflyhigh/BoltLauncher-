@@ -85,8 +85,10 @@ class AppDrawerFragment : BaseFragment() {
         val previousAdapter = binding.recyclerView.adapter
         // Keep the same app/contacts container for the WEB destination picker.
         // Replacing it detaches adapters, cancels work and recycles all visible rows.
+        // The destination picker owns its entire results list. Never mix it into the
+        // unified apps/contacts ConcatAdapter, whose sections are hidden in this mode.
         val usesSearchSections = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
-            !thunderMode && activeSearch == null
+            !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
         if (!usesSearchSections) {
             unifiedReversed = null
             unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
@@ -435,11 +437,16 @@ class AppDrawerFragment : BaseFragment() {
         binding.homeSearch.setOnClickListener { openHomeSearch() }
         binding.dockSearch.setOnClickListener {
             cancelAutoLaunch()
-            if (adapter.searchCommandsOnly) switchSearchDestination()
-            else if (activeSearch != null) launchAppSearch()
-            else if (binding.search.query.isEmpty()) switchSearchDestination()
-            else if (!inAppSearch.launchBrowser(binding.search.query.toString()))
-                requireContext().showToast("No browser available")
+            when {
+                // Back arrow always returns to regular results, without closing the IME.
+                adapter.searchCommandsOnly -> switchSearchDestination()
+                activeSearch != null -> launchAppSearch()
+                // Empty query opens the in-app destination picker.
+                binding.search.query.toString().isBlank() -> switchSearchDestination()
+                // A non-empty query goes straight to the default browser.
+                !inAppSearch.launchBrowser(binding.search.query.toString()) ->
+                    requireContext().showToast("No browser available")
+            }
         }
         binding.dockSearch.setOnLongClickListener { showAppSearchEditor(); true }
         searchTextView?.let {
@@ -1175,7 +1182,9 @@ class AppDrawerFragment : BaseFragment() {
             }
         } else filterUnifiedContacts(query)
         adapter.filterApps(query)
-        // No dock animation, focus change, keyboard request, or query replacement:
+        // The same focused SearchView stays attached during either transition.
+        binding.search.showKeyboard()
+        // No dock animation or query replacement:
         // only the results and the contacts affordance change.
     }
 
