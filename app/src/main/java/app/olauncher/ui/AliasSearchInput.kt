@@ -80,6 +80,8 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
     }
 
     var submitEmpty: (() -> Boolean)? = null
+    /** Contacts mode always owns Enter, including Gboard's IME action. */
+    var submitContacts: (() -> Boolean)? = null
     private var consumingEnter = false
 
     private fun submitEmptyQuery(): Boolean = dismissContactSelection?.invoke() == true ||
@@ -88,7 +90,8 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_ENTER) {
             if (event.action == KeyEvent.ACTION_DOWN) {
-                if (event.repeatCount == 0) consumingEnter = submitEmptyQuery()
+                if (event.repeatCount == 0) consumingEnter =
+                    submitContacts?.invoke() == true || submitEmptyQuery()
                 if (consumingEnter) return true
             } else if (event.action == KeyEvent.ACTION_UP && consumingEnter) {
                 consumingEnter = false
@@ -115,7 +118,8 @@ class AliasSearchInput @JvmOverloads constructor(context: Context, attrs: Attrib
                 if ((editorAction == EditorInfo.IME_ACTION_SEARCH ||
                         editorAction == EditorInfo.IME_ACTION_DONE ||
                         editorAction == EditorInfo.IME_ACTION_GO ||
-                        editorAction == EditorInfo.IME_NULL) && submitEmptyQuery()) return true
+                        editorAction == EditorInfo.IME_NULL) &&
+                    (submitContacts?.invoke() == true || submitEmptyQuery())) return true
                 return super.performEditorAction(editorAction)
             }
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
