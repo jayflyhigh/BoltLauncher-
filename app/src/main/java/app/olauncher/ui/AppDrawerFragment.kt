@@ -1179,12 +1179,33 @@ class AppDrawerFragment : BaseFragment() {
         updateAliasHint(binding.search.query.toString())
     }
 
+    /** Visually join results to the dock only while search is expanded. */
+    private fun updateConnectedSearchSurfaces(connected: Boolean) {
+        val results = binding.recyclerView
+        val params = results.layoutParams as android.widget.LinearLayout.LayoutParams
+        val gap = (8 * resources.displayMetrics.density).toInt()
+        val desiredGap = if (connected) 0 else gap
+        if (params.bottomMargin != desiredGap) {
+            params.bottomMargin = desiredGap
+            results.layoutParams = params
+        }
+        results.setBackgroundResource(
+            if (connected) R.drawable.search_results_panel_connected
+            else R.drawable.search_results_panel
+        )
+        binding.dock.setBackgroundResource(
+            if (connected) R.drawable.dock_search_bar_connected
+            else R.drawable.dock_search_bar
+        )
+    }
+
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
         val opening = expanded && !dockExpanded
         dockExpanded = expanded
         if (expanded) dockThunderTransition = thunderMode
         val animateThunder = dockThunderTransition
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
+        updateConnectedSearchSurfaces(expanded || !isHomePage)
         if (opening && animate) binding.recyclerView.animateSearchResults(binding.search.query.toString(), force = true)
         dockAnimator?.cancel()
         val query = binding.search.query.toString()
