@@ -187,7 +187,7 @@ class ContactSearchAdapter(
             binding.root.isSelected = contact.uri == selectedUri
             binding.root.foreground = if (binding.root.isSelected) GradientDrawable().apply {
                 setColor(Color.TRANSPARENT)
-                cornerRadius = 30f * binding.root.resources.displayMetrics.density
+                cornerRadius = 14f * binding.root.resources.displayMetrics.density
                 setStroke((2f * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1), Color.rgb(255, 214, 0))
             } else null
         }
