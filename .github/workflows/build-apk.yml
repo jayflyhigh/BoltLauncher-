@@ -17,6 +17,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Compile debug APK
         run: chmod +x gradlew && ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain
+      - name: Show lint failures
+        if: failure()
+        run: |
+          if [ -f app/build/reports/lint-results-debug.txt ]; then
+            grep -n -E 'Error:|[0-9]+ errors' app/build/reports/lint-results-debug.txt || true
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
