@@ -1021,39 +1021,83 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun showThunderFlash() {
-        val root = _binding?.root ?: return
+        val b = _binding ?: return
         if (requireContext().isSystemAnimationsDisabled() || requireContext().isEinkDisplay()) return
+        val root = b.root
+        val bolt = b.dockBolt
+        if (root.width == 0 || root.height == 0 || bolt.width == 0) return
+
+        // Position a small composited pulse on the actual Thunder button,
+        // rather than flashing a full-screen lightning silhouette.
+        val rootLocation = IntArray(2)
+        val boltLocation = IntArray(2)
+        root.getLocationInWindow(rootLocation)
+        bolt.getLocationInWindow(boltLocation)
+        val density = resources.displayMetrics.density
+        val size = (56f * density).toInt()
+        val centerX = boltLocation[0] - rootLocation[0] + bolt.width / 2
+        val centerY = boltLocation[1] - rootLocation[1] + bolt.height / 2
         val flash = object : android.graphics.drawable.Drawable() {
             private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-            private var opacity = 255
+            var progress = 0f
+                set(value) {
+                    field = value
+                    invalidateSelf()
+                }
             override fun draw(canvas: android.graphics.Canvas) {
-                val w = bounds.width().toFloat()
-                val h = bounds.height().toFloat()
-                paint.color = android.graphics.Color.argb(opacity / 7, 255, 214, 0)
-                canvas.drawRect(bounds, paint)
+                val cx = bounds.exactCenterX()
+                val cy = bounds.exactCenterY()
+                val fade = (1f - progress).coerceIn(0f, 1f)
+                val radius = bounds.width() * (0.23f + progress * 0.22f)
+                paint.style = android.graphics.Paint.Style.FILL
+                paint.color = android.graphics.Color.argb((42 * fade).toInt(), 255, 214, 0)
+                canvas.drawCircle(cx, cy, radius, paint)
+                paint.style = android.graphics.Paint.Style.STROKE
+                paint.strokeWidth = 1.5f * density
+                paint.color = android.graphics.Color.argb((145 * fade).toInt(), 255, 226, 72)
+                canvas.drawCircle(cx, cy, radius * 0.88f, paint)
+
+                // A tiny, controlled icon pulse with no large zoom or flicker.
+                paint.style = android.graphics.Paint.Style.FILL
+                paint.color = android.graphics.Color.argb((220 * fade).toInt(), 255, 244, 155)
                 val path = android.graphics.Path().apply {
-                    moveTo(w * .57f, h * .24f)
-                    lineTo(w * .35f, h * .53f)
-                    lineTo(w * .49f, h * .53f)
-                    lineTo(w * .42f, h * .76f)
-                    lineTo(w * .66f, h * .44f)
-                    lineTo(w * .52f, h * .44f)
+                    moveTo(cx + 2f * density, cy - 11f * density)
+                    lineTo(cx - 7f * density, cy + 1f * density)
+                    lineTo(cx - 1f * density, cy + 1f * density)
+                    lineTo(cx - 4f * density, cy + 11f * density)
+                    lineTo(cx + 7f * density, cy - 2f * density)
+                    lineTo(cx + 1f * density, cy - 2f * density)
                     close()
                 }
-                paint.color = android.graphics.Color.argb(opacity, 255, 235, 125)
+                val pulse = if (progress < 0.35f) 0.94f + progress * 0.25f
+                    else 1.0275f - (progress - 0.35f) * 0.0423f
+                canvas.save()
+                canvas.scale(pulse, pulse, cx, cy)
                 canvas.drawPath(path, paint)
+                canvas.restore()
             }
-            override fun setAlpha(alpha: Int) { opacity = alpha; invalidateSelf() }
+            override fun setAlpha(alpha: Int) { /* opacity follows animation progress */ }
             override fun setColorFilter(filter: android.graphics.ColorFilter?) {}
             @Suppress("DEPRECATION")
             override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
         }
-        flash.setBounds(0, 0, root.width, root.height)
+        flash.setBounds(centerX - size / 2, centerY - size / 2,
+            centerX + size / 2, centerY + size / 2)
         thunderFlash = flash
         root.overlay.add(flash)
-        thunderFlashAnimator = android.animation.ValueAnimator.ofInt(255, 0).apply {
-            duration = 150L
-            addUpdateListener { flash.alpha = it.animatedValue as Int }
+        thunderFlashAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 180L
+            interpolator = android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)
+            addUpdateListener { flash.progress = it.animatedValue as Float }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (thunderFlash === flash) {
+                        root.overlay.remove(flash)
+                        thunderFlash = null
+                        thunderFlashAnimator = null
+                    }
+                }
+            })
             start()
         }
     }
@@ -1179,27 +1223,20 @@ class AppDrawerFragment : BaseFragment() {
         updateAliasHint(binding.search.query.toString())
     }
 
-    /** Visually join results to the dock only while search is expanded. */
+    /** Keep the results and search control as separate, fully rounded surfaces.
+     * A consistent gap prevents a hard seam across all search modes.
+     */
     private fun updateConnectedSearchSurfaces(connected: Boolean) {
         val results = binding.recyclerView
         val params = results.layoutParams as android.widget.LinearLayout.LayoutParams
         val gap = (8 * resources.displayMetrics.density).toInt()
-        val desiredGap = if (connected) 0 else gap
-        if (params.bottomMargin != desiredGap) {
-            params.bottomMargin = desiredGap
+        if (params.bottomMargin != gap) {
+            params.bottomMargin = gap
             results.layoutParams = params
         }
-        results.setBackgroundResource(
-            if (connected) R.drawable.search_results_panel_connected
-            else R.drawable.search_results_panel
-        )
+        results.setBackgroundResource(R.drawable.search_results_panel)
         binding.dock.setBackgroundResource(
-            when {
-                thunderMode && connected -> R.drawable.dock_yellow_connected
-                thunderMode -> R.drawable.dock_yellow
-                connected -> R.drawable.dock_search_bar_connected
-                else -> R.drawable.dock_search_bar
-            }
+            if (thunderMode) R.drawable.dock_yellow else R.drawable.dock_search_bar
         )
     }
 
