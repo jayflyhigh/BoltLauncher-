@@ -991,7 +991,7 @@ class AppDrawerFragment : BaseFragment() {
         adapter.filterApps(binding.search.query.toString())
         if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-        binding.dock.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_search_bar)
+        updateConnectedSearchSurfaces(dockExpanded || !isHomePage)
         binding.search.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         if (activeSearch == null) showWebBadge()
         // Both controls share the search bar surface; yellow identifies Bolt at rest.
@@ -1179,12 +1179,37 @@ class AppDrawerFragment : BaseFragment() {
         updateAliasHint(binding.search.query.toString())
     }
 
+    /** Visually join results to the dock only while search is expanded. */
+    private fun updateConnectedSearchSurfaces(connected: Boolean) {
+        val results = binding.recyclerView
+        val params = results.layoutParams as android.widget.LinearLayout.LayoutParams
+        val gap = (8 * resources.displayMetrics.density).toInt()
+        val desiredGap = if (connected) 0 else gap
+        if (params.bottomMargin != desiredGap) {
+            params.bottomMargin = desiredGap
+            results.layoutParams = params
+        }
+        results.setBackgroundResource(
+            if (connected) R.drawable.search_results_panel_connected
+            else R.drawable.search_results_panel
+        )
+        binding.dock.setBackgroundResource(
+            when {
+                thunderMode && connected -> R.drawable.dock_yellow_connected
+                thunderMode -> R.drawable.dock_yellow
+                connected -> R.drawable.dock_search_bar_connected
+                else -> R.drawable.dock_search_bar
+            }
+        )
+    }
+
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
         val opening = expanded && !dockExpanded
         dockExpanded = expanded
         if (expanded) dockThunderTransition = thunderMode
         val animateThunder = dockThunderTransition
         binding.recyclerView.visibility = if (expanded || !isHomePage) View.VISIBLE else View.INVISIBLE
+        updateConnectedSearchSurfaces(expanded || !isHomePage)
         if (opening && animate) binding.recyclerView.animateSearchResults(binding.search.query.toString(), force = true)
         dockAnimator?.cancel()
         val query = binding.search.query.toString()
@@ -1251,9 +1276,15 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    /** Leave either secondary page without dismissing Gboard or dropping the query. */
+    /** Back from contact filtering returns to the full contacts list first. */
     private fun returnFromSecondarySearch(): Boolean {
         if (_binding == null || (!contactsMode && !adapter.searchCommandsOnly)) return false
+        if (contactsMode && (contactCommand != null || binding.search.query.isNotEmpty())) {
+            // Do not switch into app search or show Search Within Apps results.
+            // Restore the original contacts list and its shortcut buttons.
+            showContactCommands()
+            return true
+        }
         cancelAutoLaunch()
         contactSelectionBar = false
         contactCommand = null

@@ -384,8 +384,9 @@ class AppDrawerAdapter(
             root.setBackgroundResource(R.drawable.dock_shell)
             appTitle.setTextColor(android.graphics.Color.WHITE)
             searchBadge.isVisible = hasSearchBadge && !enabled
-            resultBolt.isVisible = enabled
-            val endPadding = ((if (enabled || hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
+            // Thunder mode uses its existing search-bar indicator; no per-result bolt.
+            resultBolt.isVisible = false
+            val endPadding = ((if (hasSearchBadge) 76 else 24) * root.resources.displayMetrics.density).toInt()
             appTitle.setPaddingRelative(((if (isSuggestion || isSearchDestination) 24 else 76) * root.resources.displayMetrics.density).toInt(), appTitle.paddingTop, endPadding, appTitle.paddingBottom)
         }
 
