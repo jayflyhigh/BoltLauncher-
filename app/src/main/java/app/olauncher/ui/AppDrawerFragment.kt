@@ -180,12 +180,14 @@ class AppDrawerFragment : BaseFragment() {
             return previousAdapter !== target
         }
         val reversed = query.isNotBlank()
-        if (unifiedReversed != reversed || binding.recyclerView.adapter !== unifiedAdapter) {
+        if (unifiedReversed != reversed || unifiedAdapter == null) {
             unifiedReversed = reversed
             unifiedAdapter = if (reversed) androidx.recyclerview.widget.ConcatAdapter(
                 adapter, appsHeader, contactsAdapter, contactsHeader, destinationsAdapter, destinationsHeader)
             else androidx.recyclerview.widget.ConcatAdapter(destinationsHeader, destinationsAdapter,
                 appsHeader, adapter, contactsHeader, contactsAdapter)
+        }
+        if (binding.recyclerView.adapter !== unifiedAdapter) {
             binding.recyclerView.adapter = unifiedAdapter
         }
         linearLayoutManager.reverseLayout = reversed
