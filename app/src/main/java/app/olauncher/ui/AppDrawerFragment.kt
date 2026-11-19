@@ -881,14 +881,28 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    // RecyclerView already keeps its visible items when a filter updates. Only restore
+    // position zero when the layout direction changes or the best match has actually
+    // left the viewport; resetting it for every keystroke causes visible jumps.
+    private fun keepBestMatchVisible(queryChanged: Boolean, layoutChanged: Boolean) {
+        if (!queryChanged && !layoutChanged) return
+        val list = _binding?.recyclerView ?: return
+        if (list.adapter?.itemCount == 0) return
+        if (layoutChanged || linearLayoutManager.findViewByPosition(0) == null) {
+            list.scrollToPosition(0)
+        }
+    }
+
     private fun filterContacts(query: String) {
         if (query != contactLaunchQuery) contactLaunchQuery = null
         contactsAdapter.filter(query) {
             val b = _binding ?: return@filter
             if (!contactsMode || b.search.query.toString() != query) return@filter
-            linearLayoutManager.reverseLayout = query.isNotBlank()
+            val reversed = query.isNotBlank()
+            val layoutChanged = linearLayoutManager.reverseLayout != reversed
+            linearLayoutManager.reverseLayout = reversed
             linearLayoutManager.stackFromEnd = false
-            if (positionedContactQuery != query) b.recyclerView.scrollToPosition(0)
+            keepBestMatchVisible(positionedContactQuery != query, layoutChanged)
             positionedContactQuery = query
             b.recyclerView.animateSearchResults(query)
             scheduleContactLaunch(query)
@@ -1752,9 +1766,12 @@ class AppDrawerFragment : BaseFragment() {
                     if (contactsMode) return@AppDrawerAdapter
                     updateEnterHighlight(query)
                     updateSectionHeaders()
-                    linearLayoutManager.reverseLayout = thunderMode || activeSearch != null || (!adapter.searchCommandsOnly && query.isNotBlank())
+                    val reversed = thunderMode || activeSearch != null ||
+                        (!adapter.searchCommandsOnly && query.isNotBlank())
+                    val layoutChanged = linearLayoutManager.reverseLayout != reversed
+                    linearLayoutManager.reverseLayout = reversed
                     linearLayoutManager.stackFromEnd = false
-                    if (thunderMode || positionedAppQuery != query) binding.recyclerView.scrollToPosition(0)
+                    keepBestMatchVisible(positionedAppQuery != query, layoutChanged)
                     positionedAppQuery = query
                     if (activeSearch == null) binding.recyclerView.animateSearchResults(query)
                     scheduleAutoLaunch(query)

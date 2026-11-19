@@ -7,9 +7,9 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.View
-import android.widget.ImageButton
+import androidx.appcompat.widget.AppCompatImageButton
 
-internal class ContactActionButton(context: Context) : ImageButton(context) {
+internal class ContactActionButton(context: Context) : AppCompatImageButton(context) {
     var shortcutLabel: String? = null
         set(value) {
             if (field == value) return
