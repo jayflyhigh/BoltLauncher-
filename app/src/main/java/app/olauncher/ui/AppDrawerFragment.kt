@@ -899,8 +899,16 @@ class AppDrawerFragment : BaseFragment() {
         if (!queryChanged && !layoutChanged) return
         val list = _binding?.recyclerView ?: return
         if (list.adapter?.itemCount == 0) return
-        if (layoutChanged || linearLayoutManager.findViewByPosition(0) == null) {
-            list.scrollToPosition(0)
+        // When the query changes, retain the current viewport whenever possible.
+        // Only re-anchor if a layout-direction switch leaves the best match outside it.
+        // Posting avoids forcing a synchronous layout inside an adapter update.
+        if (layoutChanged && linearLayoutManager.findViewByPosition(0) == null) {
+            list.post {
+                if (_binding?.recyclerView === list && list.adapter?.itemCount != 0 &&
+                    linearLayoutManager.findViewByPosition(0) == null) {
+                    linearLayoutManager.scrollToPositionWithOffset(0, 0)
+                }
+            }
         }
     }
 
@@ -1245,10 +1253,17 @@ class AppDrawerFragment : BaseFragment() {
             params.bottomMargin = gap
             results.layoutParams = params
         }
-        results.setBackgroundResource(R.drawable.search_results_panel)
-        binding.dock.setBackgroundResource(
-            if (thunderMode) R.drawable.dock_yellow else R.drawable.dock_search_bar
-        )
+        // Avoid recreating backgrounds for every query/open animation frame.
+        val resultsBackground = R.drawable.search_results_panel
+        if (results.getTag(R.id.recyclerView) != resultsBackground) {
+            results.setBackgroundResource(resultsBackground)
+            results.setTag(R.id.recyclerView, resultsBackground)
+        }
+        val dockBackground = if (thunderMode) R.drawable.dock_yellow else R.drawable.dock_search_bar
+        if (binding.dock.getTag(R.id.recyclerView) != dockBackground) {
+            binding.dock.setBackgroundResource(dockBackground)
+            binding.dock.setTag(R.id.recyclerView, dockBackground)
+        }
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -1400,21 +1415,12 @@ class AppDrawerFragment : BaseFragment() {
         // The affordance changes without relocating the editor.
         // A short opacity settle makes the icon change legible without a
         // disruptive dock-wide animation or touch-target movement.
+        // Never blank and redraw the icons on each mode change: the icon asset
+        // changes immediately, while a subtle results fade handles the transition.
         binding.dockSearch.animate().cancel()
         binding.dockAllContacts.animate().cancel()
-        if (!requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled()) {
-            binding.dockSearch.alpha = 0.55f
-            binding.dockSearch.animate().alpha(1f).setDuration(160L)
-                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
-            if (!commandsOnly) {
-                binding.dockAllContacts.alpha = 0f
-                binding.dockAllContacts.animate().alpha(1f).setDuration(180L)
-                    .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
-            }
-        } else {
-            binding.dockSearch.alpha = 1f
-            binding.dockAllContacts.alpha = 1f
-        }
+        binding.dockSearch.alpha = 1f
+        binding.dockAllContacts.alpha = 1f
         updateAliasHint(query)
         if (commandsOnly) {
             contactsAdapter.filter("", showAll = false) {
