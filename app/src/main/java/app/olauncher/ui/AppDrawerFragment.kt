@@ -174,8 +174,8 @@ class AppDrawerFragment : BaseFragment() {
             !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
         if (!usesSearchSections) {
             unifiedReversed = null
-            unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
-            unifiedAdapter = null
+            // Keep the composite adapter alive while the destination picker is shown.
+            // Rebuilding it on every mode switch detaches every row and causes a visible flash.
             val target = if (contactsMode) contactsAdapter else adapter
             if (binding.recyclerView.adapter !== target) binding.recyclerView.adapter = target
             return previousAdapter !== target
@@ -183,7 +183,6 @@ class AppDrawerFragment : BaseFragment() {
         val reversed = query.isNotBlank()
         if (unifiedReversed != reversed || binding.recyclerView.adapter !== unifiedAdapter) {
             unifiedReversed = reversed
-            unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = if (reversed) androidx.recyclerview.widget.ConcatAdapter(
                 adapter, appsHeader, contactsAdapter, contactsHeader, destinationsAdapter, destinationsHeader)
             else androidx.recyclerview.widget.ConcatAdapter(destinationsHeader, destinationsAdapter,
@@ -1355,10 +1354,11 @@ class AppDrawerFragment : BaseFragment() {
             }
         } else filterUnifiedContacts(query)
         adapter.filterApps(query)
-        // The same focused SearchView stays attached during either transition.
+        // The editor and its keyboard never move or lose focus. Animate only the
+        // content that changed, using compositor properties rather than relayout.
+        binding.recyclerView.animateModeChange()
+        if (!binding.search.hasFocus()) binding.search.requestFocus()
         binding.search.showKeyboard()
-        // No dock animation or query replacement:
-        // only the results and the contacts affordance change.
     }
 
     private fun showHomeSettings() {
