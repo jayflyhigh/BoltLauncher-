@@ -155,6 +155,9 @@ class AppDrawerFragment : BaseFragment() {
     private var contactSelectionBar = false
     private var unifiedReversed: Boolean? = null
     private var unifiedAdapter: androidx.recyclerview.widget.ConcatAdapter? = null
+    private val filteredDestinationsAdapter by lazy {
+        androidx.recyclerview.widget.ConcatAdapter(destinationsHeader, destinationsAdapter)
+    }
     private val appsHeader = SearchSectionAdapter("Apps")
     private val contactsHeader = SearchSectionAdapter("Contacts")
     private val destinationsHeader = SearchSectionAdapter("Search within Apps")
@@ -166,15 +169,21 @@ class AppDrawerFragment : BaseFragment() {
     private fun configureResultSections(query: String): Boolean {
         updateEnterHighlight(query)
         val previousAdapter = binding.recyclerView.adapter
-        // Keep the same app/contacts container for the WEB destination picker.
-        // Replacing it detaches adapters, cancels work and recycles all visible rows.
-        // The destination picker owns its entire results list. Never mix it into the
-        // unified apps/contacts ConcatAdapter, whose sections are hidden in this mode.
+        // Filtering WEB destinations stays inside regular Search. There is no
+        // separate Search within Apps page or navigation destination.
+        val destinationsOnly = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
+            !thunderMode && activeSearch == null && adapter.searchCommandsOnly
+        if (destinationsOnly) {
+            updateSectionHeaders()
+            if (binding.recyclerView.adapter !== filteredDestinationsAdapter)
+                binding.recyclerView.adapter = filteredDestinationsAdapter
+            linearLayoutManager.reverseLayout = false
+            linearLayoutManager.stackFromEnd = false
+            return previousAdapter !== filteredDestinationsAdapter
+        }
         val usesSearchSections = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
-            !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
+            !thunderMode && activeSearch == null
         if (!usesSearchSections) {
-            // Keep the composite adapter alive while the destination picker is shown.
-            // Rebuilding it on every mode switch detaches every row and causes a visible flash.
             val target = if (contactsMode) contactsAdapter else adapter
             if (binding.recyclerView.adapter !== target) binding.recyclerView.adapter = target
             return previousAdapter !== target
@@ -199,11 +208,13 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateSectionHeaders() {
         appsHeader.show(isUnifiedSearch() && adapter.appFilteredList.isNotEmpty())
         contactsHeader.show(isUnifiedSearch() && contactsAdapter.itemCount > 0)
-        val destinations = if (isUnifiedSearch() && binding.search.query.isNotBlank())
+        val destinations = if ((isUnifiedSearch() && binding.search.query.isNotBlank()) ||
+            (adapter.searchCommandsOnly && !contactsMode && !thunderMode && activeSearch == null))
             inAppSearch.targets.values.map { it.app }.distinctBy { it.appPackage }.toMutableList<AppModel>()
         else mutableListOf()
         if (destinationsAdapter.appsList != destinations) destinationsAdapter.setAppList(destinations)
-        else if (destinationsAdapter.committedQuery == null) destinationsAdapter.filterApps("")
+        else if (adapter.searchCommandsOnly || destinationsAdapter.committedQuery == null)
+            destinationsAdapter.filterApps(binding.search.query.toString())
         destinationsHeader.show(destinations.isNotEmpty())
     }
 
@@ -888,8 +899,16 @@ class AppDrawerFragment : BaseFragment() {
         if (!queryChanged && !layoutChanged) return
         val list = _binding?.recyclerView ?: return
         if (list.adapter?.itemCount == 0) return
-        if (layoutChanged || linearLayoutManager.findViewByPosition(0) == null) {
-            list.scrollToPosition(0)
+        // When the query changes, retain the current viewport whenever possible.
+        // Only re-anchor if a layout-direction switch leaves the best match outside it.
+        // Posting avoids forcing a synchronous layout inside an adapter update.
+        if (layoutChanged && linearLayoutManager.findViewByPosition(0) == null) {
+            list.post {
+                if (_binding?.recyclerView === list && list.adapter?.itemCount != 0 &&
+                    linearLayoutManager.findViewByPosition(0) == null) {
+                    linearLayoutManager.scrollToPositionWithOffset(0, 0)
+                }
+            }
         }
     }
 
@@ -1234,10 +1253,17 @@ class AppDrawerFragment : BaseFragment() {
             params.bottomMargin = gap
             results.layoutParams = params
         }
-        results.setBackgroundResource(R.drawable.search_results_panel)
-        binding.dock.setBackgroundResource(
-            if (thunderMode) R.drawable.dock_yellow else R.drawable.dock_search_bar
-        )
+        // Avoid recreating backgrounds for every query/open animation frame.
+        val resultsBackground = R.drawable.search_results_panel
+        if (results.getTag(R.id.recyclerView) != resultsBackground) {
+            results.setBackgroundResource(resultsBackground)
+            results.setTag(R.id.recyclerView, resultsBackground)
+        }
+        val dockBackground = if (thunderMode) R.drawable.dock_yellow else R.drawable.dock_search_bar
+        if (binding.dock.getTag(R.id.recyclerView) != dockBackground) {
+            binding.dock.setBackgroundResource(dockBackground)
+            binding.dock.setTag(R.id.recyclerView, dockBackground)
+        }
     }
 
     private fun setDockExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -1317,7 +1343,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun returnFromSecondarySearch(): Boolean {
         if (_binding == null || (!contactsMode && !adapter.searchCommandsOnly)) return false
         if (contactsMode && (contactCommand != null || binding.search.query.isNotEmpty())) {
-            // Do not switch into app search or show Search Within Apps results.
+            // Do not switch into app search or show WEB destination results.
             // Restore the original contacts list and its shortcut buttons.
             showContactCommands()
             return true
@@ -1385,29 +1411,22 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockAllContacts.isEnabled = !commandsOnly
         binding.dockAllContacts.visibility = if (commandsOnly) View.GONE else View.VISIBLE
         showWebBadge()
-        // The destination/back affordance changes without relocating the editor.
+        // WEB filters the existing Search results; Back restores all results.
+        // The affordance changes without relocating the editor.
         // A short opacity settle makes the icon change legible without a
         // disruptive dock-wide animation or touch-target movement.
+        // Never blank and redraw the icons on each mode change: the icon asset
+        // changes immediately, while a subtle results fade handles the transition.
         binding.dockSearch.animate().cancel()
         binding.dockAllContacts.animate().cancel()
-        if (!requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled()) {
-            binding.dockSearch.alpha = 0.55f
-            binding.dockSearch.animate().alpha(1f).setDuration(160L)
-                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
-            if (!commandsOnly) {
-                binding.dockAllContacts.alpha = 0f
-                binding.dockAllContacts.animate().alpha(1f).setDuration(180L)
-                    .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
-            }
-        } else {
-            binding.dockSearch.alpha = 1f
-            binding.dockAllContacts.alpha = 1f
-        }
+        binding.dockSearch.alpha = 1f
+        binding.dockAllContacts.alpha = 1f
         updateAliasHint(query)
         if (commandsOnly) {
             contactsAdapter.filter("", showAll = false) {
                 if (_binding != null) updateSectionHeaders()
             }
+            destinationsAdapter.filterApps(query)
         } else filterUnifiedContacts(query)
         adapter.filterApps(query)
         // The editor and its keyboard never move or lose focus. Animate only the
@@ -1495,7 +1514,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.showKeyboard()
     }
 
-    // Suggestions belong to Search within apps, not the unified Search page.
+    // Web suggestions do not belong to the unified Search results.
     private fun canShowWebSuggestions(): Boolean = false
 
     private fun updateSearchSuggestions(query: String) {
@@ -1600,7 +1619,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
 
-    /** A contact search can never submit as an app search or change destination pages. */
+    /** Contact searches never submit as app searches or toggle destination filters. */
     private fun submitContactsOnly(): Boolean {
         if (!contactsMode || _binding == null) return false
         cancelAutoLaunch()
@@ -1692,6 +1711,7 @@ class AppDrawerFragment : BaseFragment() {
                     } else {
                         configureResultSections(newText)
                         adapter.filterApps(newText)
+                        if (adapter.searchCommandsOnly) destinationsAdapter.filterApps(newText)
                         if (isUnifiedSearch()) filterUnifiedContacts(newText)
                         if (activeSearch != null) updateSearchSuggestions(newText)
                     }

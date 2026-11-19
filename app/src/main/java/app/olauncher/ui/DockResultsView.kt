@@ -17,41 +17,22 @@ class DockResultsView @JvmOverloads constructor(
     private var animationGeneration = 0
     private var lastQuery: String? = null
 
-    /** Animate the rows, keeping the panel and keyboard completely stationary. */
+    /**
+     * Filtering must not animate or reset existing rows. DiffUtil already updates the
+     * contents; moving/dimming every visible row made rapid typing visibly blink.
+     */
     fun animateSearchResults(query: String, force: Boolean = false) {
-        // Filtering should stay steady: never restart every visible row on a keystroke.
-        if (!force) {
-            if (lastQuery != query) {
-                animationGeneration++
-                resetRows()
-            }
-            lastQuery = query
-            return
-        }
         lastQuery = query
-        val generation = ++animationGeneration
-        resetRows()
-        if (scrollState != SCROLL_STATE_IDLE || !isShown || context.isEinkDisplay() || context.isSystemAnimationsDisabled()) return
-        doOnPreDraw {
-            if (generation != animationGeneration || scrollState != SCROLL_STATE_IDLE || !isShown) return@doOnPreDraw
-            val rows = (0 until childCount).map { getChildAt(it) }.sortedByDescending { it.top }
-            rows.forEachIndexed { index, row ->
-                row.animate().cancel()
-                row.alpha = 0.72f
-                row.translationY = 8f * resources.displayMetrics.density
-                row.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setStartDelay((index.coerceAtMost(5) * 8).toLong())
-                    .setDuration(300L)
-                    .setInterpolator(PathInterpolator(0.2f, 0f, 0.2f, 1f))
-                    .start()
-            }
+        if (force) {
+            animationGeneration++
+            resetRows()
         }
     }
 
-    /** Crossfade and gently settle newly bound rows without moving the panel or IME.
-     * Repeated mode taps cancel the previous pass instead of stacking animations.
+    /**
+     * On a mode change, preserve the current row positions. A subtle opacity settle
+     * is enough, with no Y translation, no stagger and no repeated blank frames.
+     * The keyboard and dock are never animated by the results view.
      */
     fun animateModeChange() {
         val generation = ++animationGeneration
@@ -63,13 +44,11 @@ class DockResultsView @JvmOverloads constructor(
             for (index in 0 until childCount) {
                 val row = getChildAt(index)
                 row.animate().cancel()
-                row.alpha = 0.65f
-                row.translationY = 5f * resources.displayMetrics.density
-                row.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setDuration(190L)
-                    .setStartDelay((index.coerceAtMost(4) * 12).toLong())
+                row.alpha = 0.92f
+                row.translationY = 0f
+                row.animate().alpha(1f)
+                    .setDuration(130L)
+                    .setStartDelay(0L)
                     .setInterpolator(PathInterpolator(0.2f, 0f, 0.2f, 1f))
                     .start()
             }
