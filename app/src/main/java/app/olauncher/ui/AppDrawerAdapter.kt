@@ -30,7 +30,7 @@ import app.olauncher.data.Constants
 import app.olauncher.databinding.AdapterAppDrawerBinding
 import app.olauncher.databinding.AdapterPrivateSpaceHeaderBinding
 import app.olauncher.helper.AppLabelMatcher
-import app.olauncher.helper.thunderAppLabelMatches
+import app.olauncher.helper.ThunderAppLabelMatcher
 import app.olauncher.helper.normalizeForSearch
 import app.olauncher.helper.appSearchRank
 import app.olauncher.helper.hideKeyboard
@@ -191,6 +191,7 @@ class AppDrawerAdapter(
         filterJob = iconScope.launch {
             val items = withContext(Dispatchers.Default) {
                 val matcher = AppLabelMatcher(trimmed)
+                val thunderMatcher = if (thunder) ThunderAppLabelMatcher(trimmed) else null
                 when {
                     commandsOnly && selectedPackage == null -> destinations
                     selectedPackage != null -> apps.filter {
@@ -200,7 +201,7 @@ class AppDrawerAdapter(
                     else -> apps.filter { app ->
                         ensureActive()
                         app !is AppModel.PrivateSpaceHeader &&
-                            ((if (thunder) thunderAppLabelMatches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch(), trimmed)
+                            ((if (thunder) thunderMatcher!!.matches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch())
                               else matcher.matches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch())) ||
                                 aliases[app]?.startsWith(trimmed, true) == true)
                     }.map { app ->
