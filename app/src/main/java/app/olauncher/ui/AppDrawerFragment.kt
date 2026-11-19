@@ -173,7 +173,6 @@ class AppDrawerFragment : BaseFragment() {
         val usesSearchSections = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
             !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
         if (!usesSearchSections) {
-            unifiedReversed = null
             // Keep the composite adapter alive while the destination picker is shown.
             // Rebuilding it on every mode switch detaches every row and causes a visible flash.
             val target = if (contactsMode) contactsAdapter else adapter
