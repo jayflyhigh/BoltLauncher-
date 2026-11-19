@@ -1348,6 +1348,24 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockAllContacts.isEnabled = !commandsOnly
         binding.dockAllContacts.visibility = if (commandsOnly) View.GONE else View.VISIBLE
         showWebBadge()
+        // The destination/back affordance changes without relocating the editor.
+        // A short opacity settle makes the icon change legible without a
+        // disruptive dock-wide animation or touch-target movement.
+        binding.dockSearch.animate().cancel()
+        binding.dockAllContacts.animate().cancel()
+        if (!requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled()) {
+            binding.dockSearch.alpha = 0.55f
+            binding.dockSearch.animate().alpha(1f).setDuration(160L)
+                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
+            if (!commandsOnly) {
+                binding.dockAllContacts.alpha = 0f
+                binding.dockAllContacts.animate().alpha(1f).setDuration(180L)
+                    .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
+            }
+        } else {
+            binding.dockSearch.alpha = 1f
+            binding.dockAllContacts.alpha = 1f
+        }
         updateAliasHint(query)
         if (commandsOnly) {
             contactsAdapter.filter("", showAll = false) {
