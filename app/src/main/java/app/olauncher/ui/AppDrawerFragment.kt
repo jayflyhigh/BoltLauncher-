@@ -991,7 +991,7 @@ class AppDrawerFragment : BaseFragment() {
         adapter.filterApps(binding.search.query.toString())
         if (isUnifiedSearch()) filterUnifiedContacts(binding.search.query.toString())
         val foreground = if (enabled) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-        binding.dock.setBackgroundResource(if (enabled) R.drawable.dock_yellow else R.drawable.dock_search_bar)
+        updateConnectedSearchSurfaces(dockExpanded || !isHomePage)
         binding.search.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         if (activeSearch == null) showWebBadge()
         // Both controls share the search bar surface; yellow identifies Bolt at rest.
@@ -1194,8 +1194,12 @@ class AppDrawerFragment : BaseFragment() {
             else R.drawable.search_results_panel
         )
         binding.dock.setBackgroundResource(
-            if (connected) R.drawable.dock_search_bar_connected
-            else R.drawable.dock_search_bar
+            when {
+                thunderMode && connected -> R.drawable.dock_yellow_connected
+                thunderMode -> R.drawable.dock_yellow
+                connected -> R.drawable.dock_search_bar_connected
+                else -> R.drawable.dock_search_bar
+            }
         )
     }
 
