@@ -1377,7 +1377,11 @@ class AppDrawerFragment : BaseFragment() {
         // content that changed, using compositor properties rather than relayout.
         binding.recyclerView.animateModeChange()
         if (!binding.search.hasFocus()) binding.search.requestFocus()
-        binding.search.showKeyboard()
+        // Re-requesting an already visible IME on every toggle causes needless
+        // inset animation work and can produce a keyboard flicker on some devices.
+        val imeVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        if (!imeVisible) binding.search.showKeyboard()
     }
 
     private fun showHomeSettings() {
