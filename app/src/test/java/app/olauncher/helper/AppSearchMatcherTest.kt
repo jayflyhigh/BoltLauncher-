@@ -65,4 +65,23 @@ class AppSearchMatcherTest {
             }
         }
     }
+    @Test
+    fun `thunder supports continuing from the end to the start of an app name`() {
+        val facebook = "Facebook"
+        val normalized = facebook.normalizeForSearch()
+        for (query in listOf("book", "bookf", "bookfa", "bookface", "FACEBOOK")) {
+            assertTrue(thunderAppLabelMatches(facebook, normalized, query))
+        }
+        assertFalse(appLabelMatches(facebook, "bookface"))
+    }
+
+    @Test
+    fun `thunder matching does not accept extra repetitions or unrelated text`() {
+        val normalized = "Facebook".normalizeForSearch()
+        assertFalse(thunderAppLabelMatches("Facebook", normalized, "bookfacebook"))
+        assertFalse(thunderAppLabelMatches("Facebook", normalized, "bookxyz"))
+        assertFalse(thunderAppLabelMatches("Facebook", normalized, "---"))
+        assertTrue(thunderAppLabelMatches("Google Maps", "Google Maps".normalizeForSearch(), "mapsgoogle"))
+    }
+
 }
