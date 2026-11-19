@@ -30,6 +30,7 @@ import app.olauncher.data.Constants
 import app.olauncher.databinding.AdapterAppDrawerBinding
 import app.olauncher.databinding.AdapterPrivateSpaceHeaderBinding
 import app.olauncher.helper.AppLabelMatcher
+import app.olauncher.helper.thunderAppLabelMatches
 import app.olauncher.helper.normalizeForSearch
 import app.olauncher.helper.appSearchRank
 import app.olauncher.helper.hideKeyboard
@@ -199,7 +200,9 @@ class AppDrawerAdapter(
                     else -> apps.filter { app ->
                         ensureActive()
                         app !is AppModel.PrivateSpaceHeader &&
-                            (matcher.matches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch()) || aliases[app]?.startsWith(trimmed, true) == true)
+                            ((if (thunder) thunderAppLabelMatches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch(), trimmed)
+                              else matcher.matches(app.appLabel, labels[app.appLabel] ?: app.appLabel.normalizeForSearch())) ||
+                                aliases[app]?.startsWith(trimmed, true) == true)
                     }.map { app ->
                         ensureActive()
                         Triple(app, appSearchRank(app.appLabel, trimmed),
