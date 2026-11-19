@@ -1,0 +1,2 @@
+Thunder auto-launch pulse and clean search/results spacing.
+Build validation requested for this branch.
