@@ -175,8 +175,8 @@
     <string name="invalid_pin_request">Invalid pin request</string>
     <string name="widgets_not_supported">Widgets are not supported</string>
     <string name="pin_action_not_supported">This pin action is not supported</string>
-    <string name="contact_action_edit">Edit %1$s</string>
-    <string name="contact_action_with_shortcut">%1$s, keyboard shortcut %2$s</string>
+    <string name="contact_action_edit" translatable="false">Edit %1$s</string>
+    <string name="contact_action_with_shortcut" translatable="false">%1$s, keyboard shortcut %2$s</string>
     <string name="shortcut_pinned">Shortcut added</string>
     <string name="shortcut_pin_failed">Could not add shortcut</string>
     <string name="invalid_shortcut">Invalid shortcut</string>
