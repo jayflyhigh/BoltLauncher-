@@ -468,7 +468,7 @@ class AppDrawerAdapter(
             }
             appTitle.maxLines = 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
-            appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20f)
+            appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
             appTitle.ellipsize = android.text.TextUtils.TruncateAt.END
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE

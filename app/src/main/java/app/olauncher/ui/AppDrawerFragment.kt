@@ -173,21 +173,21 @@ class AppDrawerFragment : BaseFragment() {
         val usesSearchSections = flag == Constants.FLAG_LAUNCH_APP && !contactsMode &&
             !thunderMode && activeSearch == null && !adapter.searchCommandsOnly
         if (!usesSearchSections) {
-            unifiedReversed = null
-            unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
-            unifiedAdapter = null
+            // Keep the composite adapter alive while the destination picker is shown.
+            // Rebuilding it on every mode switch detaches every row and causes a visible flash.
             val target = if (contactsMode) contactsAdapter else adapter
             if (binding.recyclerView.adapter !== target) binding.recyclerView.adapter = target
             return previousAdapter !== target
         }
         val reversed = query.isNotBlank()
-        if (unifiedReversed != reversed || binding.recyclerView.adapter !== unifiedAdapter) {
+        if (unifiedReversed != reversed || unifiedAdapter == null) {
             unifiedReversed = reversed
-            unifiedAdapter?.let { old -> old.adapters.toList().forEach { old.removeAdapter(it) } }
             unifiedAdapter = if (reversed) androidx.recyclerview.widget.ConcatAdapter(
                 adapter, appsHeader, contactsAdapter, contactsHeader, destinationsAdapter, destinationsHeader)
             else androidx.recyclerview.widget.ConcatAdapter(destinationsHeader, destinationsAdapter,
                 appsHeader, adapter, contactsHeader, contactsAdapter)
+        }
+        if (binding.recyclerView.adapter !== unifiedAdapter) {
             binding.recyclerView.adapter = unifiedAdapter
         }
         linearLayoutManager.reverseLayout = reversed
@@ -1348,6 +1348,24 @@ class AppDrawerFragment : BaseFragment() {
         binding.dockAllContacts.isEnabled = !commandsOnly
         binding.dockAllContacts.visibility = if (commandsOnly) View.GONE else View.VISIBLE
         showWebBadge()
+        // The destination/back affordance changes without relocating the editor.
+        // A short opacity settle makes the icon change legible without a
+        // disruptive dock-wide animation or touch-target movement.
+        binding.dockSearch.animate().cancel()
+        binding.dockAllContacts.animate().cancel()
+        if (!requireContext().isEinkDisplay() && !requireContext().isSystemAnimationsDisabled()) {
+            binding.dockSearch.alpha = 0.55f
+            binding.dockSearch.animate().alpha(1f).setDuration(160L)
+                .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
+            if (!commandsOnly) {
+                binding.dockAllContacts.alpha = 0f
+                binding.dockAllContacts.animate().alpha(1f).setDuration(180L)
+                    .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0.2f, 1f)).start()
+            }
+        } else {
+            binding.dockSearch.alpha = 1f
+            binding.dockAllContacts.alpha = 1f
+        }
         updateAliasHint(query)
         if (commandsOnly) {
             contactsAdapter.filter("", showAll = false) {
@@ -1355,10 +1373,15 @@ class AppDrawerFragment : BaseFragment() {
             }
         } else filterUnifiedContacts(query)
         adapter.filterApps(query)
-        // The same focused SearchView stays attached during either transition.
-        binding.search.showKeyboard()
-        // No dock animation or query replacement:
-        // only the results and the contacts affordance change.
+        // The editor and its keyboard never move or lose focus. Animate only the
+        // content that changed, using compositor properties rather than relayout.
+        binding.recyclerView.animateModeChange()
+        if (!binding.search.hasFocus()) binding.search.requestFocus()
+        // Re-requesting an already visible IME on every toggle causes needless
+        // inset animation work and can produce a keyboard flicker on some devices.
+        val imeVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        if (!imeVisible) binding.search.showKeyboard()
     }
 
     private fun showHomeSettings() {

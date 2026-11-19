@@ -50,6 +50,32 @@ class DockResultsView @JvmOverloads constructor(
         }
     }
 
+    /** Crossfade and gently settle newly bound rows without moving the panel or IME.
+     * Repeated mode taps cancel the previous pass instead of stacking animations.
+     */
+    fun animateModeChange() {
+        val generation = ++animationGeneration
+        resetRows()
+        if (!isShown || context.isEinkDisplay() || context.isSystemAnimationsDisabled()) return
+        doOnPreDraw {
+            if (generation != animationGeneration || !isShown ||
+                scrollState != SCROLL_STATE_IDLE) return@doOnPreDraw
+            for (index in 0 until childCount) {
+                val row = getChildAt(index)
+                row.animate().cancel()
+                row.alpha = 0.65f
+                row.translationY = 5f * resources.displayMetrics.density
+                row.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(190L)
+                    .setStartDelay((index.coerceAtMost(4) * 12).toLong())
+                    .setInterpolator(PathInterpolator(0.2f, 0f, 0.2f, 1f))
+                    .start()
+            }
+        }
+    }
+
     override fun onScrollStateChanged(state: Int) {
         if (state != SCROLL_STATE_IDLE) {
             animationGeneration++

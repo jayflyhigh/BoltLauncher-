@@ -18,9 +18,10 @@ class SearchSectionAdapter(private val title: String) : RecyclerView.Adapter<Sea
         val density = parent.resources.displayMetrics.density
         return Holder(TextView(parent.context).apply {
             layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-            setPadding((16 * density).toInt(), (10 * density).toInt(), (16 * density).toInt(), (6 * density).toInt())
-            setTextColor(Color.rgb(189, 189, 189))
-            textSize = 13f
+            setPadding((20 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (8 * density).toInt())
+            setTextColor(Color.rgb(175, 168, 191))
+            textSize = 12f
+            letterSpacing = 0.06f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             androidx.core.view.ViewCompat.setAccessibilityHeading(this, true)
         })
