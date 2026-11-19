@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Bottom half of the unified Raycast-style search panel. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#252331"/>
+    <solid android:color="#252230"/>
     <corners android:topLeftRadius="0dp" android:topRightRadius="0dp" android:bottomLeftRadius="18dp" android:bottomRightRadius="18dp"/>
-    <stroke android:width="1dp" android:color="#5A526D"/>
+    <stroke android:width="1dp" android:color="#564E66"/>
 </shape>
