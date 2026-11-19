@@ -1276,9 +1276,15 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    /** Leave either secondary page without dismissing Gboard or dropping the query. */
+    /** Back from contact filtering returns to the full contacts list first. */
     private fun returnFromSecondarySearch(): Boolean {
         if (_binding == null || (!contactsMode && !adapter.searchCommandsOnly)) return false
+        if (contactsMode && (contactCommand != null || binding.search.query.isNotEmpty())) {
+            // Do not switch into app search or show Search Within Apps results.
+            // Restore the original contacts list and its shortcut buttons.
+            showContactCommands()
+            return true
+        }
         cancelAutoLaunch()
         contactSelectionBar = false
         contactCommand = null
