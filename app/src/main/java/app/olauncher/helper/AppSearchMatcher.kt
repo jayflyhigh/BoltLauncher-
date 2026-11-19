@@ -28,3 +28,17 @@ internal fun CharSequence.normalizeForSearch(): String =
     Normalizer.normalize(this, Normalizer.Form.NFD)
         .replace(diacriticsRegex, "")
         .replace(separatorsRegex, "")
+
+/**
+ * Thunder mode lets a user start anywhere in an app name and continue from
+ * the beginning when they reach its end (e.g. "bookface" -> "Facebook").
+ * Preserve normal matching and prevent repeated/wrapped text longer than the
+ * actual label from matching. Normal search deliberately does not use this.
+ */
+fun thunderAppLabelMatches(label: String, normalizedLabel: String, query: CharSequence): Boolean {
+    val matcher = AppLabelMatcher(query)
+    if (matcher.matches(label, normalizedLabel)) return true
+    val needle = query.normalizeForSearch()
+    if (needle.isEmpty() || needle.length > normalizedLabel.length) return false
+    return (normalizedLabel + normalizedLabel.dropLast(1)).contains(needle, ignoreCase = true)
+}
