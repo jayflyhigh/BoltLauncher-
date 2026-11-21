@@ -3,6 +3,9 @@ package app.olauncher.ui
 import android.content.Context
 import android.os.Build
 import android.util.AttributeSet
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputConnectionWrapper
 import androidx.appcompat.widget.AppCompatEditText
 import app.olauncher.R
 
@@ -11,6 +14,21 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     private var thunderCursor = false
     private var blinkStart = 0L
     private val cursorPaint = android.graphics.Paint().apply { color = android.graphics.Color.BLACK }
+
+    var onImeCommit: (() -> Unit)? = null
+
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val connection = super.onCreateInputConnection(outAttrs) ?: return null
+        return object : InputConnectionWrapper(connection, false) {
+            override fun finishComposingText(): Boolean {
+                return super.finishComposingText().also { if (it) onImeCommit?.invoke() }
+            }
+
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+                return super.commitText(text, newCursorPosition).also { if (it) onImeCommit?.invoke() }
+            }
+        }
+    }
 
     fun setThunderCursor(enabled: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
