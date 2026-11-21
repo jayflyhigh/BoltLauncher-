@@ -523,7 +523,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun selectContact(contact: ContactSearchAdapter.Contact) {
         val query = binding.search.text.toString()
         if (!expanded || thunderMode || contactsAdapter.committedQuery != query) return
-        contactsAdapter.select(contact)
+        contactsAdapter.toggleSelection(contact)
         updateResultHighlight(query)
     }
 
