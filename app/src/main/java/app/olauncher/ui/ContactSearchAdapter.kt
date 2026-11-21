@@ -1,10 +1,15 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Typeface
+import androidx.core.content.ContextCompat
+import app.olauncher.R
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.ContactsContract
+import android.telephony.PhoneNumberUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +22,11 @@ import androidx.recyclerview.widget.DiffUtil
 import app.olauncher.databinding.AdapterAppDrawerBinding
 import kotlinx.coroutines.*
 import java.util.Locale
+
+internal fun formatContactNumber(number: String): String {
+    val formatted = PhoneNumberUtils.formatNumber(number, Locale.getDefault().country) ?: number
+    return formatted.replace(Regex("(?:\\s+|\\)\\s*)"), "-").replace("(", "")
+}
 
 /** Contact rows share the app result layout and dock-key silhouette. */
 class ContactSearchAdapter(
@@ -58,17 +68,22 @@ class ContactSearchAdapter(
         results.indexOfFirst { it.uri == previous }.takeIf { it >= 0 }?.let { notifyItemChanged(it, SELECTION) }
     }
 
-    fun clearContacts() {
+    fun clearResults() {
         filterGeneration++
         filterJob?.cancel()
-        contacts = emptyList()
+        val previousSize = results.size
         results = emptyList()
+        committedQuery = null
         enterHighlightedResult = null
         selectedUri = null
-        committedQuery = null
+        if (previousSize > 0) notifyItemRangeRemoved(0, previousSize)
+    }
+
+    fun clearContacts() {
+        clearResults()
+        contacts = emptyList()
         photoScope.coroutineContext.cancelChildren()
         photoCache.evictAll()
-        notifyDataSetChanged()
     }
     private val photoScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     // Bound by bitmap bytes so large address books cannot retain unlimited photos.
@@ -158,13 +173,13 @@ class ContactSearchAdapter(
         init {
             val density = binding.root.resources.displayMetrics.density
             binding.root.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
-            binding.root.minimumHeight = (68 * density).toInt()
+            binding.root.minimumHeight = (50 * density).toInt()
             // Measure the name and number together so two name lines never overlap the number.
             binding.root.removeView(binding.appTitle)
             binding.root.removeView(binding.contactNumber)
             val labels = LinearLayout(binding.root.context).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(0, (9 * density).toInt(), 0, (9 * density).toInt())
+                setPadding(0, (4 * density).toInt(), 0, (4 * density).toInt())
             }
             binding.appTitle.apply {
                 maxLines = 2
@@ -178,7 +193,7 @@ class ContactSearchAdapter(
             binding.root.addView(labels, FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 android.view.Gravity.CENTER_VERTICAL).apply {
-                marginStart = (76 * density).toInt()
+                marginStart = (68 * density).toInt()
                 marginEnd = (24 * density).toInt()
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
@@ -195,14 +210,15 @@ class ContactSearchAdapter(
             photoJob?.cancel()
             bindSelection(contact)
             val number = contact.numbers.firstOrNull().orEmpty()
-            binding.contactNumber.text = number
+            binding.contactNumber.text = formatContactNumber(number)
             binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
-            binding.appTitle.text = if (contact == enterHighlightedResult && contact.name.isNotEmpty()) {
-                android.text.SpannableString(contact.name).apply {
-                    setSpan(android.text.style.ForegroundColorSpan(Color.rgb(255, 214, 0)),
-                        0, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                }
-            } else contact.name
+            val highlighted = contact == enterHighlightedResult
+            val rowColor = if (highlighted) R.color.bolt_search_yellow else R.color.bolt_search_result
+            binding.root.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, rowColor))
+            binding.appTitle.text = contact.name
+            binding.appTitle.setTypeface(null, if (highlighted) Typeface.BOLD else Typeface.NORMAL)
+            binding.appTitle.setTextColor(if (highlighted) Color.BLACK else Color.WHITE)
+            binding.contactNumber.setTextColor(if (highlighted) 0xFF302B17.toInt() else 0xFFBDBDBD.toInt())
             binding.otherProfileIndicator.visibility = View.GONE
             binding.appHideLayout.visibility = View.GONE
             binding.renameLayout.visibility = View.GONE
@@ -236,7 +252,11 @@ class ContactSearchAdapter(
                                 android.graphics.BitmapFactory.decodeStream(it, null,
                                     android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 })
                             }
-                        } catch (_: Exception) { null }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            null
+                        }
                     }
                     if (bitmap != null) {
                         photoCache.put(photo, bitmap)

@@ -7,4 +7,11 @@
     <string name="bolt_select_app">Select an app</string>
     <string name="bolt_enable_thunder">Enable Thunder mode</string>
     <string name="bolt_disable_thunder">Disable Thunder mode</string>
+    <string name="bolt_contacts_app_unavailable">No contacts app available</string>
+    <string name="bolt_action_call">Call</string>
+    <string name="bolt_action_message">Message</string>
+    <string name="bolt_action_whatsapp">WhatsApp message</string>
+    <string name="bolt_action_unavailable">No app available for this action</string>
+    <dimen name="bolt_contact_action_width">48dp</dimen>
+    <dimen name="bolt_contact_action_divider_width">1dp</dimen>
 </resources>
