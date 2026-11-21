@@ -1,5 +1,6 @@
 package app.olauncher.helper
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -82,6 +83,14 @@ class AppSearchMatcherTest {
         assertFalse(thunderAppLabelMatches("Facebook", normalized, "bookxyz"))
         assertFalse(thunderAppLabelMatches("Facebook", normalized, "---"))
         assertTrue(thunderAppLabelMatches("Google Maps", "Google Maps".normalizeForSearch(), "mapsgoogle"))
+    }
+
+    @Test
+    fun `thunder highlights the original label across normalized and wrapped matches`() {
+        assertEquals(listOf(0..3), thunderMatchRanges("Café", "cafe"))
+        assertEquals(listOf(0..10), thunderMatchRanges("Google Maps", "googlemaps"))
+        assertEquals(listOf(4..7, 0..1), thunderMatchRanges("Facebook", "bookfa"))
+        assertEquals(emptyList<IntRange>(), thunderMatchRanges("Facebook", "bookxyz"))
     }
 
 }

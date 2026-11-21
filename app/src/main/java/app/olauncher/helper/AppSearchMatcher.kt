@@ -48,3 +48,28 @@ class ThunderAppLabelMatcher(query: CharSequence) {
 
 fun thunderAppLabelMatches(label: String, normalizedLabel: String, query: CharSequence): Boolean =
     ThunderAppLabelMatcher(query).matches(label, normalizedLabel)
+
+/** Maps a Thunder match back to the original label, including matches that wrap around. */
+internal fun thunderMatchRanges(label: String, query: String): List<IntRange> {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return emptyList()
+    val direct = label.indexOf(trimmed, ignoreCase = true)
+    if (direct >= 0) return listOf(direct until direct + trimmed.length)
+
+    val needle = trimmed.normalizeForSearch()
+    val offsets = mutableListOf<Int>()
+    val normalized = buildString {
+        label.forEachIndexed { index, character ->
+            val part = character.toString().normalizeForSearch()
+            append(part)
+            repeat(part.length) { offsets.add(index) }
+        }
+    }
+    if (needle.isEmpty() || needle.length > normalized.length) return emptyList()
+    val start = (normalized + normalized.dropLast(1)).indexOf(needle, ignoreCase = true)
+    if (start < 0) return emptyList()
+
+    val end = start + needle.length - 1
+    return if (end < normalized.length) listOf(offsets[start]..offsets[end])
+    else listOf(offsets[start]..offsets.last(), offsets.first()..offsets[end - normalized.length])
+}
