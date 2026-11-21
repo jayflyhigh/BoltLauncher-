@@ -25,6 +25,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Filter
 import android.widget.Filterable
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -309,6 +310,12 @@ class AppDrawerAdapter(
         filterApps(requestedQuery)
     }
 
+    internal fun launchAnimation(recyclerView: RecyclerView, root: View, app: AppModel): ThunderLaunchAnimation? {
+        val holder = recyclerView.findViewHolderForAdapterPosition(0) as? ViewHolder ?: return null
+        if (holder.bindingAdapter !== this || holder.bindingAdapterPosition != 0) return null
+        return holder.launchAnimation(root, app)
+    }
+
     fun launchOnlyResult(): Boolean {
         val only = currentList.singleOrNull() ?: return false
         if (only is AppModel.PrivateSpaceHeader || only.appPackage.isEmpty()) return false
@@ -340,6 +347,36 @@ class AppDrawerAdapter(
         RecyclerView.ViewHolder(binding.root) {
         private var iconJob: Job? = null
         private var renameWatcher: TextWatcher? = null
+
+        private var boundApp: AppModel? = null
+
+        fun launchAnimation(root: View, app: AppModel): ThunderLaunchAnimation? {
+            val icon = copyDisplayedIcon(app) ?: return null
+            if (!binding.appIcon.isShown || binding.appIcon.width == 0) return null
+            val origin = IntArray(2)
+            root.getLocationInWindow(origin)
+            fun boundsOf(view: View): android.graphics.RectF {
+                val location = IntArray(2)
+                view.getLocationInWindow(location)
+                val x = (location[0] - origin[0]).toFloat()
+                val y = (location[1] - origin[1]).toFloat()
+                return android.graphics.RectF(x, y, x + view.width, y + view.height)
+            }
+            return ThunderLaunchAnimation(root.context, icon, boundsOf(binding.root), boundsOf(binding.appIcon))
+        }
+
+        private fun copyDisplayedIcon(app: AppModel): Drawable? {
+            if (boundApp != app) return null
+            val icon = binding.appIcon.drawable ?: return null
+            return icon.constantState?.newDrawable(binding.root.resources)
+                ?: android.graphics.drawable.BitmapDrawable(
+                    binding.root.resources,
+                    icon.toBitmap(
+                        width = binding.appIcon.width.coerceAtLeast(1),
+                        height = binding.appIcon.height.coerceAtLeast(1),
+                    ),
+                )
+        }
 
         fun cancelIconLoad() {
             iconJob?.cancel()
@@ -419,6 +456,7 @@ class AppDrawerAdapter(
             enterHighlighted: Boolean,
             showInlineActions: Boolean,
         ) = with(binding) {
+            boundApp = appModel
             bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
             appTitle.maxLines = 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)

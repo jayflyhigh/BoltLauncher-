@@ -105,6 +105,8 @@ class AppDrawerFragment : BaseFragment() {
     private var decoratedContact: Pair<Int, Uri>? = null
     private var highlightedContactQuery: String? = null
     private var autoLaunch: Runnable? = null
+    private var thunderLaunchAnimation: ThunderLaunchAnimation? = null
+    private var thunderLaunchAnimator: ValueAnimator? = null
     private var thunderEditAt: Long? = null
     private var imeWasVisible = false
     private data class SearchRename(val app: AppModel, val query: String)
@@ -122,6 +124,8 @@ class AppDrawerFragment : BaseFragment() {
 
     private companion object {
         const val SEARCH_RETURN_WINDOW_MS = 5_000L
+        const val THUNDER_LIFT_MS = 190L
+        const val THUNDER_PREVIEW_MS = 165L
         const val THUNDER_QUIET_MS = 220L
         const val COMPOSITION_RECHECK_MS = 100L
     }
@@ -154,7 +158,10 @@ class AppDrawerFragment : BaseFragment() {
         initAdapter()
         initSearch()
         binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
-        binding.root.onBackBeforeIme = ::dismissSearchEdit
+        binding.root.onBackBeforeIme = {
+            cancelAutoLaunch()
+            dismissSearchEdit()
+        }
         binding.root.onTap = ::dismissSearchActionsOutside
         initObservers()
         initClickListeners()
@@ -305,7 +312,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.onImeCommit = {
             // Let the IME finish its edit before checking the composing span.
             autoLaunch?.let { task ->
-                val delay = thunderEditAt?.let { it + THUNDER_QUIET_MS - SystemClock.uptimeMillis() }
+                val delay = thunderEditAt?.let {
+                    it + THUNDER_QUIET_MS - THUNDER_PREVIEW_MS - SystemClock.uptimeMillis()
+                }
                 if (delay != null) {
                     binding.root.removeCallbacks(task)
                     binding.root.postDelayed(task, delay.coerceAtLeast(0L))
@@ -627,36 +636,84 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun cancelAutoLaunch() {
+    private fun cancelAutoLaunch(clearAnimation: Boolean = true) {
         autoLaunch?.let { _binding?.root?.removeCallbacks(it) }
         autoLaunch = null
         thunderEditAt = null
+        if (clearAnimation) clearThunderLaunchAnimation()
+    }
+
+    private fun clearThunderLaunchAnimation() {
+        thunderLaunchAnimator?.cancel()
+        thunderLaunchAnimator = null
+        thunderLaunchAnimation?.let { _binding?.root?.overlay?.remove(it) }
+        thunderLaunchAnimation = null
+    }
+
+    private fun showThunderLaunchAnimation(app: AppModel) {
+        val root = binding.root
+        if (!LauncherMotion.isEnabled(root.context)) return
+        val animation = adapter.launchAnimation(binding.recyclerView, root, app) ?: return
+        animation.setBounds(0, 0, root.width, root.height)
+        root.overlay.add(animation)
+        thunderLaunchAnimation = animation
+        thunderLaunchAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = THUNDER_LIFT_MS
+            interpolator = LauncherMotion.settle
+            addUpdateListener {
+                animation.progress = it.animatedValue as Float
+                if (it.animatedFraction >= 1f) {
+                    root.overlay.remove(animation)
+                    thunderLaunchAnimation = null
+                    thunderLaunchAnimator = null
+                }
+            }
+            start()
+        }
     }
 
     private fun scheduleAutoLaunch(query: String) {
         val editedAt = thunderEditAt ?: return
         autoLaunch?.let(binding.root::removeCallbacks)
         autoLaunch = null
+        clearThunderLaunchAnimation()
         if (!thunderMode || !expanded || query.isBlank() || adapter.itemCount != 1 ||
             adapter.firstLaunchableResult == null) return
+        val result = adapter.firstLaunchableResult ?: return
         val committedAt = SystemClock.uptimeMillis()
+        val launchDeadline = editedAt + THUNDER_QUIET_MS
         val task = object : Runnable {
+            private var previewDeadline: Long? = null
+
             override fun run() {
                 val view = _binding ?: return
                 if (!thunderMode || !expanded || adapter.committedQuery != query ||
                     view.search.text.toString() != query || !view.root.hasWindowFocus() ||
+                    adapter.itemCount != 1 || adapter.firstLaunchableResult != result ||
                     viewLifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
                     cancelAutoLaunch()
                     return
                 }
                 val composing = view.search.text?.let { BaseInputConnection.getComposingSpanStart(it) >= 0 } == true
                 if (composing) {
+                    previewDeadline = null
+                    clearThunderLaunchAnimation()
                     // Covers IMEs that remove composing spans through another input method.
                     view.root.postDelayed(this, COMPOSITION_RECHECK_MS)
                     return
                 }
+                val now = SystemClock.uptimeMillis()
+                if (previewDeadline == null) {
+                    showThunderLaunchAnimation(result)
+                    previewDeadline = if (thunderLaunchAnimation != null) now + THUNDER_PREVIEW_MS else now
+                }
+                val readyAt = maxOf(launchDeadline, checkNotNull(previewDeadline))
+                if (now < readyAt) {
+                    view.root.postDelayed(this, readyAt - now)
+                    return
+                }
                 val launchAt = SystemClock.uptimeMillis()
-                cancelAutoLaunch()
+                cancelAutoLaunch(clearAnimation = false)
                 if (adapter.launchOnlyResult() && BuildConfig.DEBUG) {
                     Log.d("BoltThunderTiming", "editToCommitMs=${committedAt - editedAt} " +
                         "commitToLaunchRequestMs=${launchAt - committedAt}")
@@ -664,7 +721,7 @@ class AppDrawerFragment : BaseFragment() {
             }
         }
         autoLaunch = task
-        binding.root.postDelayed(task, (editedAt + THUNDER_QUIET_MS - committedAt).coerceAtLeast(0L))
+        binding.root.postDelayed(task, (launchDeadline - THUNDER_PREVIEW_MS - committedAt).coerceAtLeast(0L))
     }
 
     private fun beginSearchRename(app: AppModel) {
@@ -796,13 +853,14 @@ class AppDrawerFragment : BaseFragment() {
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
                 if (searchRename != null) return@AppDrawerAdapter
-                cancelAutoLaunch()
+                val animatingThunderLaunch = thunderLaunchAnimation != null
+                cancelAutoLaunch(clearAnimation = !animatingThunderLaunch)
                 if (flag == Constants.FLAG_LAUNCH_APP && isHomePage && expanded && !thunderMode) {
                     val keyboardWasVisible = imeWasVisible
                     if (!viewModel.launchAppResult(appModel)) return@AppDrawerAdapter
                     searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
                 } else {
-                    binding.search.hideKeyboard()
+                    if (!animatingThunderLaunch) binding.search.hideKeyboard()
                     viewModel.selectedApp(appModel, flag)
                 }
                 if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
@@ -1030,7 +1088,7 @@ class AppDrawerFragment : BaseFragment() {
     override fun onPause() {
         restoreSearchKeyboard = false
         dismissSearchEdit()
-        cancelAutoLaunch()
+        cancelAutoLaunch(clearAnimation = false)
         super.onPause()
     }
 
