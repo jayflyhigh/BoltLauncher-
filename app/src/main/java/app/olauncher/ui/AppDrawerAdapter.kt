@@ -336,6 +336,7 @@ class AppDrawerAdapter(
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
             appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
             appTitle.ellipsize = android.text.TextUtils.TruncateAt.END
+            if (appHideLayout.isVisible) LauncherMotion.reset(appHideLayout)
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
             appTitle.visibility = View.VISIBLE
@@ -405,7 +406,10 @@ class AppDrawerAdapter(
                         true -> 0.5f
                         false -> 1.0f
                     }
-                    appHideLayout.visibility = View.VISIBLE
+                    if (!appHideLayout.isVisible) {
+                        appHideLayout.visibility = View.VISIBLE
+                        LauncherMotion.reveal(appHideLayout)
+                    }
                     // Only allow renaming non hidden apps
                     appRename.isVisible = flag != Constants.FLAG_HIDDEN_APPS
                 }
@@ -423,6 +427,7 @@ class AppDrawerAdapter(
                     etAppRename.setText(appModel.appLabel)
                     etAppRename.setSelectAllOnFocus(true)
                     renameLayout.visibility = View.VISIBLE
+                    LauncherMotion.reset(appHideLayout)
                     appHideLayout.visibility = View.GONE
                     etAppRename.showKeyboard()
                     etAppRename.imeOptions = EditorInfo.IME_ACTION_DONE
@@ -478,6 +483,7 @@ class AppDrawerAdapter(
             appInfo.setOnClickListener { appInfoListener(appModel) }
             appDelete.setOnClickListener { appDeleteListener(appModel) }
             appMenuClose.setOnClickListener {
+                LauncherMotion.reset(appHideLayout)
                 appHideLayout.visibility = View.GONE
                 appTitle.visibility = View.VISIBLE
             }
