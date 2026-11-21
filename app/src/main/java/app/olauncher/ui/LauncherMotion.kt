@@ -52,17 +52,22 @@ internal object LauncherMotion {
             .start()
     }
 
-    fun setRowHighlight(view: View, selected: Boolean, active: Boolean, animate: Boolean) {
-        val changed = view.isSelected != selected || view.isActivated != active
+    fun setRowHighlight(view: View, selected: Boolean, animate: Boolean) {
+        val changed = view.isSelected != selected
         val background = view.background as? StateListDrawable
         val fade = if (changed && animate && isEnabled(view.context)) 110 else 0
         if (changed || !animate) {
             background?.setEnterFadeDuration(fade)
             background?.setExitFadeDuration(fade)
             view.isSelected = selected
-            view.isActivated = active
         }
         if (!animate) background?.jumpToCurrentState()
+    }
+
+    fun configureResultPress(view: View) {
+        val foreground = view.foreground as? StateListDrawable ?: return
+        // Keep touch-down immediate and let the press fade over the opening actions on release.
+        foreground.setExitFadeDuration(if (isEnabled(view.context)) 100 else 0)
     }
 
     fun reset(view: View) {

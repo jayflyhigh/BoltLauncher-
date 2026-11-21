@@ -338,6 +338,10 @@ class AppDrawerAdapter(
 
     private class ViewHolder(private val binding: AdapterAppDrawerBinding) :
         RecyclerView.ViewHolder(binding.root) {
+        init {
+            LauncherMotion.configureResultPress(binding.root)
+        }
+
         private var iconJob: Job? = null
         private var renameWatcher: TextWatcher? = null
 
@@ -345,27 +349,17 @@ class AppDrawerAdapter(
 
         fun launchAnimation(root: View, app: AppModel): ThunderLaunchAnimation? {
             if (boundApp != app) return null
-            val icon = copyDisplayedIcon(app)
-            if (!binding.appIcon.isShown || binding.appIcon.width == 0) return null
+            val source = binding.appIcon
+            if (!source.isShown || source.width == 0 || source.height == 0) return null
+            val icon = copyDisplayedIcon(app) ?: return null
             val origin = IntArray(2)
+            val location = IntArray(2)
             root.getLocationInWindow(origin)
-            fun boundsOf(view: View): android.graphics.RectF {
-                val location = IntArray(2)
-                view.getLocationInWindow(location)
-                val x = (location[0] - origin[0]).toFloat()
-                val y = (location[1] - origin[1]).toFloat()
-                return android.graphics.RectF(x, y, x + view.width, y + view.height)
-            }
-            val title = binding.appTitle
-            val titleBounds = boundsOf(title)
-            val labelX = titleBounds.left + title.compoundPaddingLeft
-            return ThunderLaunchAnimation(
-                root.context, icon, boundsOf(binding.root), boundsOf(binding.appIcon),
-                title.text.toString(), title.paint,
-                androidx.core.widget.TextViewCompat.getTextMetricsParams(title).textDirection
-                    ?: android.text.TextDirectionHeuristics.FIRSTSTRONG_LTR,
-                labelX, title.width - title.compoundPaddingLeft - title.compoundPaddingRight,
-            )
+            source.getLocationInWindow(location)
+            val x = (location[0] - origin[0]).toFloat()
+            val y = (location[1] - origin[1]).toFloat()
+            return ThunderLaunchAnimation(source, icon,
+                android.graphics.RectF(x, y, x + source.width, y + source.height))
         }
 
         private fun copyDisplayedIcon(app: AppModel): Drawable? {
@@ -393,7 +387,7 @@ class AppDrawerAdapter(
             enterHighlighted: Boolean,
             animateHighlight: Boolean = false,
         ) = with(binding) {
-            LauncherMotion.setRowHighlight(root, enterHighlighted, active = false, animate = animateHighlight)
+            LauncherMotion.setRowHighlight(root, enterHighlighted, animate = animateHighlight)
             appTitle.setTextColor(if (enterHighlighted) Color.WHITE else
                 androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
             appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
@@ -405,10 +399,11 @@ class AppDrawerAdapter(
                 if (appModel.isNew) append(" ✦")
             }
             if (thunderMode && !enterHighlighted && query.isNotBlank()) {
-                val yellow = androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_yellow)
                 appTitle.text = android.text.SpannableString(appTitle.text).apply {
                     thunderMatchRanges(appModel.appLabel, query).forEach { range ->
-                        setSpan(android.text.style.ForegroundColorSpan(yellow), range.first, range.last + 1,
+                        setSpan(android.text.style.ForegroundColorSpan(Color.WHITE), range.first, range.last + 1,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), range.first, range.last + 1,
                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     }
                 }

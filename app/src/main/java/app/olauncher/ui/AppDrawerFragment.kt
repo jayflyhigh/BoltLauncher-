@@ -28,6 +28,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -605,9 +606,11 @@ class AppDrawerFragment : BaseFragment() {
             text = when {
                 feedback != null -> getString(feedback)
                 offerWeb -> getString(R.string.bolt_search_web_for, query.trim())
-                showEmpty -> getString(R.string.bolt_no_matching_apps)
+                showEmpty -> getString(R.string.bolt_no_matches)
                 else -> ""
             }
+            setBackgroundResource(if (offerWeb) R.drawable.bolt_search_best_match else 0)
+            minimumHeight = if (offerWeb) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
             setOnClickListener(if (offerWeb) View.OnClickListener { openWebSearch(query) } else null)
             isClickable = offerWeb
             isFocusable = offerWeb
@@ -661,50 +664,39 @@ class AppDrawerFragment : BaseFragment() {
             dismissedShortcutsQuery != currentResultsQuery()
         binding.renameControls.isVisible = searchRename != null
         val shortcuts = binding.contactShortcuts
-        if (shortcutsRequested != showShortcuts || (!expanded && shortcuts.isVisible)) {
+        val animate = expanded && !thunderMode && searchRename == null &&
+            LauncherMotion.isEnabled(shortcuts.context)
+        if (shortcutsRequested != showShortcuts || (!animate && shortcuts.isVisible != showShortcuts)) {
             shortcutsRequested = showShortcuts
-            shortcuts.animate().cancel()
-            when {
-                showShortcuts -> {
-                    shortcuts.isVisible = true
-                    if (LauncherMotion.isEnabled(shortcuts.context)) {
-                        if (shortcuts.alpha == 1f) {
-                            shortcuts.alpha = 0f
-                            shortcuts.translationX = resources.displayMetrics.density * 8f
-                        }
-                        shortcuts.animate().alpha(1f).translationX(0f).setDuration(120L)
-                            .setInterpolator(LauncherMotion.settle).start()
-                    } else {
+            if (showShortcuts) {
+                val fromAlpha = if (shortcuts.isVisible) shortcuts.alpha else 0f
+                shortcuts.isVisible = true
+                LauncherMotion.reveal(shortcuts, fromAlpha = fromAlpha, duration = 120L)
+            } else if (animate) {
+                shortcuts.animate().cancel()
+                shortcuts.animate().alpha(0f).setDuration(100L)
+                    .setInterpolator(LauncherMotion.settle)
+                    .withEndAction {
+                        shortcuts.isVisible = false
                         LauncherMotion.reset(shortcuts)
-                    }
-                }
-                expanded && !thunderMode && searchRename == null && LauncherMotion.isEnabled(shortcuts.context) -> {
-                    shortcuts.animate().alpha(0f).translationX(resources.displayMetrics.density * 8f).setDuration(100L).setInterpolator(LauncherMotion.settle)
-                        .withEndAction {
-                            shortcuts.isVisible = false
-                            LauncherMotion.reset(shortcuts)
-                            updateDockButtons()
-                        }.start()
-                }
-                else -> {
-                    shortcuts.isVisible = false
-                    LauncherMotion.reset(shortcuts)
-                }
+                        updateDockButtons()
+                    }.start()
+            } else {
+                shortcuts.isVisible = false
+                LauncherMotion.reset(shortcuts)
             }
         }
-        val manuallySelected = showShortcuts && contactsAdapter.selectedContact != null
-        shortcuts.background = if (manuallySelected)
-            ContextCompat.getDrawable(requireContext(), R.drawable.bolt_contact_shortcut_surface) else null
         val hasNumber = showShortcuts && contact?.numbers?.isNotEmpty() == true
         listOf(binding.contactCall, binding.contactMessage, binding.contactWhatsapp).forEach {
             it.isEnabled = hasNumber
             if (showShortcuts) it.alpha = if (hasNumber) 1f else 0.4f
         }
         updateBoltVisibility()
+        val contactWidth = resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width) * 3 +
+            resources.getDimensionPixelSize(R.dimen.bolt_contact_action_divider_width)
         val actionMargin = when {
             searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2
-            shortcuts.isVisible -> resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width) * 3 +
-                resources.getDimensionPixelSize(R.dimen.bolt_contact_action_divider_width)
+            shortcuts.isVisible -> contactWidth
             thunderMode -> resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
             !expanded && flag == Constants.FLAG_LAUNCH_APP ->
                 resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
@@ -715,7 +707,10 @@ class AppDrawerFragment : BaseFragment() {
         if (web.isVisible && (web.layoutParams as FrameLayout.LayoutParams).marginEnd != actionMargin) {
             web.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = actionMargin }
         }
-        val margin = actionMargin + if (web.isVisible) web.layoutParams.width else 0
+        // Keep the input viewport stable when a contact becomes the target or is deselected.
+        val inputActionMargin = if (web.isVisible && searchRename == null && hasContactsPermission())
+            contactWidth else actionMargin
+        val margin = inputActionMargin + if (web.isVisible) web.layoutParams.width else 0
         if ((binding.search.layoutParams as FrameLayout.LayoutParams).marginEnd != margin) {
             binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = margin }
         }
@@ -783,9 +778,6 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun clearThunderLaunchAnimation() {
         thunderLaunchAnimator?.cancel()
-        thunderLaunchAnimator = null
-        thunderLaunchAnimation?.let { _binding?.root?.overlay?.remove(it) }
-        thunderLaunchAnimation = null
     }
 
     private fun showThunderLaunchAnimation(app: AppModel) {
@@ -795,12 +787,18 @@ class AppDrawerFragment : BaseFragment() {
         animation.setBounds(0, 0, root.width, root.height)
         root.overlay.add(animation)
         thunderLaunchAnimation = animation
-        thunderLaunchAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        thunderLaunchAnimator = ValueAnimator.ofFloat(animation.progress, 1f).apply {
             duration = THUNDER_LIFT_MS
             interpolator = LauncherMotion.settle
             addUpdateListener { animation.progress = it.animatedValue as Float }
-            start()
+            doOnEnd {
+                root.overlay.remove(animation)
+                animation.restoreIcon()
+                thunderLaunchAnimation = null
+                thunderLaunchAnimator = null
+            }
         }
+        thunderLaunchAnimator?.start()
     }
 
     private fun scheduleAutoLaunch(query: String) {
@@ -969,7 +967,9 @@ class AppDrawerFragment : BaseFragment() {
         if (!thunderCommitted) cancelAutoLaunch(clearAnimation = !animatingThunderLaunch)
         if (flag == Constants.FLAG_LAUNCH_APP && expanded) {
             val keyboardWasVisible = imeWasVisible
-            if (!viewModel.launchAppResult(appModel, ::showSearchFeedback)) return false
+            if (!viewModel.launchAppResult(
+                    appModel, ::showSearchFeedback, thunderLaunchAnimation?.launchOptions()
+                )) return false
             if (isHomePage && !thunderMode) {
                 searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
             } else if (!animatingThunderLaunch) {

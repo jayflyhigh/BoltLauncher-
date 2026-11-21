@@ -174,6 +174,7 @@ class ContactSearchAdapter(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         init {
+            LauncherMotion.configureResultPress(binding.root)
             val density = binding.root.resources.displayMetrics.density
             binding.root.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
             binding.root.minimumHeight = (50 * density).toInt()
@@ -197,15 +198,14 @@ class ContactSearchAdapter(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 android.view.Gravity.CENTER_VERTICAL).apply {
                 marginStart = (68 * density).toInt()
-                marginEnd = (36 * density).toInt()
+                marginEnd = (24 * density).toInt()
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
         fun bindHighlight(contact: Contact, animateHighlight: Boolean = false) {
             val selected = contact.uri == selectedUri
-            val highlighted = !selected && contact == enterHighlightedResult
-            binding.contactSelectedIndicator.isVisible = selected
-            LauncherMotion.setRowHighlight(binding.root, highlighted, selected, animateHighlight)
+            val highlighted = contact == enterHighlightedResult
+            LauncherMotion.setRowHighlight(binding.root, highlighted, animate = animateHighlight)
             val state = when {
                 selected -> R.string.bolt_contact_selected
                 highlighted -> R.string.bolt_enter_target
@@ -214,7 +214,7 @@ class ContactSearchAdapter(
             androidx.core.view.ViewCompat.setStateDescription(binding.root,
                 state?.let(binding.root.resources::getString))
             binding.appTitle.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            binding.appTitle.setTextColor(if (highlighted || selected) Color.WHITE else
+            binding.appTitle.setTextColor(if (highlighted) Color.WHITE else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
         }
 

@@ -29,13 +29,11 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="8dp"
         android:layout_marginBottom="4dp"
-        android:background="@drawable/bolt_search_best_match"
         android:foreground="@drawable/bolt_search_press"
         android:accessibilityLiveRegion="polite"
         android:ellipsize="end"
         android:gravity="center_vertical"
         android:maxLines="2"
-        android:minHeight="50dp"
         android:paddingHorizontal="16dp"
         android:paddingVertical="8dp"
         android:textColor="@color/bolt_search_secondary"
@@ -108,7 +106,8 @@
                 android:layout_height="match_parent"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/bolt_action_call"
-                android:scaleType="center"
+                android:scaleType="centerInside"
+                android:paddingHorizontal="13dp"
                 app:srcCompat="@drawable/contact_call"
                 app:tint="@color/bolt_search_label" />
 
@@ -118,7 +117,8 @@
                 android:layout_height="match_parent"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/bolt_action_message"
-                android:scaleType="center"
+                android:scaleType="centerInside"
+                android:paddingHorizontal="13dp"
                 app:srcCompat="@drawable/contact_message"
                 app:tint="@color/bolt_search_label" />
 
@@ -128,7 +128,8 @@
                 android:layout_height="match_parent"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/bolt_action_whatsapp"
-                android:scaleType="center"
+                android:scaleType="centerInside"
+                android:paddingHorizontal="13dp"
                 app:srcCompat="@drawable/contact_whatsapp"
                 app:tint="@color/bolt_search_whatsapp" />
         </LinearLayout>
