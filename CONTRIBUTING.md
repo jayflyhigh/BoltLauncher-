@@ -21,6 +21,18 @@ request fits that goal; some niche features are kept hidden rather than exposed 
 
 - No ktlint/detekt config exists in this repo yet — match the style of the file you're editing.
 
+## Launcher motion
+
+When adding or changing a visible launcher interaction, consider what motion would help users
+follow the state change. Reuse `LauncherMotion` for small reveals and mode transitions, and
+use the existing navigation transitions for new destinations. Handle reduced motion and e-ink
+through the shared policy.
+
+Apply state, focus and input changes immediately. Animate a single view or group using alpha
+or translation. Keep animation work out of search filtering, list binding and app launch timing.
+Let incoming search rows reveal through `DockResultsView` without restarting visible rows. Cancel and reset animations when their views are hidden or reused. Check rapid
+interaction and disabled animations as part of reviewing the feature.
+
 ## Licence
 
 - GPLv3 — by contributing, you agree your changes are licensed under the same terms.

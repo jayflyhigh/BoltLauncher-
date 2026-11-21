@@ -12,6 +12,7 @@ import android.provider.ContactsContract
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.telephony.PhoneNumberUtils
 import java.util.Locale
@@ -25,7 +26,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
-import android.view.animation.AccelerateDecelerateInterpolator
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -49,7 +49,6 @@ import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.ContactLoadResult
 import app.olauncher.helper.deletePinnedShortcut
 import app.olauncher.helper.hideKeyboard
-import app.olauncher.helper.isSystemAnimationsDisabled
 import app.olauncher.helper.isEinkDisplay
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.openAppInfo
@@ -98,8 +97,11 @@ class AppDrawerFragment : BaseFragment() {
 
     private var expanded = false
     private var thunderMode = false
+    private var revealedContactShortcuts = false
     private var resultsQuery: String? = null
     private var autoLaunch: Runnable? = null
+    private var backdropAnimator: ValueAnimator? = null
+    private val searchBackdrop = ColorDrawable(0xFF0D0D0D.toInt())
     private var boltAnimator: ValueAnimator? = null
     private var boltProgress = 0f
 
@@ -120,6 +122,7 @@ class AppDrawerFragment : BaseFragment() {
         canRename = arguments?.getBoolean(Constants.Key.RENAME, false) ?: false
         expanded = !isHomePage
         thunderMode = false
+        revealedContactShortcuts = false
         boltProgress = 0f
         resultsQuery = null
         initAdapter()
@@ -128,6 +131,7 @@ class AppDrawerFragment : BaseFragment() {
         initClickListeners()
         initHomeSwipe()
         applyDockInsets()
+        binding.root.background = searchBackdrop
         updateSearchVisibility()
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
@@ -186,8 +190,8 @@ class AppDrawerFragment : BaseFragment() {
                 override fun onStart(animation: androidx.core.view.WindowInsetsAnimationCompat,
                     bounds: androidx.core.view.WindowInsetsAnimationCompat.BoundsCompat): androidx.core.view.WindowInsetsAnimationCompat.BoundsCompat {
                     if (animation.typeMask and androidx.core.view.WindowInsetsCompat.Type.ime() != 0) {
-                        offset = if (requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) 0f
-                            else (startBottom - dockBottom()).toFloat()
+                        offset = if (LauncherMotion.isEnabled(requireContext()))
+                            (startBottom - dockBottom()).toFloat() else 0f
                         root.translationY = offset
                     }
                     return bounds
@@ -289,8 +293,19 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun openSearch(thunder: Boolean) {
+        val opening = !expanded
         expanded = true
-        updateSearchVisibility()
+        updateSearchVisibility(animateBackdrop = opening)
+        if (opening) {
+            LauncherMotion.reveal(
+                binding.recyclerView, fromAlpha = 1f, riseDp = 22f,
+                duration = LauncherMotion.SEARCH_DURATION,
+            )
+            LauncherMotion.reveal(
+                binding.dock, fromAlpha = 1f, fromScale = 0.94f,
+                duration = LauncherMotion.SEARCH_DURATION,
+            )
+        }
         setThunderMode(thunder)
         if (!thunder && flag == Constants.FLAG_LAUNCH_APP && !hasContactsPermission() && !askedForContacts) {
             askedForContacts = true
@@ -304,12 +319,29 @@ class AppDrawerFragment : BaseFragment() {
         if (!imeVisible) binding.search.showKeyboard()
     }
 
-    private fun updateSearchVisibility() {
+    private fun updateSearchVisibility(animateBackdrop: Boolean = false) {
         binding.homeSearch.isVisible = !expanded
         binding.search.isVisible = expanded
         binding.recyclerView.visibility = if (expanded) View.VISIBLE else View.INVISIBLE
-        binding.root.setBackgroundColor(if (expanded) 0xFF0D0D0D.toInt() else Color.TRANSPARENT)
+        binding.recyclerView.updateRowMotion(expanded)
+        updateSearchBackdrop(animateBackdrop)
         updateDockButtons()
+    }
+
+    private fun updateSearchBackdrop(animate: Boolean) {
+        val target = if (expanded) 255 else 0
+        backdropAnimator?.cancel()
+        backdropAnimator = null
+        if (!animate || !LauncherMotion.isEnabled(requireContext()) || searchBackdrop.alpha == target) {
+            searchBackdrop.alpha = target
+            return
+        }
+        backdropAnimator = ValueAnimator.ofInt(searchBackdrop.alpha, target).apply {
+            duration = LauncherMotion.SEARCH_DURATION
+            interpolator = LauncherMotion.settle
+            addUpdateListener { searchBackdrop.alpha = it.animatedValue as Int }
+            start()
+        }
     }
 
     private fun setThunderMode(enabled: Boolean, animate: Boolean = true) {
@@ -321,12 +353,12 @@ class AppDrawerFragment : BaseFragment() {
         applySearchColors()
         val target = if (enabled) 1f else 0f
         boltAnimator?.cancel()
-        if (!animate || requireContext().isEinkDisplay() || requireContext().isSystemAnimationsDisabled()) {
+        if (!animate || !LauncherMotion.isEnabled(requireContext())) {
             positionBolt(target)
         } else {
             boltAnimator = ValueAnimator.ofFloat(boltProgress, target).apply {
-                duration = 220
-                interpolator = AccelerateDecelerateInterpolator()
+                duration = LauncherMotion.MODE_DURATION
+                interpolator = LauncherMotion.settle
                 addUpdateListener { positionBolt(it.animatedValue as Float) }
                 start()
             }
@@ -429,7 +461,16 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateDockButtons() {
         val contact = contactsAdapter.enterHighlightedResult
         val showShortcuts = expanded && !thunderMode && contact != null
-        binding.contactShortcuts.isVisible = showShortcuts
+        val shortcuts = binding.contactShortcuts
+        if (shortcuts.isVisible != showShortcuts) {
+            shortcuts.isVisible = showShortcuts
+            if (!showShortcuts) {
+                LauncherMotion.reset(shortcuts)
+            } else if (!revealedContactShortcuts) {
+                revealedContactShortcuts = true
+                LauncherMotion.reveal(shortcuts, fromAlpha = 0.6f)
+            }
+        }
         val hasNumber = contact?.numbers?.isNotEmpty() == true
         listOf(binding.contactCall, binding.contactMessage, binding.contactWhatsapp).forEach {
             it.isEnabled = hasNumber
@@ -533,19 +574,24 @@ class AppDrawerFragment : BaseFragment() {
         if (insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true) {
             binding.search.hideKeyboard()
         } else {
-            resetHomeSearch()
+            resetHomeSearch(animateBackdrop = true)
+            LauncherMotion.reveal(binding.homeSearch, fromAlpha = 0.45f)
         }
         return true
     }
 
-    fun resetHomeSearch() {
+    fun resetHomeSearch(animateBackdrop: Boolean = false) {
         if (_binding == null || !isHomePage) return
         expanded = false
+        revealedContactShortcuts = false
+        LauncherMotion.reset(binding.recyclerView)
+        LauncherMotion.reset(binding.homeSearch)
+        LauncherMotion.reset(binding.dock)
         cancelAutoLaunch()
         binding.search.hideKeyboard()
         binding.search.text?.clear()
         setThunderMode(false, animate = false)
-        updateSearchVisibility()
+        updateSearchVisibility(animateBackdrop)
     }
 
     private fun showHomeSettings() {
@@ -768,6 +814,7 @@ class AppDrawerFragment : BaseFragment() {
             if (hasContactsPermission()) loadContactsIfAllowed()
             else contactsAdapter.clearContacts()
         }
+        binding.recyclerView.updateRowMotion(expanded)
         if (expanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
     }
 
@@ -783,6 +830,12 @@ class AppDrawerFragment : BaseFragment() {
         stopLoadingContacts()
         boltAnimator?.cancel()
         boltAnimator = null
+        backdropAnimator?.cancel()
+        backdropAnimator = null
+        LauncherMotion.reset(binding.recyclerView)
+        LauncherMotion.reset(binding.homeSearch)
+        LauncherMotion.reset(binding.dock)
+        LauncherMotion.reset(binding.contactShortcuts)
         adapter.cancelFiltering()
         binding.recyclerView.adapter = null
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
