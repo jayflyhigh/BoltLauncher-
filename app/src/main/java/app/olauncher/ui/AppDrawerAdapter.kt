@@ -195,7 +195,7 @@ class AppDrawerAdapter(
                         ensureActive()
                         return DIFF_CALLBACK.areContentsTheSame(previous[old], items[new])
                     }
-                }, false)
+                }, true)
                 items to changes
             }
             if (generation != filterGeneration) return@launch
@@ -252,7 +252,7 @@ class AppDrawerAdapter(
             val app = getItem(position)
             val highlighted = !thunderMode && app == enterHighlightedResult
             holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), highlighted)
-            holder.bindSearchActions(app, app == actionApp, highlighted)
+            holder.bindSearchActions(app, app == actionApp)
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -351,7 +351,8 @@ class AppDrawerAdapter(
         private var boundApp: AppModel? = null
 
         fun launchAnimation(root: View, app: AppModel): ThunderLaunchAnimation? {
-            val icon = copyDisplayedIcon(app) ?: return null
+            if (boundApp != app) return null
+            val icon = copyDisplayedIcon(app)
             if (!binding.appIcon.isShown || binding.appIcon.width == 0) return null
             val origin = IntArray(2)
             root.getLocationInWindow(origin)
@@ -362,7 +363,16 @@ class AppDrawerAdapter(
                 val y = (location[1] - origin[1]).toFloat()
                 return android.graphics.RectF(x, y, x + view.width, y + view.height)
             }
-            return ThunderLaunchAnimation(root.context, icon, boundsOf(binding.root), boundsOf(binding.appIcon))
+            val title = binding.appTitle
+            val titleBounds = boundsOf(title)
+            val labelX = titleBounds.left + title.compoundPaddingLeft
+            return ThunderLaunchAnimation(
+                root.context, icon, boundsOf(binding.root), boundsOf(binding.appIcon),
+                title.text.toString(), title.paint,
+                androidx.core.widget.TextViewCompat.getTextMetricsParams(title).textDirection
+                    ?: android.text.TextDirectionHeuristics.FIRSTSTRONG_LTR,
+                labelX, title.width - title.compoundPaddingLeft - title.compoundPaddingRight,
+            )
         }
 
         private fun copyDisplayedIcon(app: AppModel): Drawable? {
@@ -385,11 +395,9 @@ class AppDrawerAdapter(
 
         fun bindSearchStyle(appModel: AppModel, thunderMode: Boolean, query: String, enterHighlighted: Boolean) =
             with(binding) {
-                val rowColor = if (enterHighlighted) R.color.bolt_search_yellow else R.color.bolt_search_result
-                root.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                    androidx.core.content.ContextCompat.getColor(root.context, rowColor)
-                )
-                appTitle.setTextColor(if (enterHighlighted) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                root.isSelected = enterHighlighted
+                appTitle.setTextColor(if (enterHighlighted) Color.WHITE else
+                    androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
                 appTitle.setTypeface(null, if (enterHighlighted) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
                 // Show indicators in title based on app type and state
                 appTitle.text = buildString {
@@ -407,11 +415,8 @@ class AppDrawerAdapter(
                 }
             }
 
-        fun bindSearchActions(app: AppModel, show: Boolean, highlighted: Boolean) = with(binding) {
+        fun bindSearchActions(app: AppModel, show: Boolean) = with(binding) {
             if (show) {
-                val color = if (highlighted) Color.BLACK else Color.WHITE
-                listOf(searchRename, searchPlayStore, searchAppInfo, searchUninstall)
-                    .forEach { it.setTextColor(color) }
                 if (!searchAppActions.isVisible) {
                     val context = root.context
                     searchUninstall.isVisible = app is AppModel.App &&
@@ -457,6 +462,13 @@ class AppDrawerAdapter(
             showInlineActions: Boolean,
         ) = with(binding) {
             boundApp = appModel
+            val identity = when (appModel) {
+                is AppModel.App -> appModel.appPackage to appModel.user
+                is AppModel.PinnedShortcut -> appModel.identity
+                else -> appModel
+            }
+            root.setTag(R.id.bolt_result_identity, identity)
+            (root.parent as? DockResultsView)?.rememberRow(root, identity)
             bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
             appTitle.maxLines = 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
@@ -479,12 +491,15 @@ class AppDrawerAdapter(
                     ?: root.context.packageManager.defaultActivityIcon)
                 if (cached == null) {
                     val context = root.context.applicationContext
+                    val resources = root.resources
+                    val appIconSlotSize = appIcon.layoutParams.width
                     iconJob = iconScope.launch {
                         val icon = withContext(Dispatchers.IO) {
                             try {
                                 val launcher = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
                                 launcher.getActivityList(key.packageName, key.user)
                                     .firstOrNull()?.getBadgedIcon(key.density)
+                                    ?.let { normalizeSearchIcon(it, resources, appIconSlotSize) }
                             } catch (_: Exception) { null }
                         }
                         ensureActive()
@@ -493,11 +508,9 @@ class AppDrawerAdapter(
                     }
                 }
             }
-            appIcon.setOnClickListener { clickListener(appModel) }
             appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             otherProfileIndicator.isVisible = appModel.user != myUserHandle
 
-            appTitle.setOnClickListener { clickListener(appModel) }
             root.setOnClickListener { clickListener(appModel) }
             val showAppActions = View.OnLongClickListener {
                 if (appModel.appPackage.isNotEmpty() && !showSearchActions(appModel)) {
@@ -531,8 +544,6 @@ class AppDrawerAdapter(
             }
 
             root.setOnLongClickListener(showAppActions)
-            appTitle.setOnLongClickListener(showAppActions)
-            appIcon.setOnLongClickListener(showAppActions)
 
             // Configure rename behavior
             appRename.setOnClickListener {
@@ -598,7 +609,7 @@ class AppDrawerAdapter(
             searchPlayStore.setOnClickListener { runSearchAction { appPlayStoreListener(appModel) } }
             searchAppInfo.setOnClickListener { runSearchAction { appInfoListener(appModel) } }
             searchUninstall.setOnClickListener { runSearchAction { appDeleteListener(appModel) } }
-            bindSearchActions(appModel, showInlineActions, enterHighlighted)
+            bindSearchActions(appModel, showInlineActions)
             appInfo.setOnClickListener { appInfoListener(appModel) }
             appDelete.setOnClickListener { appDeleteListener(appModel) }
             appMenuClose.setOnClickListener {

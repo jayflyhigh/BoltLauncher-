@@ -1,7 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <item type="id" name="bolt_result_identity" />
     <color name="bolt_search_yellow">#FFD640</color>
     <color name="bolt_search_result">#303030</color>
+    <color name="bolt_search_dock">#242424</color>
+    <color name="bolt_search_label">#DEDEDE</color>
+    <color name="bolt_search_secondary">#B7B7B7</color>
+    <color name="bolt_search_uninstall">#F19A95</color>
+    <color name="bolt_search_whatsapp">#59D88A</color>
+    <dimen name="bolt_search_corner_radius">16dp</dimen>
+    <dimen name="bolt_search_ime_gap">8dp</dimen>
     <dimen name="bolt_search_button_width">52dp</dimen>
     <string name="bolt_search">Search</string>
     <string name="bolt_select_app">Select an app</string>

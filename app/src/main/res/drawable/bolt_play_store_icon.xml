@@ -1,0 +1,9 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="@color/bolt_search_label"
+        android:pathData="M5,3v18l15,-9zM7,6.53L16.11,12 7,17.47z"
+        android:fillType="evenOdd" />
+</vector>

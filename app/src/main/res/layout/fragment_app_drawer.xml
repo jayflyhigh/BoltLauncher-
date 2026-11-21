@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginHorizontal="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="4dp"
         android:layout_weight="1"
         android:visibility="invisible" />
 
@@ -28,7 +28,7 @@
         android:layout_width="match_parent"
         android:layout_height="52dp"
         android:layout_marginHorizontal="8dp"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="@dimen/bolt_search_ime_gap"
         android:background="@drawable/bolt_search_idle"
         android:layoutDirection="ltr">
 
@@ -38,6 +38,7 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="@dimen/bolt_search_button_width"
             android:focusable="true"
+            android:foreground="@drawable/bolt_search_press"
             android:gravity="start|center_vertical"
             android:paddingHorizontal="16dp"
             android:text="@string/bolt_search"
@@ -50,6 +51,7 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="@dimen/bolt_search_button_width"
             android:background="@null"
+            android:foreground="@drawable/bolt_search_press"
             android:gravity="start|center_vertical"
             android:imeOptions="actionGo|flagNoExtractUi"
             android:inputType="text|textNoSuggestions"
@@ -65,7 +67,7 @@
             android:layout_width="@dimen/bolt_search_button_width"
             android:layout_height="match_parent"
             android:layout_gravity="end"
-            android:background="@android:color/transparent"
+            android:background="@drawable/bolt_search_press"
             android:contentDescription="@string/bolt_enable_thunder"
             android:scaleType="center"
             app:srcCompat="@drawable/bolt_search_lightning"
@@ -80,7 +82,7 @@
 
             <View
                 android:layout_width="@dimen/bolt_contact_action_divider_width"
-                android:layout_height="24dp"
+                android:layout_height="18dp"
                 android:background="#666666" />
 
             <androidx.appcompat.widget.AppCompatImageButton
@@ -90,7 +92,8 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/bolt_action_call"
                 android:scaleType="center"
-                app:srcCompat="@drawable/contact_call" />
+                app:srcCompat="@drawable/contact_call"
+                app:tint="@color/bolt_search_label" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/contactMessage"
@@ -99,7 +102,8 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/bolt_action_message"
                 android:scaleType="center"
-                app:srcCompat="@drawable/contact_message" />
+                app:srcCompat="@drawable/contact_message"
+                app:tint="@color/bolt_search_label" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/contactWhatsapp"
@@ -108,7 +112,8 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/bolt_action_whatsapp"
                 android:scaleType="center"
-                app:srcCompat="@drawable/contact_whatsapp" />
+                app:srcCompat="@drawable/contact_whatsapp"
+                app:tint="@color/bolt_search_whatsapp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/renameControls"
