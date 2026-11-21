@@ -31,11 +31,12 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     fun setThunderCursor(enabled: Boolean) {
+        if (thunderCursor == enabled) return
+        thunderCursor = enabled
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             setTextCursorDrawable(if (enabled) R.drawable.bolt_cursor_black else R.drawable.bolt_cursor_yellow)
             return
         }
-        thunderCursor = enabled
         // Android 7–9 cannot change the framework cursor drawable at runtime.
         isCursorVisible = !enabled
         blinkStart = android.os.SystemClock.uptimeMillis()
@@ -62,7 +63,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        if (!thunderCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || !thunderCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
             selectionStart != selectionEnd) return
         val textLayout = layout ?: return
         val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart

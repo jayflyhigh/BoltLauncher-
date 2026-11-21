@@ -23,6 +23,25 @@
         android:text="@string/rename"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/searchStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/bolt_search_best_match"
+        android:foreground="@drawable/bolt_search_press"
+        android:accessibilityLiveRegion="polite"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="2"
+        android:minHeight="50dp"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:textColor="@color/bolt_search_secondary"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
     <FrameLayout
         android:id="@+id/dock"
         android:layout_width="match_parent"
@@ -31,19 +50,6 @@
         android:layout_marginBottom="@dimen/bolt_search_ime_gap"
         android:background="@drawable/bolt_search_idle"
         android:layoutDirection="ltr">
-
-        <TextView
-            android:id="@+id/homeSearch"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="@dimen/bolt_search_button_width"
-            android:focusable="true"
-            android:foreground="@drawable/bolt_search_press"
-            android:gravity="start|center_vertical"
-            android:paddingHorizontal="16dp"
-            android:text="@string/bolt_search"
-            android:textColor="#BDBDBD"
-            android:textSize="18sp" />
 
         <app.olauncher.ui.BoltSearchInput
             android:id="@+id/search"
@@ -59,8 +65,7 @@
             android:saveEnabled="false"
             android:singleLine="true"
             android:textCursorDrawable="@drawable/bolt_cursor_yellow"
-            android:textSize="18sp"
-            android:visibility="gone" />
+            android:textSize="18sp" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/dockBolt"
@@ -72,6 +77,18 @@
             android:scaleType="center"
             app:srcCompat="@drawable/bolt_search_lightning"
             app:tint="@color/bolt_search_yellow" />
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/dockWeb"
+            android:layout_width="@dimen/bolt_contact_action_width"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="@drawable/bolt_search_press"
+            android:contentDescription="@string/bolt_search_web"
+            android:scaleType="center"
+            android:visibility="gone"
+            app:srcCompat="@drawable/dock_web"
+            app:tint="@color/bolt_search_label" />
+
         <LinearLayout
             android:id="@+id/contactShortcuts"
             android:layout_width="wrap_content"
@@ -83,7 +100,7 @@
             <View
                 android:layout_width="@dimen/bolt_contact_action_divider_width"
                 android:layout_height="18dp"
-                android:background="#666666" />
+                android:background="#474747" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/contactCall"
