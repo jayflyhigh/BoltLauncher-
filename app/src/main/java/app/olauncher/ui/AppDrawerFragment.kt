@@ -107,6 +107,9 @@ class AppDrawerFragment : BaseFragment() {
     private var autoLaunch: Runnable? = null
     private var thunderEditAt: Long? = null
     private var imeWasVisible = false
+    private data class SearchRename(val app: AppModel, val query: String)
+    private var searchRename: SearchRename? = null
+
     private var searchAppLaunch: SearchAppLaunch? = null
 
     private data class SearchAppLaunch(val at: Long, val keyboardWasVisible: Boolean) {
@@ -146,6 +149,8 @@ class AppDrawerFragment : BaseFragment() {
         decoratedContact = null
         initAdapter()
         initSearch()
+        binding.root.onBackBeforeIme = ::dismissSearchEdit
+        binding.root.onTap = ::dismissSearchActionsOutside
         initObservers()
         initClickListeners()
         initHomeSwipe()
@@ -155,7 +160,7 @@ class AppDrawerFragment : BaseFragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (!collapseSearch() && !isHomePage) closeDrawer()
+                    if (!dismissSearchEdit() && !collapseSearch() && !isHomePage) closeDrawer()
                 }
             })
     }
@@ -302,7 +307,11 @@ class AppDrawerFragment : BaseFragment() {
                 }
             }
         }
+        binding.renameConfirm.setOnClickListener { saveSearchRename() }
+        binding.renameCancel.setOnClickListener { finishSearchRename() }
         binding.search.doAfterTextChanged { text ->
+            if (searchRename != null) return@doAfterTextChanged
+            adapter.closeSearchActions()
             cancelAutoLaunch()
             val query = text.toString()
             if (thunderMode && expanded && query.isNotBlank()) thunderEditAt = SystemClock.uptimeMillis()
@@ -315,8 +324,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.setOnEditorActionListener { _, actionId, event ->
             val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER ||
                 event?.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
-            if (actionId != EditorInfo.IME_ACTION_GO && !enter) return@setOnEditorActionListener false
+            if (actionId != EditorInfo.IME_ACTION_GO &&
+                !(searchRename != null && actionId == EditorInfo.IME_ACTION_DONE) && !enter) return@setOnEditorActionListener false
             if (event?.action != KeyEvent.ACTION_DOWN && !thunderMode) {
+                if (searchRename != null) {
+                    saveSearchRename()
+                    return@setOnEditorActionListener true
+                }
+                if (adapter.closeSearchActions()) return@setOnEditorActionListener true
                 val query = binding.search.text.toString()
                 val highlightedContact = contactsAdapter.enterHighlightedResult
                     ?.takeIf { highlightedContactQuery == query && contactsAdapter.committedQuery == query }
@@ -382,6 +397,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun setThunderMode(enabled: Boolean, animate: Boolean = true) {
         if (thunderMode == enabled) return
         cancelAutoLaunch()
+        adapter.closeSearchActions()
         thunderMode = enabled
         updateDockButtons()
         adapter.setThunderMode(enabled)
@@ -431,8 +447,10 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.translationX = inset * progress
     }
 
+    private fun currentResultsQuery(): String = searchRename?.query ?: binding.search.text.toString()
+
     private fun onResultsChanged(query: String) {
-        if (_binding == null || query != binding.search.text.toString()) return
+        if (_binding == null || query != currentResultsQuery()) return
         updateContactDecoration()
         val bottomAnchored = thunderMode || query.isNotBlank()
         val directionChanged = layoutManager.reverseLayout != bottomAnchored
@@ -460,11 +478,11 @@ class AppDrawerFragment : BaseFragment() {
                 is ContactLoadResult.Success -> {
                     contactsLoaded = true
                     contactsAdapter.contacts = result.contacts
-                    filterContacts(binding.search.text.toString())
+                    filterContacts(currentResultsQuery())
                 }
                 ContactLoadResult.PermissionDenied -> {
                     contactsAdapter.clearContacts()
-                    updateResultHighlight(binding.search.text.toString())
+                    updateResultHighlight(currentResultsQuery())
                 }
                 is ContactLoadResult.Failure -> Unit
             }
@@ -522,7 +540,8 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun updateDockButtons() {
         val contact = contactsAdapter.enterHighlightedResult
-        val showShortcuts = expanded && !thunderMode && contact != null
+        val showShortcuts = expanded && !thunderMode && contact != null && searchRename == null
+        binding.renameControls.isVisible = searchRename != null
         val shortcuts = binding.contactShortcuts
         if (shortcuts.isVisible != showShortcuts) {
             shortcuts.isVisible = showShortcuts
@@ -540,6 +559,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.dockBolt.isVisible = flag == Constants.FLAG_LAUNCH_APP && (!expanded || thunderMode)
         val margin = when {
+            searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2
             showShortcuts -> resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width) * 3 +
                 resources.getDimensionPixelSize(R.dimen.bolt_contact_action_divider_width)
             thunderMode -> resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
@@ -588,7 +608,7 @@ class AppDrawerFragment : BaseFragment() {
             requireContext().showToast(getString(R.string.bolt_contacts_app_unavailable))
         } catch (_: SecurityException) {
             contactsAdapter.clearContacts()
-            updateResultHighlight(binding.search.text.toString())
+            updateResultHighlight(currentResultsQuery())
         }
     }
 
@@ -642,6 +662,77 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.postDelayed(task, (editedAt + THUNDER_QUIET_MS - committedAt).coerceAtLeast(0L))
     }
 
+    private fun beginSearchRename(app: AppModel) {
+        searchRename = SearchRename(app, binding.search.text.toString())
+        binding.search.hint = getString(R.string.bolt_new_app_name)
+        binding.search.imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        binding.search.text?.clear()
+        updateSearchVisibility()
+        binding.search.showKeyboard()
+    }
+
+    private fun saveSearchRename() {
+        val rename = searchRename ?: return
+        val label = binding.search.text.toString().trim()
+        finishSearchRename()
+        saveAppLabel(rename.app, label)
+    }
+
+    private fun finishSearchRename(): Boolean {
+        val rename = searchRename ?: return false
+        searchRename = null
+        binding.search.hint = getString(R.string.bolt_search)
+        binding.search.imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        binding.search.setText(rename.query)
+        binding.search.setSelection(rename.query.length)
+        updateSearchVisibility()
+        return true
+    }
+
+    private fun dismissSearchEdit(): Boolean =
+        finishSearchRename() || adapter.closeSearchActions()
+
+    private fun saveAppLabel(app: AppModel, label: String) {
+        val identifier = when (app) {
+            is AppModel.PinnedShortcut -> app.identity
+            is AppModel.App -> app.appPackage
+            else -> return
+        }
+        prefs.setAppRenameLabel(identifier, label)
+        viewModel.getAppList()
+    }
+
+    private fun dismissSearchActionsOutside(x: Float, y: Float): Boolean {
+        val position = adapter.actionPosition
+        if (position == RecyclerView.NO_POSITION) return false
+        val results = binding.recyclerView
+        val location = IntArray(2)
+        results.getLocationOnScreen(location)
+        val localX = x - location[0]
+        val localY = y - location[1]
+        val tile = if (localX >= 0 && localX < results.width && localY >= 0 && localY < results.height)
+            results.findChildViewUnder(localX, localY) else null
+        val holder = tile?.let(results::getChildViewHolder)
+        if (holder?.absoluteAdapterPosition == position) return false
+        adapter.closeSearchActions()
+        // A tap on another app dismisses the strip before that app can be opened.
+        return holder?.bindingAdapter === adapter
+    }
+
+    private fun openPlayStore(app: AppModel) {
+        val uri = Uri.parse("market://details").buildUpon()
+            .appendQueryParameter("id", app.appPackage)
+            .build()
+        val intent = Intent(Intent.ACTION_VIEW, uri).setPackage("com.android.vending")
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            requireContext().showToast(getString(R.string.bolt_play_store_unavailable, app.appLabel))
+        } catch (_: SecurityException) {
+            requireContext().showToast(getString(R.string.bolt_play_store_unavailable, app.appLabel))
+        }
+    }
+
     fun collapseSearch(): Boolean {
         if (_binding == null || !expanded || !isHomePage) return false
         cancelAutoLaunch()
@@ -663,6 +754,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun resetHomeSearch(animateBackdrop: Boolean = false) {
         if (_binding == null || !isHomePage) return
         searchAppLaunch = null
+        dismissSearchEdit()
         expanded = false
         revealedContactShortcuts = false
         LauncherMotion.reset(binding.recyclerView)
@@ -697,6 +789,7 @@ class AppDrawerFragment : BaseFragment() {
             flag,
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
+                if (searchRename != null) return@AppDrawerAdapter
                 cancelAutoLaunch()
                 if (flag == Constants.FLAG_LAUNCH_APP && isHomePage && expanded && !thunderMode) {
                     val keyboardWasVisible = imeWasVisible
@@ -739,7 +832,13 @@ class AppDrawerFragment : BaseFragment() {
                             requireContext().showToast(getString(R.string.system_app_cannot_delete))
                             openAppInfo(requireContext(), appModel.user, appModel.appPackage)
                         } else {
-                            requireContext().uninstall(appModel.appPackage)
+                            try {
+                                requireContext().uninstall(appModel.appPackage)
+                            } catch (_: ActivityNotFoundException) {
+                                requireContext().showToast(getString(R.string.bolt_uninstall_unavailable))
+                            } catch (_: SecurityException) {
+                                requireContext().showToast(getString(R.string.bolt_uninstall_unavailable))
+                            }
                         }
                     }
                 }
@@ -774,15 +873,10 @@ class AppDrawerFragment : BaseFragment() {
                 viewModel.getAppList()
                 viewModel.getHiddenApps()
             },
-            appRenameListener = { appModel, renameLabel ->
-                val identifier = when (appModel) {
-                    is AppModel.PinnedShortcut -> appModel.identity
-                    is AppModel.App -> appModel.appPackage
-                    else -> return@AppDrawerAdapter
-                }
-                prefs.setAppRenameLabel(identifier, renameLabel)
-                viewModel.getAppList()
-            },
+            appRenameListener = ::saveAppLabel,
+            searchRenameListener = ::beginSearchRename,
+            canShowSearchActions = { expanded && !thunderMode && flag == Constants.FLAG_LAUNCH_APP },
+            appPlayStoreListener = ::openPlayStore,
             resultsChanged = ::onResultsChanged,
             privateSpaceToggleListener = { viewModel.togglePrivateSpaceLock() },
             privateSpaceSettingsListener = {
@@ -812,7 +906,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.recyclerView.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
             override fun onInterceptTouchEvent(rv: RecyclerView, event: android.view.MotionEvent): Boolean {
                 if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) cancelAutoLaunch()
-                return false
+                return searchRename != null
             }
         })
         if (requireContext().isEinkDisplay()) binding.recyclerView.overScrollMode = View.OVER_SCROLL_NEVER
@@ -919,6 +1013,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onPause() {
+        dismissSearchEdit()
         cancelAutoLaunch()
         super.onPause()
     }
@@ -931,6 +1026,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
+        searchRename = null
         searchAppLaunch = null
         cancelAutoLaunch()
         binding.search.onImeCommit = null

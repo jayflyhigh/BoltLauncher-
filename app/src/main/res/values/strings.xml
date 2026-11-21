@@ -182,4 +182,9 @@
     <string name="invalid_shortcut">Invalid shortcut</string>
     <string name="shortcut_not_found">Shortcut not found</string>
     <string name="unable_to_open_shortcut">Unable to open shortcut</string>
+    <string name="bolt_play_store">Play Store</string>
+    <string name="bolt_app_info">App info</string>
+    <string name="bolt_play_store_unavailable">Unable to open the Play Store listing for %1$s</string>
+    <string name="bolt_uninstall_unavailable">Uninstall is unavailable for this app</string>
+    <string name="bolt_new_app_name">New app name</string>
 </resources>

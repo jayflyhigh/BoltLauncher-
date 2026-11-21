@@ -1,6 +1,10 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
+import android.os.UserManager
 import android.content.pm.LauncherApps
 import android.os.UserHandle
 import android.graphics.drawable.Drawable
@@ -46,6 +50,9 @@ class AppDrawerAdapter(
     private val appDeleteListener: (AppModel) -> Unit,
     private val appHideListener: (AppModel, Int) -> Unit,
     private val appRenameListener: (AppModel, String) -> Unit,
+    private val canShowSearchActions: () -> Boolean = { false },
+    private val searchRenameListener: (AppModel) -> Unit = {},
+    private val appPlayStoreListener: (AppModel) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
     private val privateSpaceSettingsListener: () -> Unit = {},
@@ -111,6 +118,36 @@ class AppDrawerAdapter(
             value?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it, SEARCH_STYLE) }
         }
 
+    private var actionApp: AppModel? = null
+
+    val actionPosition: Int
+        get() = actionApp?.let(currentList::indexOf) ?: RecyclerView.NO_POSITION
+
+    fun closeSearchActions(): Boolean {
+        if (actionApp == null) return false
+        val position = actionPosition
+        actionApp = null
+        if (position != RecyclerView.NO_POSITION) notifyItemChanged(position, SEARCH_STYLE)
+        return true
+    }
+
+    private fun showSearchActions(app: AppModel): Boolean {
+        if (!canShowSearchActions()) return false
+        if (committedQuery == null || app !in currentList) return true
+        if (app != actionApp) {
+            closeSearchActions()
+            actionApp = app
+            notifyItemChanged(actionPosition, SEARCH_STYLE)
+        }
+        return true
+    }
+
+    private fun runSearchAction(app: AppModel, action: () -> Unit) {
+        if (app != actionApp || committedQuery == null || app !in currentList) return
+        closeSearchActions()
+        action()
+    }
+
     private fun getItem(position: Int) = displayedItems[position]
     override fun getItemCount() = displayedItems.size
     private var filterGeneration = 0L
@@ -161,6 +198,7 @@ class AppDrawerAdapter(
                 items to changes
             }
             if (generation != filterGeneration) return@launch
+            if (actionApp?.let { it !in items } == true) closeSearchActions()
             displayedItems = items
             committedQuery = query
             changes?.dispatchUpdatesTo(this@AppDrawerAdapter)
@@ -211,7 +249,9 @@ class AppDrawerAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
         if (holder is ViewHolder && payloads.isNotEmpty() && payloads.all { it == SEARCH_STYLE }) {
             val app = getItem(position)
-            holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), !thunderMode && app == enterHighlightedResult)
+            val highlighted = !thunderMode && app == enterHighlightedResult
+            holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), highlighted)
+            holder.bindSearchActions(app, app == actionApp, highlighted)
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -240,9 +280,14 @@ class AppDrawerAdapter(
                     appInfoListener,
                     appHideListener,
                     appRenameListener,
+                    ::showSearchActions,
+                    { action -> runSearchAction(appModel, action) },
+                    searchRenameListener,
+                    appPlayStoreListener,
                     iconScope,
                     iconCache,
-                    thunderMode, committedQuery.orEmpty(), !thunderMode && appModel == enterHighlightedResult
+                    thunderMode, committedQuery.orEmpty(), !thunderMode && appModel == enterHighlightedResult,
+                    appModel == actionApp
                 )
             }
         } catch (e: Exception) {
@@ -325,6 +370,34 @@ class AppDrawerAdapter(
                 }
             }
 
+        fun bindSearchActions(app: AppModel, show: Boolean, highlighted: Boolean) = with(binding) {
+            if (show) {
+                val color = if (highlighted) Color.BLACK else Color.WHITE
+                listOf(searchRename, searchPlayStore, searchAppInfo, searchUninstall)
+                    .forEach { it.setTextColor(color) }
+                if (!searchAppActions.isVisible) {
+                    val context = root.context
+                    searchUninstall.isVisible = app is AppModel.App &&
+                        app.user == android.os.Process.myUserHandle() &&
+                        !context.isSystemApp(app.appPackage, app.user) &&
+                        context.getSystemService(UserManager::class.java)
+                            ?.hasUserRestriction(UserManager.DISALLOW_UNINSTALL_APPS) == false &&
+                        Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.appPackage, null))
+                            .resolveActivity(context.packageManager) != null
+                    searchAppActions.isVisible = true
+                    LauncherMotion.reveal(searchAppActions)
+                }
+            } else if (searchAppActions.isVisible) {
+                LauncherMotion.reset(searchAppActions)
+                searchAppActions.isVisible = false
+            } else {
+                return@with
+            }
+            appTitle.isVisible = !show && !renameLayout.isVisible
+            appIcon.isVisible = !show && app.appPackage.isNotEmpty()
+            otherProfileIndicator.isVisible = !show && app.user != android.os.Process.myUserHandle()
+        }
+
         fun bind(
             flag: Int,
             appLabelGravity: Int,
@@ -335,11 +408,16 @@ class AppDrawerAdapter(
             appInfoListener: (AppModel) -> Unit,
             appHideListener: (AppModel, Int) -> Unit,
             appRenameListener: (AppModel, String) -> Unit,
+            showSearchActions: (AppModel) -> Boolean,
+            runSearchAction: (() -> Unit) -> Unit,
+            searchRenameListener: (AppModel) -> Unit,
+            appPlayStoreListener: (AppModel) -> Unit,
             iconScope: CoroutineScope,
             iconCache: LruCache<IconKey, Drawable.ConstantState>,
             thunderMode: Boolean,
             query: String,
             enterHighlighted: Boolean,
+            showInlineActions: Boolean,
         ) = with(binding) {
             bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
             appTitle.maxLines = 1
@@ -349,6 +427,8 @@ class AppDrawerAdapter(
             if (appHideLayout.isVisible) LauncherMotion.reset(appHideLayout)
             appHideLayout.visibility = View.GONE
             renameLayout.visibility = View.GONE
+            LauncherMotion.reset(searchAppActions)
+            searchAppActions.isVisible = false
             appTitle.visibility = View.VISIBLE
 
             cancelIconLoad()
@@ -382,7 +462,7 @@ class AppDrawerAdapter(
             appTitle.setOnClickListener { clickListener(appModel) }
             root.setOnClickListener { clickListener(appModel) }
             val showAppActions = View.OnLongClickListener {
-                if (appModel.appPackage.isNotEmpty()) {
+                if (appModel.appPackage.isNotEmpty() && !showSearchActions(appModel)) {
                     appDelete.alpha = when (
                         appModel is AppModel.PinnedShortcut || !root.context.isSystemApp(appModel.appPackage, appModel.user)
                     ) {
@@ -476,6 +556,11 @@ class AppDrawerAdapter(
                     renameLayout.visibility = View.GONE
                 }
             }
+            searchRename.setOnClickListener { runSearchAction { searchRenameListener(appModel) } }
+            searchPlayStore.setOnClickListener { runSearchAction { appPlayStoreListener(appModel) } }
+            searchAppInfo.setOnClickListener { runSearchAction { appInfoListener(appModel) } }
+            searchUninstall.setOnClickListener { runSearchAction { appDeleteListener(appModel) } }
+            bindSearchActions(appModel, showInlineActions, enterHighlighted)
             appInfo.setOnClickListener { appInfoListener(appModel) }
             appDelete.setOnClickListener { appDeleteListener(appModel) }
             appMenuClose.setOnClickListener {

@@ -641,7 +641,8 @@ class Prefs(context: Context) {
         if (appPackageSwipeRight == packageName) appActivityClassNameRight = activityClassName
     }
 
-    fun getAppRenameLabel(appPackage: String): String = prefs.getString(appPackage, "").toString()
+    fun getAppRenameLabel(appPackage: String, legacyKey: String? = null): String =
+        prefs.getString(appPackage, null) ?: legacyKey?.let { prefs.getString(it, "") }.orEmpty()
 
     fun setAppRenameLabel(appPackage: String, renameLabel: String) = prefs.edit { putString(appPackage, renameLabel) }
 }
