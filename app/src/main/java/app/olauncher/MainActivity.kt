@@ -354,7 +354,7 @@ class MainActivity : AppCompatActivity() {
             navController.popBackStack(R.id.mainFragment, false)
         val host = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
         (host?.childFragmentManager?.primaryNavigationFragment as? app.olauncher.ui.AppDrawerFragment)
-            ?.resetHomeSearch()
+            ?.resetHomeSearchUnlessReturningFromApp()
     }
 
     private fun setPlainWallpaper() {

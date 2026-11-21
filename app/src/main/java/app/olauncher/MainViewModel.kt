@@ -75,15 +75,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectedApp(appModel: AppModel, flag: Int) {
         if (appModel is AppModel.PrivateSpaceHeader) return
         when (flag) {
-            Constants.FLAG_LAUNCH_APP -> {
-                when (appModel) {
-                    is AppModel.PinnedShortcut -> launchShortcut(appModel)
-                    is AppModel.App ->
-                        launchApp(appModel.appPackage, appModel.activityClassName, appModel.user)
-
-                    else -> {}
-                }
-            }
+            Constants.FLAG_LAUNCH_APP -> launchAppResult(appModel)
 
             Constants.FLAG_HIDDEN_APPS -> {
                 if (appModel is AppModel.App) {
@@ -108,10 +100,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun launchShortcut(appModel: AppModel.PinnedShortcut) {
+    fun launchAppResult(appModel: AppModel): Boolean = when (appModel) {
+        is AppModel.PinnedShortcut -> launchShortcut(appModel)
+        is AppModel.App -> launchApp(appModel.appPackage, appModel.activityClassName, appModel.user)
+        else -> false
+    }
+
+    private fun launchShortcut(appModel: AppModel.PinnedShortcut): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
             appContext.showToast(appContext.getString(R.string.unable_to_open_shortcut))
-            return
+            return false
         }
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val query = LauncherApps.ShortcutQuery().apply {
@@ -123,11 +121,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ?.find { it.id == appModel.shortcutId }
             if (shortcut == null) {
                 appContext.showToast(appContext.getString(R.string.shortcut_not_found))
-                return
+                return false
             }
             launcher.startShortcut(shortcut, null, null)
+            return true
         } catch (_: Exception) {
             appContext.showToast(appContext.getString(R.string.unable_to_open_shortcut))
+            return false
         }
     }
 
@@ -371,13 +371,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateSwipeApps.postValue(Unit)
     }
 
-    private fun launchApp(packageName: String, activityClassName: String?, userHandle: UserHandle) {
+    private fun launchApp(packageName: String, activityClassName: String?, userHandle: UserHandle): Boolean {
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val activityInfo = try {
             launcher.getActivityList(packageName, userHandle)
         } catch (_: Exception) {
             appContext.showToast(appContext.getString(R.string.unable_to_open_app))
-            return
+            return false
         }
 
         val isActivityValid = activityClassName.isNullOrBlank().not()
@@ -389,7 +389,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             when (activityInfo.size) {
                 0 -> {
                     appContext.showToast(appContext.getString(R.string.app_not_found))
-                    return
+                    return false
                 }
 
                 1 -> ComponentName(packageName, activityInfo[0].name)
@@ -404,10 +404,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 launcher.startMainActivity(component, android.os.Process.myUserHandle(), null, null)
             } catch (e: Exception) {
                 appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+                return false
             }
         } catch (e: Exception) {
             appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+            return false
         }
+        return true
     }
 
     fun getAppList(includeHiddenApps: Boolean = false) {

@@ -107,8 +107,14 @@ class AppDrawerFragment : BaseFragment() {
     private var autoLaunch: Runnable? = null
     private var thunderEditAt: Long? = null
     private var imeWasVisible = false
+    private var searchAppLaunch: SearchAppLaunch? = null
+
+    private data class SearchAppLaunch(val at: Long, val keyboardWasVisible: Boolean) {
+        fun isRecent() = SystemClock.elapsedRealtime() - at <= SEARCH_RETURN_WINDOW_MS
+    }
 
     private companion object {
+        const val SEARCH_RETURN_WINDOW_MS = 5_000L
         const val THUNDER_QUIET_MS = 220L
         const val COMPOSITION_RECHECK_MS = 100L
     }
@@ -649,8 +655,14 @@ class AppDrawerFragment : BaseFragment() {
         return true
     }
 
-    fun resetHomeSearch(animateBackdrop: Boolean = false) {
+    fun resetHomeSearchUnlessReturningFromApp() {
+        // Home intents and background callbacks can both arrive before the fragment resumes.
+        if (searchAppLaunch?.isRecent() != true) resetHomeSearch()
+    }
+
+    private fun resetHomeSearch(animateBackdrop: Boolean = false) {
         if (_binding == null || !isHomePage) return
+        searchAppLaunch = null
         expanded = false
         revealedContactShortcuts = false
         LauncherMotion.reset(binding.recyclerView)
@@ -686,8 +698,15 @@ class AppDrawerFragment : BaseFragment() {
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
                 cancelAutoLaunch()
-                binding.search.hideKeyboard()
-                viewModel.selectedApp(appModel, flag)
+                if (flag == Constants.FLAG_LAUNCH_APP && isHomePage && expanded && !thunderMode) {
+                    val keyboardWasVisible = imeWasVisible
+                    if (!viewModel.launchAppResult(appModel)) return@AppDrawerAdapter
+                    searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
+                    binding.search.hideKeyboard()
+                } else {
+                    binding.search.hideKeyboard()
+                    viewModel.selectedApp(appModel, flag)
+                }
                 if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
                     findNavController().popBackStack(R.id.mainFragment, false)
                 else
@@ -875,6 +894,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onStart() {
         super.onStart()
+        if (searchAppLaunch?.isRecent() == false) resetHomeSearch()
         val controller = androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.root)
         controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (prefs.showStatusBar) controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
@@ -884,7 +904,18 @@ class AppDrawerFragment : BaseFragment() {
             else contactsAdapter.clearContacts()
         }
         binding.recyclerView.updateRowMotion(expanded)
-        if (expanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
+        if (expanded && searchAppLaunch == null) binding.search.showKeyboard(prefs.autoShowKeyboard)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val launch = searchAppLaunch ?: return
+        searchAppLaunch = null
+        if (!launch.isRecent()) {
+            resetHomeSearch()
+        } else if (launch.keyboardWasVisible && expanded && !thunderMode) {
+            binding.search.showKeyboard()
+        }
     }
 
     override fun onPause() {
@@ -895,11 +926,12 @@ class AppDrawerFragment : BaseFragment() {
     override fun onStop() {
         cancelAutoLaunch()
         stopLoadingContacts()
-        if (isHomePage) resetHomeSearch() else binding.search.hideKeyboard()
+        if (isHomePage) resetHomeSearchUnlessReturningFromApp() else binding.search.hideKeyboard()
         super.onStop()
     }
 
     override fun onDestroyView() {
+        searchAppLaunch = null
         cancelAutoLaunch()
         binding.search.onImeCommit = null
         stopLoadingContacts()
