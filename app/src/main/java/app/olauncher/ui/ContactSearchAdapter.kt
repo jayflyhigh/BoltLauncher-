@@ -1,7 +1,6 @@
 package app.olauncher.ui
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 import app.olauncher.R
@@ -119,7 +118,7 @@ class ContactSearchAdapter(
                         ensureActive()
                         return previous[old] == next[new]
                     }
-                }, false)
+                }, true)
                 next to diff
             }
             if (generation != filterGeneration || source !== contacts) return@launch
@@ -192,15 +191,15 @@ class ContactSearchAdapter(
         }
         fun bindHighlight(contact: Contact) {
             val highlighted = contact == enterHighlightedResult
-            val rowColor = if (highlighted) R.color.bolt_search_yellow else R.color.bolt_search_result
-            binding.root.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, rowColor))
             binding.root.isSelected = highlighted
             binding.appTitle.setTypeface(null, if (highlighted) Typeface.BOLD else Typeface.NORMAL)
-            binding.appTitle.setTextColor(if (highlighted) Color.BLACK else Color.WHITE)
-            binding.contactNumber.setTextColor(if (highlighted) 0xFF302B17.toInt() else 0xFFBDBDBD.toInt())
+            binding.appTitle.setTextColor(if (highlighted) Color.WHITE else
+                ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
         }
 
         fun bind(contact: Contact) {
+            binding.root.setTag(R.id.bolt_result_identity, contact.uri)
+            (binding.root.parent as? DockResultsView)?.rememberRow(binding.root, contact.uri)
             photoJob?.cancel()
             bindHighlight(contact)
             val number = contact.numbers.firstOrNull().orEmpty()

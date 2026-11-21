@@ -108,6 +108,7 @@ class AppDrawerFragment : BaseFragment() {
     private var thunderLaunchAnimation: ThunderLaunchAnimation? = null
     private var thunderLaunchAnimator: ValueAnimator? = null
     private var thunderEditAt: Long? = null
+    private var thunderCommitted = false
     private var imeWasVisible = false
     private data class SearchRename(val app: AppModel, val query: String)
     private var searchRename: SearchRename? = null
@@ -124,15 +125,17 @@ class AppDrawerFragment : BaseFragment() {
 
     private companion object {
         const val SEARCH_RETURN_WINDOW_MS = 5_000L
-        const val THUNDER_LIFT_MS = 190L
-        const val THUNDER_PREVIEW_MS = 165L
+        const val THUNDER_LIFT_MS = 120L
         const val THUNDER_QUIET_MS = 220L
         const val COMPOSITION_RECHECK_MS = 100L
     }
     private var backdropAnimator: ValueAnimator? = null
-    private val searchBackdrop = ColorDrawable(0xFF0D0D0D.toInt())
+    private val searchBackdrop = ColorDrawable(Color.BLACK)
     private var boltAnimator: ValueAnimator? = null
     private var boltProgress = 0f
+    private lateinit var dockBackground: android.graphics.drawable.GradientDrawable
+    private var dockIdleColor = 0
+    private var boltYellow = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -190,13 +193,6 @@ class AppDrawerFragment : BaseFragment() {
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
             if (imeWasVisible && !keyboardVisible) cancelAutoLaunch()
             imeWasVisible = keyboardVisible
-            // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
-            val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
-            val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
-            if (dockParams.bottomMargin != bottomMargin) {
-                dockParams.bottomMargin = bottomMargin
-                binding.dock.layoutParams = dockParams
-            }
             // Reserve the system area beneath the dock in both gesture and button navigation.
             // A hidden status bar still leaves the physical camera cutout unsafe.
             val safe = insets.getInsetsIgnoringVisibility(
@@ -291,6 +287,13 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initSearch() {
+        dockIdleColor = ContextCompat.getColor(requireContext(), R.color.bolt_search_dock)
+        boltYellow = ContextCompat.getColor(requireContext(), R.color.bolt_search_yellow)
+        dockBackground = (binding.dock.background.mutate() as android.graphics.drawable.GradientDrawable)
+        binding.dock.background = dockBackground
+        binding.search.filters = binding.search.filters + android.text.InputFilter { _, _, _, dest, start, end ->
+            if (thunderCommitted) dest.subSequence(start, end) else null
+        }
         binding.search.hint = when {
             flag == Constants.FLAG_HIDDEN_APPS -> getString(R.string.hidden_apps)
             flag != Constants.FLAG_LAUNCH_APP -> getString(R.string.bolt_select_app)
@@ -301,7 +304,9 @@ class AppDrawerFragment : BaseFragment() {
         if (!binding.dockBolt.isVisible) {
             binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = 0 }
         }
-        binding.dockBolt.setOnClickListener { openSearch(thunder = !thunderMode) }
+        binding.dockBolt.setOnClickListener {
+            if (!thunderCommitted) openSearch(thunder = !thunderMode)
+        }
         binding.contactCall.setOnClickListener { runContactAction(Intent.ACTION_DIAL, "tel") }
         binding.contactMessage.setOnClickListener { runContactAction(Intent.ACTION_SENDTO, "smsto") }
         binding.contactWhatsapp.setOnClickListener { runContactAction(Intent.ACTION_VIEW, "https") }
@@ -311,9 +316,9 @@ class AppDrawerFragment : BaseFragment() {
         applySearchColors()
         binding.search.onImeCommit = {
             // Let the IME finish its edit before checking the composing span.
-            autoLaunch?.let { task ->
+            autoLaunch?.takeUnless { thunderCommitted }?.let { task ->
                 val delay = thunderEditAt?.let {
-                    it + THUNDER_QUIET_MS - THUNDER_PREVIEW_MS - SystemClock.uptimeMillis()
+                    it + THUNDER_QUIET_MS - SystemClock.uptimeMillis()
                 }
                 if (delay != null) {
                     binding.root.removeCallbacks(task)
@@ -324,7 +329,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.renameConfirm.setOnClickListener { saveSearchRename() }
         binding.renameCancel.setOnClickListener { finishSearchRename() }
         binding.search.doAfterTextChanged { text ->
-            if (searchRename != null) return@doAfterTextChanged
+            if (searchRename != null || thunderCommitted) return@doAfterTextChanged
             adapter.closeSearchActions()
             cancelAutoLaunch()
             val query = text.toString()
@@ -437,15 +442,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun applySearchColors() {
-        val yellow = ContextCompat.getColor(requireContext(), R.color.bolt_search_yellow)
-        val foreground = if (thunderMode) Color.BLACK else Color.WHITE
-        binding.dock.setBackgroundResource(
-            if (thunderMode) R.drawable.bolt_search_active else R.drawable.bolt_search_idle
-        )
-        binding.search.setTextColor(foreground)
-        binding.search.setHintTextColor(if (thunderMode) 0xFF332A0D.toInt() else 0xFFBDBDBD.toInt())
         binding.search.setThunderCursor(thunderMode)
-        binding.dockBolt.imageTintList = ColorStateList.valueOf(if (thunderMode) Color.BLACK else yellow)
         binding.dockBolt.contentDescription = getString(
             if (thunderMode) R.string.bolt_disable_thunder else R.string.bolt_enable_thunder
         )
@@ -454,6 +451,15 @@ class AppDrawerFragment : BaseFragment() {
     private fun positionBolt(progress: Float) {
         boltProgress = progress
         val bolt = binding.dockBolt
+        val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, boltYellow, progress)
+        dockBackground.setColor(dockColor)
+        val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
+        binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
+        binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
+        bolt.imageTintList = ColorStateList.valueOf(
+            androidx.core.graphics.ColorUtils.blendARGB(boltYellow, Color.BLACK, progress)
+        )
+        updateBoltVisibility()
         if (flag != Constants.FLAG_LAUNCH_APP) return
         val travel = (binding.dock.width - bolt.width).coerceAtLeast(0)
         bolt.translationX = -travel * progress
@@ -571,7 +577,7 @@ class AppDrawerFragment : BaseFragment() {
             it.isEnabled = hasNumber
             it.alpha = if (hasNumber) 1f else 0.4f
         }
-        binding.dockBolt.isVisible = flag == Constants.FLAG_LAUNCH_APP && (!expanded || thunderMode)
+        updateBoltVisibility()
         val margin = when {
             searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2
             showShortcuts -> resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width) * 3 +
@@ -582,6 +588,16 @@ class AppDrawerFragment : BaseFragment() {
         if ((binding.search.layoutParams as FrameLayout.LayoutParams).marginEnd != margin) {
             binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = margin }
         }
+    }
+
+    private fun updateBoltVisibility() {
+        val available = flag == Constants.FLAG_LAUNCH_APP && (!expanded || thunderMode)
+        val bolt = binding.dockBolt
+        bolt.isVisible = available || (flag == Constants.FLAG_LAUNCH_APP && boltProgress > 0f)
+        bolt.isEnabled = available
+        bolt.importantForAccessibility = if (available) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+            else View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        bolt.alpha = if (available) 1f else (boltProgress * 3f).coerceAtMost(1f)
     }
 
     private fun runContactAction(action: String, scheme: String) {
@@ -640,6 +656,7 @@ class AppDrawerFragment : BaseFragment() {
         autoLaunch?.let { _binding?.root?.removeCallbacks(it) }
         autoLaunch = null
         thunderEditAt = null
+        thunderCommitted = false
         if (clearAnimation) clearThunderLaunchAnimation()
     }
 
@@ -652,27 +669,21 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun showThunderLaunchAnimation(app: AppModel) {
         val root = binding.root
-        if (!LauncherMotion.isEnabled(root.context)) return
         val animation = adapter.launchAnimation(binding.recyclerView, root, app) ?: return
         animation.setBounds(0, 0, root.width, root.height)
         root.overlay.add(animation)
         thunderLaunchAnimation = animation
+        if (!LauncherMotion.isEnabled(root.context)) return
         thunderLaunchAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = THUNDER_LIFT_MS
             interpolator = LauncherMotion.settle
-            addUpdateListener {
-                animation.progress = it.animatedValue as Float
-                if (it.animatedFraction >= 1f) {
-                    root.overlay.remove(animation)
-                    thunderLaunchAnimation = null
-                    thunderLaunchAnimator = null
-                }
-            }
+            addUpdateListener { animation.progress = it.animatedValue as Float }
             start()
         }
     }
 
     private fun scheduleAutoLaunch(query: String) {
+        if (thunderCommitted) return
         val editedAt = thunderEditAt ?: return
         autoLaunch?.let(binding.root::removeCallbacks)
         autoLaunch = null
@@ -683,8 +694,6 @@ class AppDrawerFragment : BaseFragment() {
         val committedAt = SystemClock.uptimeMillis()
         val launchDeadline = editedAt + THUNDER_QUIET_MS
         val task = object : Runnable {
-            private var previewDeadline: Long? = null
-
             override fun run() {
                 val view = _binding ?: return
                 if (!thunderMode || !expanded || adapter.committedQuery != query ||
@@ -694,34 +703,34 @@ class AppDrawerFragment : BaseFragment() {
                     cancelAutoLaunch()
                     return
                 }
-                val composing = view.search.text?.let { BaseInputConnection.getComposingSpanStart(it) >= 0 } == true
-                if (composing) {
-                    previewDeadline = null
-                    clearThunderLaunchAnimation()
-                    // Covers IMEs that remove composing spans through another input method.
-                    view.root.postDelayed(this, COMPOSITION_RECHECK_MS)
-                    return
-                }
-                val now = SystemClock.uptimeMillis()
-                if (previewDeadline == null) {
+                if (!thunderCommitted) {
+                    val composing = view.search.text?.let {
+                        BaseInputConnection.getComposingSpanStart(it) >= 0
+                    } == true
+                    if (composing) {
+                        // Covers IMEs that remove composing spans through another input method.
+                        view.root.postDelayed(this, COMPOSITION_RECHECK_MS)
+                        return
+                    }
+                    thunderCommitted = true
                     showThunderLaunchAnimation(result)
-                    previewDeadline = if (thunderLaunchAnimation != null) now + THUNDER_PREVIEW_MS else now
-                }
-                val readyAt = maxOf(launchDeadline, checkNotNull(previewDeadline))
-                if (now < readyAt) {
-                    view.root.postDelayed(this, readyAt - now)
-                    return
+                    if (thunderLaunchAnimator != null) {
+                        view.root.postDelayed(this, THUNDER_LIFT_MS)
+                        return
+                    }
                 }
                 val launchAt = SystemClock.uptimeMillis()
                 cancelAutoLaunch(clearAnimation = false)
-                if (adapter.launchOnlyResult() && BuildConfig.DEBUG) {
+                if (!adapter.launchOnlyResult()) {
+                    clearThunderLaunchAnimation()
+                } else if (BuildConfig.DEBUG) {
                     Log.d("BoltThunderTiming", "editToCommitMs=${committedAt - editedAt} " +
                         "commitToLaunchRequestMs=${launchAt - committedAt}")
                 }
             }
         }
         autoLaunch = task
-        binding.root.postDelayed(task, (launchDeadline - THUNDER_PREVIEW_MS - committedAt).coerceAtLeast(0L))
+        binding.root.postDelayed(task, (launchDeadline - committedAt).coerceAtLeast(0L))
     }
 
     private fun beginSearchRename(app: AppModel) {
@@ -852,7 +861,7 @@ class AppDrawerFragment : BaseFragment() {
             flag,
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
-                if (searchRename != null) return@AppDrawerAdapter
+                if (searchRename != null || thunderCommitted) return@AppDrawerAdapter
                 val animatingThunderLaunch = thunderLaunchAnimation != null
                 cancelAutoLaunch(clearAnimation = !animatingThunderLaunch)
                 if (flag == Constants.FLAG_LAUNCH_APP && isHomePage && expanded && !thunderMode) {
@@ -956,7 +965,7 @@ class AppDrawerFragment : BaseFragment() {
                                         state: RecyclerView.State) {
                 if (adapter.itemCount > 0 && parent.getChildAdapterPosition(view) == adapter.itemCount &&
                     contactsAdapter.itemCount > 0) {
-                    outRect.bottom = (4 * resources.displayMetrics.density).toInt()
+                    outRect.bottom = (8 * resources.displayMetrics.density).toInt()
                 }
             }
         })

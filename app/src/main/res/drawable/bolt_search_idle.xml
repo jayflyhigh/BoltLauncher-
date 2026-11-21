@@ -1,4 +1,4 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#242424" />
-    <corners android:radius="16dp" />
+    <solid android:color="@color/bolt_search_dock" />
+    <corners android:radius="@dimen/bolt_search_corner_radius" />
 </shape>
