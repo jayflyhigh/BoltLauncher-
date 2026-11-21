@@ -30,7 +30,6 @@ internal fun formatContactNumber(number: String): String {
 
 /** Contact rows share the app result layout and dock-key silhouette. */
 class ContactSearchAdapter(
-    private val open: (Contact) -> Unit,
     private val tap: (Contact) -> Unit,
     private val hold: (Contact) -> Unit,
 ) : RecyclerView.Adapter<ContactSearchAdapter.Holder>() {
@@ -41,7 +40,7 @@ class ContactSearchAdapter(
     var committedQuery: String? = null
         private set
     val selectedContact: Contact?
-        get() = contacts.firstOrNull { it.uri == selectedUri }
+        get() = results.firstOrNull { it.uri == selectedUri }
 
     val firstResult: Contact? get() = results.firstOrNull()
 
@@ -50,22 +49,16 @@ class ContactSearchAdapter(
             if (field == value) return
             val previous = field
             field = value
-            previous?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
-            value?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+            previous?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it, HIGHLIGHT) }
+            value?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it, HIGHLIGHT) }
         }
 
-    fun toggleSelection(contact: Contact) {
-        val previous = selectedUri
-        selectedUri = if (previous == contact.uri) null else contact.uri
-        results.forEachIndexed { index, result ->
-            if (result.uri == previous || result.uri == selectedUri) notifyItemChanged(index, SELECTION)
-        }
+    fun select(contact: Contact) {
+        selectedUri = contact.uri
     }
 
     fun clearSelection() {
-        val previous = selectedUri ?: return
         selectedUri = null
-        results.indexOfFirst { it.uri == previous }.takeIf { it >= 0 }?.let { notifyItemChanged(it, SELECTION) }
     }
 
     fun clearResults() {
@@ -139,15 +132,14 @@ class ContactSearchAdapter(
         }
     }
 
-    fun openFirst() { firstResult?.let(open) }
     override fun getItemCount() = results.size
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         Holder(AdapterAppDrawerBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(results[position])
     override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
-        if (payloads.isNotEmpty() && payloads.all { it == SELECTION }) {
-            holder.bindSelection(results[position])
+        if (payloads.isNotEmpty() && payloads.all { it == HIGHLIGHT }) {
+            holder.bindHighlight(results[position])
         } else super.onBindViewHolder(holder, position, payloads)
     }
 
@@ -198,27 +190,23 @@ class ContactSearchAdapter(
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
-        fun bindSelection(contact: Contact) {
-            binding.root.isSelected = contact.uri == selectedUri
-            binding.root.foreground = if (binding.root.isSelected) GradientDrawable().apply {
-                setColor(Color.TRANSPARENT)
-                cornerRadius = 14f * binding.root.resources.displayMetrics.density
-                setStroke((2f * binding.root.resources.displayMetrics.density).toInt().coerceAtLeast(1), Color.rgb(255, 214, 0))
-            } else null
-        }
-        fun bind(contact: Contact) {
-            photoJob?.cancel()
-            bindSelection(contact)
-            val number = contact.numbers.firstOrNull().orEmpty()
-            binding.contactNumber.text = formatContactNumber(number)
-            binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
+        fun bindHighlight(contact: Contact) {
             val highlighted = contact == enterHighlightedResult
             val rowColor = if (highlighted) R.color.bolt_search_yellow else R.color.bolt_search_result
             binding.root.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(binding.root.context, rowColor))
-            binding.appTitle.text = contact.name
+            binding.root.isSelected = highlighted
             binding.appTitle.setTypeface(null, if (highlighted) Typeface.BOLD else Typeface.NORMAL)
             binding.appTitle.setTextColor(if (highlighted) Color.BLACK else Color.WHITE)
             binding.contactNumber.setTextColor(if (highlighted) 0xFF302B17.toInt() else 0xFFBDBDBD.toInt())
+        }
+
+        fun bind(contact: Contact) {
+            photoJob?.cancel()
+            bindHighlight(contact)
+            val number = contact.numbers.firstOrNull().orEmpty()
+            binding.contactNumber.text = formatContactNumber(number)
+            binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
+            binding.appTitle.text = contact.name
             binding.otherProfileIndicator.visibility = View.GONE
             binding.appHideLayout.visibility = View.GONE
             binding.renameLayout.visibility = View.GONE
@@ -269,7 +257,7 @@ class ContactSearchAdapter(
     }
 
     companion object {
-        private const val SELECTION = "contact_selection"
+        private const val HIGHLIGHT = "contact_selection"
         suspend fun load(context: Context): app.olauncher.helper.ContactLoadResult<Contact> =
             withContext(Dispatchers.IO) { app.olauncher.helper.readContactsSafely {
             val cancellation = currentCoroutineContext()

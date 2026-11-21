@@ -99,6 +99,8 @@ class AppDrawerFragment : BaseFragment() {
     private var thunderMode = false
     private var revealedContactShortcuts = false
     private var resultsQuery: String? = null
+    private var decoratedContact: Pair<Int, Uri>? = null
+    private var highlightedContactQuery: String? = null
     private var autoLaunch: Runnable? = null
     private var backdropAnimator: ValueAnimator? = null
     private val searchBackdrop = ColorDrawable(0xFF0D0D0D.toInt())
@@ -125,6 +127,7 @@ class AppDrawerFragment : BaseFragment() {
         revealedContactShortcuts = false
         boltProgress = 0f
         resultsQuery = null
+        decoratedContact = null
         initAdapter()
         initSearch()
         initObservers()
@@ -274,19 +277,21 @@ class AppDrawerFragment : BaseFragment() {
             cancelAutoLaunch()
             val query = text.toString()
             binding.appRename.isVisible = canRename && query.isNotBlank()
+            highlightedContactQuery = null
+            contactsAdapter.clearSelection()
             adapter.filterApps(query)
-            updateContactHighlight(query)
             filterContacts(query)
         }
         binding.search.setOnEditorActionListener { _, actionId, event ->
             val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER ||
                 event?.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
             if (actionId != EditorInfo.IME_ACTION_GO && !enter) return@setOnEditorActionListener false
-            if (event?.action != KeyEvent.ACTION_DOWN && !thunderMode &&
-                adapter.committedQuery == binding.search.text.toString()) {
+            if (event?.action != KeyEvent.ACTION_DOWN && !thunderMode) {
                 val query = binding.search.text.toString()
-                if (adapter.firstLaunchableResult != null) adapter.launchFirstInList()
-                else if (contactsAdapter.committedQuery == query) contactsAdapter.openFirst()
+                val highlightedContact = contactsAdapter.enterHighlightedResult
+                    ?.takeIf { highlightedContactQuery == query && contactsAdapter.committedQuery == query }
+                if (highlightedContact != null) openContact(highlightedContact)
+                else if (adapter.committedQuery == query) adapter.launchFirstInList()
             }
             true
         }
@@ -398,15 +403,13 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun onResultsChanged(query: String) {
         if (_binding == null || query != binding.search.text.toString()) return
-        binding.recyclerView.invalidateItemDecorations()
+        updateContactDecoration()
         val bottomAnchored = thunderMode || query.isNotBlank()
         val directionChanged = layoutManager.reverseLayout != bottomAnchored
         layoutManager.reverseLayout = bottomAnchored
         if (resultsQuery != query || directionChanged) layoutManager.scrollToPositionWithOffset(0, 0)
         resultsQuery = query
-        adapter.enterHighlightedResult = if (flag == Constants.FLAG_LAUNCH_APP && !thunderMode && query.isNotBlank())
-            adapter.firstLaunchableResult else null
-        updateContactHighlight(query)
+        updateResultHighlight(query)
         scheduleAutoLaunch(query)
     }
 
@@ -429,7 +432,10 @@ class AppDrawerFragment : BaseFragment() {
                     contactsAdapter.contacts = result.contacts
                     filterContacts(binding.search.text.toString())
                 }
-                ContactLoadResult.PermissionDenied -> contactsAdapter.clearContacts()
+                ContactLoadResult.PermissionDenied -> {
+                    contactsAdapter.clearContacts()
+                    updateResultHighlight(binding.search.text.toString())
+                }
                 is ContactLoadResult.Failure -> Unit
             }
         }
@@ -438,23 +444,49 @@ class AppDrawerFragment : BaseFragment() {
     private fun filterContacts(query: String) {
         if (!expanded || thunderMode || flag != Constants.FLAG_LAUNCH_APP || query.isBlank()) {
             contactsAdapter.clearResults()
+            updateContactDecoration()
             updateDockButtons()
             return
         }
         contactsAdapter.filter(query, showAll = false) {
-            binding.recyclerView.invalidateItemDecorations()
-            updateContactHighlight(query)
-            if (contactsAdapter.enterHighlightedResult != null) {
+            updateContactDecoration()
+            updateResultHighlight(query)
+            if (highlightedContactQuery == query && contactsAdapter.selectedContact == null &&
+                contactsAdapter.enterHighlightedResult != null) {
                 layoutManager.scrollToPositionWithOffset(0, 0)
             }
         }
         loadContactsIfAllowed()
     }
 
-    private fun updateContactHighlight(query: String) {
-        contactsAdapter.enterHighlightedResult = if (expanded && !thunderMode && query.isNotBlank() &&
-            adapter.committedQuery == query && adapter.firstLaunchableResult == null &&
-            contactsAdapter.committedQuery == query) contactsAdapter.firstResult else null
+    private fun updateContactDecoration() {
+        val boundary = contactsAdapter.firstResult?.takeIf { adapter.itemCount > 0 }
+            ?.let { adapter.itemCount to it.uri }
+        if (boundary == decoratedContact) return
+        decoratedContact = boundary
+        binding.recyclerView.invalidateItemDecorations()
+    }
+
+    private fun selectContact(contact: ContactSearchAdapter.Contact) {
+        val query = binding.search.text.toString()
+        if (!expanded || thunderMode || contactsAdapter.committedQuery != query) return
+        contactsAdapter.select(contact)
+        updateResultHighlight(query)
+    }
+
+    private fun updateResultHighlight(query: String) {
+        val showHighlight = expanded && !thunderMode && flag == Constants.FLAG_LAUNCH_APP && query.isNotBlank()
+        val appsReady = showHighlight && adapter.committedQuery == query
+        val contactsReady = showHighlight && contactsAdapter.committedQuery == query
+        val selected = if (contactsReady) contactsAdapter.selectedContact else null
+        if (showHighlight && selected == null && !appsReady) return
+        val app = if (appsReady && selected == null) adapter.firstLaunchableResult else null
+        if (showHighlight && selected == null && app == null && !contactsReady &&
+            contactsLoaded && hasContactsPermission()) return
+        adapter.enterHighlightedResult = app
+        contactsAdapter.enterHighlightedResult = selected ?: if (contactsReady && appsReady && app == null)
+            contactsAdapter.firstResult else null
+        highlightedContactQuery = query.takeIf { contactsAdapter.enterHighlightedResult != null }
         updateDockButtons()
     }
 
@@ -489,6 +521,8 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun runContactAction(action: String, scheme: String) {
+        val query = binding.search.text.toString()
+        if (highlightedContactQuery != query || contactsAdapter.committedQuery != query) return
         val contact = contactsAdapter.enterHighlightedResult ?: return
         fun launch(number: String) {
             val intent = if (scheme == "https") {
@@ -524,6 +558,7 @@ class AppDrawerFragment : BaseFragment() {
             requireContext().showToast(getString(R.string.bolt_contacts_app_unavailable))
         } catch (_: SecurityException) {
             contactsAdapter.clearContacts()
+            updateResultHighlight(binding.search.text.toString())
         }
     }
 
@@ -704,7 +739,7 @@ class AppDrawerFragment : BaseFragment() {
         )
         layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
-        contactsAdapter = ContactSearchAdapter(open = ::openContact, tap = ::openContact, hold = ::openContact)
+        contactsAdapter = ContactSearchAdapter(tap = ::selectContact, hold = ::openContact)
         binding.recyclerView.adapter = ConcatAdapter(adapter, contactsAdapter)
         binding.recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
             override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView,
