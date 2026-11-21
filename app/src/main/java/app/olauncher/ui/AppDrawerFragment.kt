@@ -19,6 +19,8 @@ import java.util.Locale
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
+import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -40,6 +42,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import app.olauncher.BuildConfig
 import app.olauncher.MainViewModel
 import app.olauncher.R
 import app.olauncher.data.AppModel
@@ -102,6 +105,13 @@ class AppDrawerFragment : BaseFragment() {
     private var decoratedContact: Pair<Int, Uri>? = null
     private var highlightedContactQuery: String? = null
     private var autoLaunch: Runnable? = null
+    private var thunderEditAt: Long? = null
+    private var imeWasVisible = false
+
+    private companion object {
+        const val THUNDER_QUIET_MS = 220L
+        const val COMPOSITION_RECHECK_MS = 100L
+    }
     private var backdropAnimator: ValueAnimator? = null
     private val searchBackdrop = ColorDrawable(0xFF0D0D0D.toInt())
     private var boltAnimator: ValueAnimator? = null
@@ -147,6 +157,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun applyDockInsets() {
         val root = binding.root
         val initialLeft = root.paddingLeft
+        imeWasVisible = false
         val initialTop = root.paddingTop
         val initialRight = root.paddingRight
         val initialBottom = root.paddingBottom
@@ -154,6 +165,8 @@ class AppDrawerFragment : BaseFragment() {
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
             val keyboard = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
             val keyboardVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            if (imeWasVisible && !keyboardVisible) cancelAutoLaunch()
+            imeWasVisible = keyboardVisible
             // Keep a compact 2dp gap while typing, and the usual 12dp above navigation.
             val dockParams = binding.dock.layoutParams as android.view.ViewGroup.MarginLayoutParams
             val bottomMargin = ((if (keyboardVisible) 2 else 12) * resources.displayMetrics.density).toInt()
@@ -273,9 +286,20 @@ class AppDrawerFragment : BaseFragment() {
             positionBolt(boltProgress)
         }
         applySearchColors()
+        binding.search.onImeCommit = {
+            // Let the IME finish its edit before checking the composing span.
+            autoLaunch?.let { task ->
+                val delay = thunderEditAt?.let { it + THUNDER_QUIET_MS - SystemClock.uptimeMillis() }
+                if (delay != null) {
+                    binding.root.removeCallbacks(task)
+                    binding.root.postDelayed(task, delay.coerceAtLeast(0L))
+                }
+            }
+        }
         binding.search.doAfterTextChanged { text ->
             cancelAutoLaunch()
             val query = text.toString()
+            if (thunderMode && expanded && query.isNotBlank()) thunderEditAt = SystemClock.uptimeMillis()
             binding.appRename.isVisible = canRename && query.isNotBlank()
             highlightedContactQuery = null
             contactsAdapter.clearSelection()
@@ -575,31 +599,41 @@ class AppDrawerFragment : BaseFragment() {
     private fun cancelAutoLaunch() {
         autoLaunch?.let { _binding?.root?.removeCallbacks(it) }
         autoLaunch = null
+        thunderEditAt = null
     }
 
     private fun scheduleAutoLaunch(query: String) {
-        cancelAutoLaunch()
-        if (!thunderMode || !expanded || query.isBlank() || adapter.itemCount != 1) return
+        val editedAt = thunderEditAt ?: return
+        autoLaunch?.let(binding.root::removeCallbacks)
+        autoLaunch = null
+        if (!thunderMode || !expanded || query.isBlank() || adapter.itemCount != 1 ||
+            adapter.firstLaunchableResult == null) return
+        val committedAt = SystemClock.uptimeMillis()
         val task = object : Runnable {
             override fun run() {
                 val view = _binding ?: return
                 if (!thunderMode || !expanded || adapter.committedQuery != query ||
-                    view.search.text.toString() != query ||
-                    !viewLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                    autoLaunch = null
+                    view.search.text.toString() != query || !view.root.hasWindowFocus() ||
+                    viewLifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
+                    cancelAutoLaunch()
                     return
                 }
-                val composing = view.search.text?.let { BaseInputConnection.getComposingSpanStart(it) >= 0 }
-                if (composing == true) {
-                    view.root.postDelayed(this, 150)
+                val composing = view.search.text?.let { BaseInputConnection.getComposingSpanStart(it) >= 0 } == true
+                if (composing) {
+                    // Covers IMEs that remove composing spans through another input method.
+                    view.root.postDelayed(this, COMPOSITION_RECHECK_MS)
                     return
                 }
-                autoLaunch = null
-                adapter.launchOnlyResult()
+                val launchAt = SystemClock.uptimeMillis()
+                cancelAutoLaunch()
+                if (adapter.launchOnlyResult() && BuildConfig.DEBUG) {
+                    Log.d("BoltThunderTiming", "editToCommitMs=${committedAt - editedAt} " +
+                        "commitToLaunchRequestMs=${launchAt - committedAt}")
+                }
             }
         }
         autoLaunch = task
-        binding.root.postDelayed(task, 350)
+        binding.root.postDelayed(task, (editedAt + THUNDER_QUIET_MS - committedAt).coerceAtLeast(0L))
     }
 
     fun collapseSearch(): Boolean {
@@ -853,6 +887,11 @@ class AppDrawerFragment : BaseFragment() {
         if (expanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
     }
 
+    override fun onPause() {
+        cancelAutoLaunch()
+        super.onPause()
+    }
+
     override fun onStop() {
         cancelAutoLaunch()
         stopLoadingContacts()
@@ -862,6 +901,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onDestroyView() {
         cancelAutoLaunch()
+        binding.search.onImeCommit = null
         stopLoadingContacts()
         boltAnimator?.cancel()
         boltAnimator = null
