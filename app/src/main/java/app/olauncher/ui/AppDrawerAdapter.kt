@@ -54,6 +54,7 @@ class AppDrawerAdapter(
     companion object {
         const val VIEW_TYPE_APP = 0
         const val VIEW_TYPE_PRIVATE_HEADER = 1
+        private const val SEARCH_STYLE = "search_style"
 
         val DIFF_CALLBACK = object : DiffUtil.ItemCallback<AppModel>() {
             override fun areItemsTheSame(oldItem: AppModel, newItem: AppModel): Boolean = when {
@@ -106,23 +107,46 @@ class AppDrawerAdapter(
             if (field == value) return
             val previous = field
             field = value
-            previous?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
-            value?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it) }
+            previous?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it, SEARCH_STYLE) }
+            value?.let { currentList.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it, SEARCH_STYLE) }
         }
 
     private fun getItem(position: Int) = displayedItems[position]
     override fun getItemCount() = displayedItems.size
-    private var diffJob: Job? = null
-    private var diffGeneration = 0L
+    private var filterGeneration = 0L
+    private var filterJob: Job? = null
 
-    /** Unlike AsyncListDiffer's queue, obsolete diffs stop consuming worker time. */
-    private fun submitList(items: List<AppModel>, committed: () -> Unit) {
-        diffJob?.cancel()
-        val generation = ++diffGeneration
+    /** Invalidate work even when a mode change keeps exactly the same query. */
+    fun cancelFiltering() {
+        filterGeneration++
+        filterJob?.cancel()
+        committedQuery = null
+    }
+
+    fun filterApps(query: String) {
+        cancelFiltering()
+        val generation = filterGeneration
+        val thunder = thunderMode
+        val trimmed = query.trim()
+        requestedQuery = query
+        val apps = appsList
+        val labels = normalizedLabels
         val previous = displayedItems
-        diffJob = iconScope.launch {
-            val changes = withContext(Dispatchers.Default) {
-                if (previous == items) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+        filterJob = iconScope.launch {
+            val (items, changes) = withContext(Dispatchers.Default) {
+                val items = if (trimmed.isEmpty()) apps else {
+                    val matches: (String, String) -> Boolean = if (thunder)
+                        ThunderAppLabelMatcher(trimmed)::matches else AppLabelMatcher(trimmed)::matches
+                    apps.asSequence().filter { app ->
+                        ensureActive()
+                        app !is AppModel.PrivateSpaceHeader &&
+                            matches(app.appLabel, labels.getValue(app.appLabel))
+                    }.map { app ->
+                        app to appSearchRank(app.appLabel, trimmed)
+                    }.sortedWith(compareBy<Pair<AppModel, Int>> { it.second }
+                        .thenBy { it.first }).map { it.first }.toList()
+                }
+                val changes = if (previous == items) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                     override fun getOldListSize(): Int { ensureActive(); return previous.size }
                     override fun getNewListSize(): Int { ensureActive(); return items.size }
                     override fun areItemsTheSame(old: Int, new: Int): Boolean {
@@ -134,70 +158,28 @@ class AppDrawerAdapter(
                         return DIFF_CALLBACK.areContentsTheSame(previous[old], items[new])
                     }
                 }, false)
-            }
-            if (generation != diffGeneration) return@launch
-            displayedItems = items
-            changes?.dispatchUpdatesTo(this@AppDrawerAdapter)
-            committed()
-        }
-    }
-
-    private var filterGeneration = 0L
-    private var filterJob: Job? = null
-
-    /** Invalidate work even when a mode change keeps exactly the same query. */
-    fun cancelFiltering() {
-        filterGeneration++
-        filterJob?.cancel()
-        diffJob?.cancel()
-        diffGeneration++
-        committedQuery = null
-    }
-
-    fun filterApps(query: String) {
-        cancelFiltering()
-        val generation = filterGeneration
-        val thunder = thunderMode
-        val trimmed = query.trim()
-        requestedQuery = query
-        val apps = appsList.toList()
-        val labels = normalizedLabels
-        filterJob = iconScope.launch {
-            val items = withContext(Dispatchers.Default) {
-                if (trimmed.isEmpty()) return@withContext apps
-                val matcher = AppLabelMatcher(trimmed)
-                val thunderMatcher = ThunderAppLabelMatcher(trimmed)
-                apps.filter { app ->
-                    ensureActive()
-                    val label = labels[app.appLabel] ?: app.appLabel.normalizeForSearch()
-                    app !is AppModel.PrivateSpaceHeader &&
-                        (if (thunder) thunderMatcher.matches(app.appLabel, label)
-                        else matcher.matches(app.appLabel, label))
-                }.map { app ->
-                    ensureActive()
-                    app to appSearchRank(app.appLabel, trimmed)
-                }.sortedWith(compareBy<Pair<AppModel, Int>> { it.second }.thenBy { it.first })
-                    .map { it.first }
+                items to changes
             }
             if (generation != filterGeneration) return@launch
-            submitList(items) {
-                committedQuery = query
-                if (thunder) notifyItemRangeChanged(0, itemCount)
-                resultsChanged(query)
-            }
+            displayedItems = items
+            committedQuery = query
+            changes?.dispatchUpdatesTo(this@AppDrawerAdapter)
+            if (thunder) notifyItemRangeChanged(0, itemCount, SEARCH_STYLE)
+            resultsChanged(query)
         }
     }
 
     fun setThunderMode(enabled: Boolean) {
         if (thunderMode == enabled) return
         thunderMode = enabled
-        notifyItemRangeChanged(0, itemCount)
+        notifyItemRangeChanged(0, itemCount, SEARCH_STYLE)
     }
 
     private val myUserHandle = android.os.Process.myUserHandle()
 
     private var normalizedLabels: Map<String, String> = emptyMap()
-    var appsList: MutableList<AppModel> = mutableListOf()
+    var appsList: List<AppModel> = emptyList()
+        private set
 
     override fun getItemViewType(position: Int): Int {
         return when (getItem(position)) {
@@ -223,6 +205,15 @@ class AppDrawerAdapter(
                     false
                 )
             )
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (holder is ViewHolder && payloads.isNotEmpty() && payloads.all { it == SEARCH_STYLE }) {
+            val app = getItem(position)
+            holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), !thunderMode && app == enterHighlightedResult)
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
         }
     }
 
@@ -268,7 +259,7 @@ class AppDrawerAdapter(
 
     fun setAppList(appsList: MutableList<AppModel>) {
         iconCache.evictAll()
-        this.appsList = appsList.toMutableList()
+        this.appsList = appsList.toList()
         normalizedLabels = appsList.associate { it.appLabel to it.appLabel.normalizeForSearch() }
         filterApps(requestedQuery)
     }
@@ -310,6 +301,30 @@ class AppDrawerAdapter(
             iconJob = null
         }
 
+        fun bindSearchStyle(appModel: AppModel, thunderMode: Boolean, query: String, enterHighlighted: Boolean) =
+            with(binding) {
+                val rowColor = if (enterHighlighted) R.color.bolt_search_yellow else R.color.bolt_search_result
+                root.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    androidx.core.content.ContextCompat.getColor(root.context, rowColor)
+                )
+                appTitle.setTextColor(if (enterHighlighted) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                appTitle.setTypeface(null, if (enterHighlighted) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                // Show indicators in title based on app type and state
+                appTitle.text = buildString {
+                    append(appModel.appLabel)
+                    if (appModel.isNew) append(" ✦")
+                }
+                if (thunderMode && !enterHighlighted && query.isNotBlank()) {
+                    val yellow = androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_yellow)
+                    appTitle.text = android.text.SpannableString(appTitle.text).apply {
+                        thunderMatchRanges(appModel.appLabel, query).forEach { range ->
+                            setSpan(android.text.style.ForegroundColorSpan(yellow), range.first, range.last + 1,
+                                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        }
+                    }
+                }
+            }
+
         fun bind(
             flag: Int,
             appLabelGravity: Int,
@@ -326,12 +341,7 @@ class AppDrawerAdapter(
             query: String,
             enterHighlighted: Boolean,
         ) = with(binding) {
-            val rowColor = if (enterHighlighted) R.color.bolt_search_yellow else R.color.bolt_search_result
-            root.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                androidx.core.content.ContextCompat.getColor(root.context, rowColor)
-            )
-            appTitle.setTextColor(if (enterHighlighted) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-            appTitle.setTypeface(null, if (enterHighlighted) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+            bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
             appTitle.maxLines = 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
             appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
@@ -366,20 +376,6 @@ class AppDrawerAdapter(
                 }
             }
             appIcon.setOnClickListener { clickListener(appModel) }
-            // Show indicators in title based on app type and state
-            appTitle.text = buildString {
-                append(appModel.appLabel)
-                if (appModel.isNew) append(" ✦")
-            }
-            if (thunderMode && !enterHighlighted && query.isNotBlank()) {
-                val yellow = androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_yellow)
-                appTitle.text = android.text.SpannableString(appTitle.text).apply {
-                    thunderMatchRanges(appModel.appLabel, query).forEach { range ->
-                        setSpan(android.text.style.ForegroundColorSpan(yellow), range.first, range.last + 1,
-                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                    }
-                }
-            }
             appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             otherProfileIndicator.isVisible = appModel.user != myUserHandle
 
