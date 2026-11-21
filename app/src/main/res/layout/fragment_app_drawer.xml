@@ -70,5 +70,45 @@
             android:scaleType="center"
             app:srcCompat="@drawable/bolt_search_lightning"
             app:tint="@color/bolt_search_yellow" />
+        <LinearLayout
+            android:id="@+id/contactShortcuts"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:gravity="center_vertical"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="@dimen/bolt_contact_action_divider_width"
+                android:layout_height="24dp"
+                android:background="#666666" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/contactCall"
+                android:layout_width="@dimen/bolt_contact_action_width"
+                android:layout_height="match_parent"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/bolt_action_call"
+                android:scaleType="center"
+                app:srcCompat="@drawable/contact_call" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/contactMessage"
+                android:layout_width="@dimen/bolt_contact_action_width"
+                android:layout_height="match_parent"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/bolt_action_message"
+                android:scaleType="center"
+                app:srcCompat="@drawable/contact_message" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/contactWhatsapp"
+                android:layout_width="@dimen/bolt_contact_action_width"
+                android:layout_height="match_parent"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/bolt_action_whatsapp"
+                android:scaleType="center"
+                app:srcCompat="@drawable/contact_whatsapp" />
+        </LinearLayout>
     </FrameLayout>
 </app.olauncher.ui.SearchGestureLayout>

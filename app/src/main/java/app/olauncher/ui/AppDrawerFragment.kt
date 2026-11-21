@@ -1,8 +1,20 @@
 package app.olauncher.ui
 
+import android.Manifest
 import android.animation.ValueAnimator
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.ContactsContract
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
+import android.net.Uri
+import android.telephony.PhoneNumberUtils
+import java.util.Locale
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
@@ -18,7 +30,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.ConcatAdapter
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -29,6 +46,7 @@ import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
 import app.olauncher.databinding.FragmentAppDrawerBinding
+import app.olauncher.helper.ContactLoadResult
 import app.olauncher.helper.deletePinnedShortcut
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isSystemAnimationsDisabled
@@ -47,6 +65,26 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var prefs: Prefs
     private lateinit var adapter: AppDrawerAdapter
     private lateinit var layoutManager: LinearLayoutManager
+    private lateinit var contactsAdapter: ContactSearchAdapter
+    private var contactsLoad: Job? = null
+    private var contactsLoaded = false
+    private var observingContacts = false
+    private var askedForContacts = false
+    private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            contactsLoaded = false
+            contactsLoad?.cancel()
+            contactsLoad = null
+            loadContactsIfAllowed()
+        }
+    }
+    private val requestContacts = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (_binding != null && expanded && !thunderMode) {
+            if (it) loadContactsIfAllowed()
+            binding.search.showKeyboard()
+        }
+    }
+
 
     private val isHomePage: Boolean
         get() = findNavController().currentDestination?.id == R.id.mainFragment
@@ -221,6 +259,9 @@ class AppDrawerFragment : BaseFragment() {
             binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = 0 }
         }
         binding.dockBolt.setOnClickListener { openSearch(thunder = !thunderMode) }
+        binding.contactCall.setOnClickListener { runContactAction(Intent.ACTION_DIAL, "tel") }
+        binding.contactMessage.setOnClickListener { runContactAction(Intent.ACTION_SENDTO, "smsto") }
+        binding.contactWhatsapp.setOnClickListener { runContactAction(Intent.ACTION_VIEW, "https") }
         binding.dock.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             positionBolt(boltProgress)
         }
@@ -230,6 +271,8 @@ class AppDrawerFragment : BaseFragment() {
             val query = text.toString()
             binding.appRename.isVisible = canRename && query.isNotBlank()
             adapter.filterApps(query)
+            updateContactHighlight(query)
+            filterContacts(query)
         }
         binding.search.setOnEditorActionListener { _, actionId, event ->
             val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER ||
@@ -237,7 +280,9 @@ class AppDrawerFragment : BaseFragment() {
             if (actionId != EditorInfo.IME_ACTION_GO && !enter) return@setOnEditorActionListener false
             if (event?.action != KeyEvent.ACTION_DOWN && !thunderMode &&
                 adapter.committedQuery == binding.search.text.toString()) {
-                adapter.launchFirstInList()
+                val query = binding.search.text.toString()
+                if (adapter.firstLaunchableResult != null) adapter.launchFirstInList()
+                else if (contactsAdapter.committedQuery == query) contactsAdapter.openFirst()
             }
             true
         }
@@ -247,6 +292,13 @@ class AppDrawerFragment : BaseFragment() {
         expanded = true
         updateSearchVisibility()
         setThunderMode(thunder)
+        if (!thunder && flag == Constants.FLAG_LAUNCH_APP && !hasContactsPermission() && !askedForContacts) {
+            askedForContacts = true
+            requestContacts.launch(Manifest.permission.READ_CONTACTS)
+            binding.search.requestFocus()
+            return
+        }
+        if (!thunder) loadContactsIfAllowed()
         val imeVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
             ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
         if (!imeVisible) binding.search.showKeyboard()
@@ -257,12 +309,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.isVisible = expanded
         binding.recyclerView.visibility = if (expanded) View.VISIBLE else View.INVISIBLE
         binding.root.setBackgroundColor(if (expanded) 0xFF0D0D0D.toInt() else Color.TRANSPARENT)
+        updateDockButtons()
     }
 
     private fun setThunderMode(enabled: Boolean, animate: Boolean = true) {
         if (thunderMode == enabled) return
         cancelAutoLaunch()
         thunderMode = enabled
+        updateDockButtons()
         adapter.setThunderMode(enabled)
         applySearchColors()
         val target = if (enabled) 1f else 0f
@@ -278,7 +332,11 @@ class AppDrawerFragment : BaseFragment() {
             }
         }
         if (enabled && !binding.search.text.isNullOrEmpty()) binding.search.text?.clear()
-        else adapter.filterApps(binding.search.text.toString())
+        else {
+            val query = binding.search.text.toString()
+            adapter.filterApps(query)
+            filterContacts(query)
+        }
     }
 
     private fun applySearchColors() {
@@ -308,6 +366,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun onResultsChanged(query: String) {
         if (_binding == null || query != binding.search.text.toString()) return
+        binding.recyclerView.invalidateItemDecorations()
         val bottomAnchored = thunderMode || query.isNotBlank()
         val directionChanged = layoutManager.reverseLayout != bottomAnchored
         layoutManager.reverseLayout = bottomAnchored
@@ -315,7 +374,126 @@ class AppDrawerFragment : BaseFragment() {
         resultsQuery = query
         adapter.enterHighlightedResult = if (flag == Constants.FLAG_LAUNCH_APP && !thunderMode && query.isNotBlank())
             adapter.firstLaunchableResult else null
+        updateContactHighlight(query)
         scheduleAutoLaunch(query)
+    }
+
+    private fun hasContactsPermission(): Boolean =
+        ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun loadContactsIfAllowed() {
+        if (_binding == null || !expanded || thunderMode || flag != Constants.FLAG_LAUNCH_APP ||
+            contactsLoaded || contactsLoad?.isActive == true || !hasContactsPermission()) return
+        val context = requireContext().applicationContext
+        if (!observingContacts) {
+            context.contentResolver.registerContentObserver(ContactsContract.AUTHORITY_URI, true, contactsObserver)
+            observingContacts = true
+        }
+        contactsLoad = viewLifecycleOwner.lifecycleScope.launch {
+            when (val result = ContactSearchAdapter.load(context)) {
+                is ContactLoadResult.Success -> {
+                    contactsLoaded = true
+                    contactsAdapter.contacts = result.contacts
+                    filterContacts(binding.search.text.toString())
+                }
+                ContactLoadResult.PermissionDenied -> contactsAdapter.clearContacts()
+                is ContactLoadResult.Failure -> Unit
+            }
+        }
+    }
+
+    private fun filterContacts(query: String) {
+        if (!expanded || thunderMode || flag != Constants.FLAG_LAUNCH_APP || query.isBlank()) {
+            contactsAdapter.clearResults()
+            updateDockButtons()
+            return
+        }
+        contactsAdapter.filter(query, showAll = false) {
+            binding.recyclerView.invalidateItemDecorations()
+            updateContactHighlight(query)
+            if (contactsAdapter.enterHighlightedResult != null) {
+                layoutManager.scrollToPositionWithOffset(0, 0)
+            }
+        }
+        loadContactsIfAllowed()
+    }
+
+    private fun updateContactHighlight(query: String) {
+        contactsAdapter.enterHighlightedResult = if (expanded && !thunderMode && query.isNotBlank() &&
+            adapter.committedQuery == query && adapter.firstLaunchableResult == null &&
+            contactsAdapter.committedQuery == query) contactsAdapter.firstResult else null
+        updateDockButtons()
+    }
+
+    private fun updateDockButtons() {
+        val contact = contactsAdapter.enterHighlightedResult
+        val showShortcuts = expanded && !thunderMode && contact != null
+        binding.contactShortcuts.isVisible = showShortcuts
+        val hasNumber = contact?.numbers?.isNotEmpty() == true
+        listOf(binding.contactCall, binding.contactMessage, binding.contactWhatsapp).forEach {
+            it.isEnabled = hasNumber
+            it.alpha = if (hasNumber) 1f else 0.4f
+        }
+        binding.dockBolt.isVisible = flag == Constants.FLAG_LAUNCH_APP && (!expanded || thunderMode)
+        val margin = when {
+            showShortcuts -> resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width) * 3 +
+                resources.getDimensionPixelSize(R.dimen.bolt_contact_action_divider_width)
+            thunderMode -> resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
+            else -> 0
+        }
+        if ((binding.search.layoutParams as FrameLayout.LayoutParams).marginEnd != margin) {
+            binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = margin }
+        }
+    }
+
+    private fun runContactAction(action: String, scheme: String) {
+        val contact = contactsAdapter.enterHighlightedResult ?: return
+        fun launch(number: String) {
+            val intent = if (scheme == "https") {
+                val international = PhoneNumberUtils.formatNumberToE164(number, Locale.getDefault().country) ?: number
+                Intent(action, Uri.parse("https://wa.me/" + international.filter { it in '0'..'9' }))
+                    .setPackage("com.whatsapp")
+            } else {
+                Intent(action, Uri.fromParts(scheme, number, null))
+            }
+            try {
+                startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                requireContext().showToast(getString(R.string.bolt_action_unavailable))
+            }
+        }
+        when (contact.numbers.size) {
+            0 -> Unit
+            1 -> launch(contact.numbers.first())
+            else -> androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(contact.name)
+                .setItems(contact.numbers.map(::formatContactNumber).toTypedArray()) { _, index ->
+                    launch(contact.numbers[index])
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    private fun openContact(contact: ContactSearchAdapter.Contact) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, contact.uri))
+        } catch (_: ActivityNotFoundException) {
+            requireContext().showToast(getString(R.string.bolt_contacts_app_unavailable))
+        } catch (_: SecurityException) {
+            contactsAdapter.clearContacts()
+        }
+    }
+
+    private fun stopLoadingContacts() {
+        contactsLoad?.cancel()
+        contactsLoad = null
+        contactsLoaded = false
+        if (observingContacts) {
+            requireContext().contentResolver.unregisterContentObserver(contactsObserver)
+            observingContacts = false
+        }
     }
 
     private fun cancelAutoLaunch() {
@@ -480,7 +658,17 @@ class AppDrawerFragment : BaseFragment() {
         )
         layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
-        binding.recyclerView.adapter = adapter
+        contactsAdapter = ContactSearchAdapter(open = ::openContact, tap = ::openContact, hold = ::openContact)
+        binding.recyclerView.adapter = ConcatAdapter(adapter, contactsAdapter)
+        binding.recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
+            override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView,
+                                        state: RecyclerView.State) {
+                if (adapter.itemCount > 0 && parent.getChildAdapterPosition(view) == adapter.itemCount &&
+                    contactsAdapter.itemCount > 0) {
+                    outRect.bottom = (4 * resources.displayMetrics.density).toInt()
+                }
+            }
+        })
         binding.recyclerView.itemAnimator = null
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -576,17 +764,23 @@ class AppDrawerFragment : BaseFragment() {
         controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (prefs.showStatusBar) controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
         else controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        if (flag == Constants.FLAG_LAUNCH_APP) {
+            if (hasContactsPermission()) loadContactsIfAllowed()
+            else contactsAdapter.clearContacts()
+        }
         if (expanded) binding.search.showKeyboard(prefs.autoShowKeyboard)
     }
 
     override fun onStop() {
         cancelAutoLaunch()
+        stopLoadingContacts()
         if (isHomePage) resetHomeSearch() else binding.search.hideKeyboard()
         super.onStop()
     }
 
     override fun onDestroyView() {
         cancelAutoLaunch()
+        stopLoadingContacts()
         boltAnimator?.cancel()
         boltAnimator = null
         adapter.cancelFiltering()
