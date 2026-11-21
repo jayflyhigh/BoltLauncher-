@@ -1,6 +1,7 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.graphics.drawable.StateListDrawable
 import android.view.View
 import android.view.animation.PathInterpolator
 import app.olauncher.helper.isEinkDisplay
@@ -51,11 +52,25 @@ internal object LauncherMotion {
             .start()
     }
 
+    fun setRowHighlight(view: View, selected: Boolean, active: Boolean, animate: Boolean) {
+        val changed = view.isSelected != selected || view.isActivated != active
+        val background = view.background as? StateListDrawable
+        val fade = if (changed && animate && isEnabled(view.context)) 110 else 0
+        if (changed || !animate) {
+            background?.setEnterFadeDuration(fade)
+            background?.setExitFadeDuration(fade)
+            view.isSelected = selected
+            view.isActivated = active
+        }
+        if (!animate) background?.jumpToCurrentState()
+    }
+
     fun reset(view: View) {
         view.animate().cancel()
         view.alpha = 1f
         view.scaleX = 1f
         view.scaleY = 1f
         view.translationY = 0f
+        view.translationX = 0f
     }
 }

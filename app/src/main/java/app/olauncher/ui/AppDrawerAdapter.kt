@@ -251,7 +251,7 @@ class AppDrawerAdapter(
         if (holder is ViewHolder && payloads.isNotEmpty() && payloads.all { it == SEARCH_STYLE }) {
             val app = getItem(position)
             val highlighted = !thunderMode && app == enterHighlightedResult
-            holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), highlighted)
+            holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), highlighted, animateHighlight = true)
             holder.bindSearchActions(app, app == actionApp)
         } else {
             super.onBindViewHolder(holder, position, payloads)
@@ -314,13 +314,6 @@ class AppDrawerAdapter(
         val holder = recyclerView.findViewHolderForAdapterPosition(0) as? ViewHolder ?: return null
         if (holder.bindingAdapter !== this || holder.bindingAdapterPosition != 0) return null
         return holder.launchAnimation(root, app)
-    }
-
-    fun launchOnlyResult(): Boolean {
-        val only = currentList.singleOrNull() ?: return false
-        if (only is AppModel.PrivateSpaceHeader || only.appPackage.isEmpty()) return false
-        appClickListener(only)
-        return true
     }
 
     fun launchFirstInList() {
@@ -393,29 +386,34 @@ class AppDrawerAdapter(
             iconJob = null
         }
 
-        fun bindSearchStyle(appModel: AppModel, thunderMode: Boolean, query: String, enterHighlighted: Boolean) =
-            with(binding) {
-                root.isSelected = enterHighlighted
-                appTitle.setTextColor(if (enterHighlighted) Color.WHITE else
-                    androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
-                appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-                androidx.core.view.ViewCompat.setStateDescription(root,
-                    if (enterHighlighted) root.resources.getString(R.string.bolt_enter_target) else null)
-                // Show indicators in title based on app type and state
-                appTitle.text = buildString {
-                    append(appModel.appLabel)
-                    if (appModel.isNew) append(" ✦")
-                }
-                if (thunderMode && !enterHighlighted && query.isNotBlank()) {
-                    val yellow = androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_yellow)
-                    appTitle.text = android.text.SpannableString(appTitle.text).apply {
-                        thunderMatchRanges(appModel.appLabel, query).forEach { range ->
-                            setSpan(android.text.style.ForegroundColorSpan(yellow), range.first, range.last + 1,
-                                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        }
+        fun bindSearchStyle(
+            appModel: AppModel,
+            thunderMode: Boolean,
+            query: String,
+            enterHighlighted: Boolean,
+            animateHighlight: Boolean = false,
+        ) = with(binding) {
+            LauncherMotion.setRowHighlight(root, enterHighlighted, active = false, animate = animateHighlight)
+            appTitle.setTextColor(if (enterHighlighted) Color.WHITE else
+                androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
+            appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            androidx.core.view.ViewCompat.setStateDescription(root,
+                if (enterHighlighted) root.resources.getString(R.string.bolt_enter_target) else null)
+            // Show indicators in title based on app type and state
+            appTitle.text = buildString {
+                append(appModel.appLabel)
+                if (appModel.isNew) append(" ✦")
+            }
+            if (thunderMode && !enterHighlighted && query.isNotBlank()) {
+                val yellow = androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_yellow)
+                appTitle.text = android.text.SpannableString(appTitle.text).apply {
+                    thunderMatchRanges(appModel.appLabel, query).forEach { range ->
+                        setSpan(android.text.style.ForegroundColorSpan(yellow), range.first, range.last + 1,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     }
                 }
             }
+        }
 
         fun bindSearchActions(app: AppModel, show: Boolean) = with(binding) {
             if (show) {

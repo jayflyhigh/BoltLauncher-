@@ -20,6 +20,7 @@
     <string name="bolt_play_store_action_unavailable">Play Store unavailable</string>
     <string name="bolt_web_unavailable">No browser available</string>
     <string name="bolt_whatsapp_unavailable">WhatsApp unavailable</string>
+    <string name="bolt_search_anything">Search Anything</string>
     <string name="bolt_search">Search</string>
     <string name="bolt_select_app">Select an app</string>
     <string name="bolt_enable_thunder">Enable Thunder mode</string>
