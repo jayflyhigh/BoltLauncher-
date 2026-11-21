@@ -53,8 +53,8 @@ class ContactSearchAdapter(
             value?.let { results.indexOf(it) }?.takeIf { it >= 0 }?.let { notifyItemChanged(it, HIGHLIGHT) }
         }
 
-    fun select(contact: Contact) {
-        selectedUri = contact.uri
+    fun toggleSelection(contact: Contact) {
+        selectedUri = contact.uri.takeUnless { it == selectedUri }
     }
 
     fun clearSelection() {
