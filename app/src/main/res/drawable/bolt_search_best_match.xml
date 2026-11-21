@@ -3,6 +3,7 @@
         <shape>
             <solid android:color="@color/bolt_contact_selected_surface" />
             <corners android:radius="@dimen/bolt_search_corner_radius" />
+            <stroke android:width="2dp" android:color="@color/bolt_search_yellow" />
         </shape>
     </item>
     <item android:state_selected="true">

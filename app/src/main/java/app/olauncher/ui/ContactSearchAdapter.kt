@@ -150,7 +150,7 @@ class ContactSearchAdapter(
     override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(results[position])
     override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
         if (payloads.isNotEmpty() && payloads.all { it == HIGHLIGHT }) {
-            holder.bindHighlight(results[position])
+            holder.bindHighlight(results[position], animateHighlight = true)
         } else super.onBindViewHolder(holder, position, payloads)
     }
 
@@ -201,12 +201,11 @@ class ContactSearchAdapter(
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
-        fun bindHighlight(contact: Contact) {
+        fun bindHighlight(contact: Contact, animateHighlight: Boolean = false) {
             val selected = contact.uri == selectedUri
             val highlighted = !selected && contact == enterHighlightedResult
             binding.contactSelectedIndicator.isVisible = selected
-            binding.root.isActivated = selected
-            binding.root.isSelected = highlighted
+            LauncherMotion.setRowHighlight(binding.root, highlighted, selected, animateHighlight)
             val state = when {
                 selected -> R.string.bolt_contact_selected
                 highlighted -> R.string.bolt_enter_target

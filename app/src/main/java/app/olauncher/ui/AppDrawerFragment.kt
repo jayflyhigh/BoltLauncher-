@@ -132,7 +132,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private companion object {
         const val SEARCH_RETURN_WINDOW_MS = 5_000L
-        const val THUNDER_LIFT_MS = 120L
+        const val THUNDER_LIFT_MS = 90L
         const val THUNDER_QUIET_MS = 220L
         const val COMPOSITION_RECHECK_MS = 100L
     }
@@ -212,41 +212,30 @@ class AppDrawerFragment : BaseFragment() {
                 initialBottom + maxOf(bars.bottom, keyboard.bottom))
             insets
         }
-        // The IME applies its final padding before drawing. Offset that layout jump,
-        // then follow the system keyboard animation using compositor translations.
+        // Layout uses the final IME inset. Translation keeps the dock aligned to
+        // the current inset, including when the system reverses the animation.
         androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(root,
             object : androidx.core.view.WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
-                private var startBottom = 0
-                private var offset = 0f
-                private val location = IntArray(2)
                 private var activeIme: androidx.core.view.WindowInsetsAnimationCompat? = null
-                private fun dockBottom(): Int {
-                    binding.dock.getLocationOnScreen(location)
-                    return location[1] + binding.dock.height
-                }
+                private var animateIme = false
+
                 override fun onPrepare(animation: androidx.core.view.WindowInsetsAnimationCompat) {
                     if (animation.typeMask and androidx.core.view.WindowInsetsCompat.Type.ime() != 0) {
-                        startBottom = dockBottom()
-                        root.translationY = 0f
                         activeIme = animation
+                        animateIme = LauncherMotion.isEnabled(root.context)
                     }
                 }
-                override fun onStart(animation: androidx.core.view.WindowInsetsAnimationCompat,
-                    bounds: androidx.core.view.WindowInsetsAnimationCompat.BoundsCompat): androidx.core.view.WindowInsetsAnimationCompat.BoundsCompat {
-                    if (animation == activeIme) {
-                        offset = if (LauncherMotion.isEnabled(requireContext()))
-                            (startBottom - dockBottom()).toFloat() else 0f
-                        root.translationY = offset
-                    }
-                    return bounds
-                }
+
                 override fun onProgress(insets: androidx.core.view.WindowInsetsCompat,
                     runningAnimations: MutableList<androidx.core.view.WindowInsetsAnimationCompat>): androidx.core.view.WindowInsetsCompat {
-                    runningAnimations.firstOrNull {
-                        it == activeIme
-                    }?.let { root.translationY = offset * (1f - it.interpolatedFraction) }
+                    if (animateIme && runningAnimations.any { it == activeIme }) {
+                        val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                        val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+                        root.translationY = (root.paddingBottom - initialBottom - maxOf(bars.bottom, ime.bottom)).toFloat()
+                    }
                     return insets
                 }
+
                 override fun onEnd(animation: androidx.core.view.WindowInsetsAnimationCompat) {
                     if (animation == activeIme) {
                         root.translationY = 0f
@@ -302,11 +291,6 @@ class AppDrawerFragment : BaseFragment() {
         binding.dock.background = dockBackground
         binding.search.filters = binding.search.filters + android.text.InputFilter { _, _, _, dest, start, end ->
             if (thunderCommitted) dest.subSequence(start, end) else null
-        }
-        binding.search.hint = when {
-            flag == Constants.FLAG_HIDDEN_APPS -> getString(R.string.hidden_apps)
-            flag != Constants.FLAG_LAUNCH_APP -> getString(R.string.bolt_select_app)
-            else -> getString(R.string.bolt_search)
         }
         binding.search.setOnClickListener { if (!expanded) openSearch(thunder = false) }
         binding.dockBolt.isVisible = flag == Constants.FLAG_LAUNCH_APP
@@ -392,10 +376,18 @@ class AppDrawerFragment : BaseFragment() {
         if (!thunder) loadContactsIfAllowed()
         val imeVisible = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
             ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
-        if (!imeVisible) binding.search.showKeyboard()
+        if (imeVisible) binding.search.requestFocus()
+        else binding.search.showKeyboard()
     }
 
     private fun updateSearchVisibility(animateBackdrop: Boolean = false) {
+        binding.search.hint = when {
+            searchRename != null -> getString(R.string.bolt_new_app_name)
+            !expanded -> getString(R.string.bolt_search_anything)
+            flag == Constants.FLAG_HIDDEN_APPS -> getString(R.string.hidden_apps)
+            flag != Constants.FLAG_LAUNCH_APP -> getString(R.string.bolt_select_app)
+            else -> null
+        }
         binding.search.isFocusableInTouchMode = expanded
         binding.search.isFocusable = expanded
         binding.search.isLongClickable = expanded
@@ -675,12 +667,22 @@ class AppDrawerFragment : BaseFragment() {
             when {
                 showShortcuts -> {
                     shortcuts.isVisible = true
-                    LauncherMotion.reveal(shortcuts, fromAlpha = 0.45f)
+                    if (LauncherMotion.isEnabled(shortcuts.context)) {
+                        if (shortcuts.alpha == 1f) {
+                            shortcuts.alpha = 0f
+                            shortcuts.translationX = resources.displayMetrics.density * 8f
+                        }
+                        shortcuts.animate().alpha(1f).translationX(0f).setDuration(120L)
+                            .setInterpolator(LauncherMotion.settle).start()
+                    } else {
+                        LauncherMotion.reset(shortcuts)
+                    }
                 }
                 expanded && !thunderMode && searchRename == null && LauncherMotion.isEnabled(shortcuts.context) -> {
-                    shortcuts.animate().alpha(0f).setDuration(100L).setInterpolator(LauncherMotion.settle)
+                    shortcuts.animate().alpha(0f).translationX(resources.displayMetrics.density * 8f).setDuration(100L).setInterpolator(LauncherMotion.settle)
                         .withEndAction {
                             shortcuts.isVisible = false
+                            LauncherMotion.reset(shortcuts)
                             updateDockButtons()
                         }.start()
                 }
@@ -834,10 +836,9 @@ class AppDrawerFragment : BaseFragment() {
                 showThunderLaunchAnimation(result)
                 view.dock.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 val launchAt = SystemClock.uptimeMillis()
-                cancelAutoLaunch(clearAnimation = false)
-                if (!adapter.launchOnlyResult()) {
-                    clearThunderLaunchAnimation()
-                } else if (BuildConfig.DEBUG) {
+                val launched = launchResult(result)
+                cancelAutoLaunch(clearAnimation = !launched)
+                if (launched && BuildConfig.DEBUG) {
                     Log.d("BoltThunderTiming", "editToCommitMs=${committedAt - editedAt} " +
                         "commitToLaunchRequestMs=${launchAt - committedAt}")
                 }
@@ -849,7 +850,6 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun beginSearchRename(app: AppModel) {
         searchRename = SearchRename(app, binding.search.text.toString())
-        binding.search.hint = getString(R.string.bolt_new_app_name)
         binding.search.imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
         binding.search.text?.clear()
         updateSearchVisibility()
@@ -866,7 +866,6 @@ class AppDrawerFragment : BaseFragment() {
     private fun finishSearchRename(): Boolean {
         val rename = searchRename ?: return false
         searchRename = null
-        binding.search.hint = getString(R.string.bolt_search)
         binding.search.imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
         binding.search.setText(rename.query)
         binding.search.setSelection(rename.query.length)
@@ -965,33 +964,34 @@ class AppDrawerFragment : BaseFragment() {
             }.show()
     }
 
+    private fun launchResult(appModel: AppModel): Boolean {
+        val animatingThunderLaunch = thunderLaunchAnimation != null
+        if (!thunderCommitted) cancelAutoLaunch(clearAnimation = !animatingThunderLaunch)
+        if (flag == Constants.FLAG_LAUNCH_APP && expanded) {
+            val keyboardWasVisible = imeWasVisible
+            if (!viewModel.launchAppResult(appModel, ::showSearchFeedback)) return false
+            if (isHomePage && !thunderMode) {
+                searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
+            } else if (!animatingThunderLaunch) {
+                binding.search.hideKeyboard()
+            }
+        } else {
+            if (!animatingThunderLaunch) binding.search.hideKeyboard()
+            viewModel.selectedApp(appModel, flag)
+        }
+        if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
+            findNavController().popBackStack(R.id.mainFragment, false)
+        else
+            closeDrawer()
+        return true
+    }
+
     private fun initAdapter() {
         adapter = AppDrawerAdapter(
             flag,
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
-                if (searchRename != null || thunderCommitted) return@AppDrawerAdapter
-                val animatingThunderLaunch = thunderLaunchAnimation != null
-                cancelAutoLaunch(clearAnimation = !animatingThunderLaunch)
-                if (flag == Constants.FLAG_LAUNCH_APP && expanded) {
-                    val keyboardWasVisible = imeWasVisible
-                    if (!viewModel.launchAppResult(appModel, ::showSearchFeedback)) {
-                        clearThunderLaunchAnimation()
-                        return@AppDrawerAdapter
-                    }
-                    if (isHomePage && !thunderMode) {
-                        searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
-                    } else if (!animatingThunderLaunch) {
-                        binding.search.hideKeyboard()
-                    }
-                } else {
-                    if (!animatingThunderLaunch) binding.search.hideKeyboard()
-                    viewModel.selectedApp(appModel, flag)
-                }
-                if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
-                    findNavController().popBackStack(R.id.mainFragment, false)
-                else
-                    closeDrawer()
+                if (searchRename == null && !thunderCommitted) launchResult(appModel)
             },
             appInfoListener = {
                 openAppInfo(
