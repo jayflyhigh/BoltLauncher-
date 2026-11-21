@@ -3,6 +3,7 @@ package app.olauncher.ui
 import android.content.Context
 import android.graphics.Typeface
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import app.olauncher.R
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -53,11 +54,22 @@ class ContactSearchAdapter(
         }
 
     fun toggleSelection(contact: Contact) {
-        selectedUri = contact.uri.takeUnless { it == selectedUri }
+        updateSelection(contact.uri.takeUnless { it == selectedUri })
     }
 
-    fun clearSelection() {
-        selectedUri = null
+    fun clearSelection(): Boolean {
+        if (selectedUri == null) return false
+        updateSelection(null)
+        return true
+    }
+
+    private fun updateSelection(uri: Uri?) {
+        val previous = selectedUri
+        selectedUri = uri
+        for (changed in listOfNotNull(previous, uri)) {
+            val index = results.indexOfFirst { it.uri == changed }
+            if (index >= 0) notifyItemChanged(index, HIGHLIGHT)
+        }
     }
 
     fun clearResults() {
@@ -185,15 +197,25 @@ class ContactSearchAdapter(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 android.view.Gravity.CENTER_VERTICAL).apply {
                 marginStart = (68 * density).toInt()
-                marginEnd = (24 * density).toInt()
+                marginEnd = (36 * density).toInt()
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
         fun bindHighlight(contact: Contact) {
-            val highlighted = contact == enterHighlightedResult
+            val selected = contact.uri == selectedUri
+            val highlighted = !selected && contact == enterHighlightedResult
+            binding.contactSelectedIndicator.isVisible = selected
+            binding.root.isActivated = selected
             binding.root.isSelected = highlighted
-            binding.appTitle.setTypeface(null, if (highlighted) Typeface.BOLD else Typeface.NORMAL)
-            binding.appTitle.setTextColor(if (highlighted) Color.WHITE else
+            val state = when {
+                selected -> R.string.bolt_contact_selected
+                highlighted -> R.string.bolt_enter_target
+                else -> null
+            }
+            androidx.core.view.ViewCompat.setStateDescription(binding.root,
+                state?.let(binding.root.resources::getString))
+            binding.appTitle.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            binding.appTitle.setTextColor(if (highlighted || selected) Color.WHITE else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
         }
 

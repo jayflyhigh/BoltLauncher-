@@ -398,7 +398,9 @@ class AppDrawerAdapter(
                 root.isSelected = enterHighlighted
                 appTitle.setTextColor(if (enterHighlighted) Color.WHITE else
                     androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
-                appTitle.setTypeface(null, if (enterHighlighted) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                androidx.core.view.ViewCompat.setStateDescription(root,
+                    if (enterHighlighted) root.resources.getString(R.string.bolt_enter_target) else null)
                 // Show indicators in title based on app type and state
                 appTitle.text = buildString {
                     append(appModel.appLabel)
@@ -427,7 +429,7 @@ class AppDrawerAdapter(
                         Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.appPackage, null))
                             .resolveActivity(context.packageManager) != null
                     searchAppActions.isVisible = true
-                    LauncherMotion.reveal(searchAppActions)
+                    LauncherMotion.reveal(searchAppActions, riseDp = 4f)
                 }
             } else if (searchAppActions.isVisible) {
                 LauncherMotion.reset(searchAppActions)
@@ -436,7 +438,7 @@ class AppDrawerAdapter(
                 return@with
             }
             appTitle.isVisible = !show && !renameLayout.isVisible
-            appIcon.isVisible = !show && app.appPackage.isNotEmpty()
+            appIcon.isVisible = app.appPackage.isNotEmpty()
             otherProfileIndicator.isVisible = !show && app.user != android.os.Process.myUserHandle()
         }
 
@@ -472,7 +474,7 @@ class AppDrawerAdapter(
             bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
             appTitle.maxLines = 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
-            appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
+            appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
             appTitle.ellipsize = android.text.TextUtils.TruncateAt.END
             if (appHideLayout.isVisible) LauncherMotion.reset(appHideLayout)
             appHideLayout.visibility = View.GONE

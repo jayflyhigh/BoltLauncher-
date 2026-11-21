@@ -17,7 +17,7 @@
         android:layout_height="match_parent"
         android:gravity="start|center_vertical"
         android:textColor="#FFFFFF"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:ellipsize="end"
         android:maxLines="1"
         android:paddingStart="68dp"
@@ -30,13 +30,24 @@
         android:layout_height="wrap_content"
         android:layout_gravity="start|bottom"
         android:layout_marginBottom="9dp"
-        android:paddingStart="76dp"
+        android:paddingStart="68dp"
         android:paddingEnd="24dp"
         android:textColor="@color/bolt_search_secondary"
         android:textSize="12sp"
         android:maxLines="1"
         android:ellipsize="end"
         android:visibility="gone" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/contactSelectedIndicator"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="12dp"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        app:srcCompat="@drawable/ic_check"
+        app:tint="@color/bolt_search_yellow" />
 
     <ImageView
         android:id="@+id/otherProfileIndicator"
@@ -142,6 +153,8 @@
         android:id="@+id/searchAppActions"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginStart="60dp"
+        android:layout_marginEnd="4dp"
         android:gravity="center_vertical"
         android:visibility="gone">
 

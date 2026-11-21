@@ -100,15 +100,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun launchAppResult(appModel: AppModel): Boolean = when (appModel) {
-        is AppModel.PinnedShortcut -> launchShortcut(appModel)
-        is AppModel.App -> launchApp(appModel.appPackage, appModel.activityClassName, appModel.user)
-        else -> false
+    fun launchAppResult(appModel: AppModel, onFailure: (Int) -> Unit = ::showLaunchFailure): Boolean =
+        when (appModel) {
+            is AppModel.PinnedShortcut -> launchShortcut(appModel, onFailure)
+            is AppModel.App -> launchApp(appModel.appPackage, appModel.activityClassName, appModel.user, onFailure)
+            else -> false
+        }
+
+    private fun showLaunchFailure(message: Int) {
+        appContext.showToast(appContext.getString(message))
     }
 
-    private fun launchShortcut(appModel: AppModel.PinnedShortcut): Boolean {
+    private fun launchShortcut(appModel: AppModel.PinnedShortcut, onFailure: (Int) -> Unit): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
-            appContext.showToast(appContext.getString(R.string.unable_to_open_shortcut))
+            onFailure(R.string.unable_to_open_shortcut)
             return false
         }
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
@@ -120,13 +125,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val shortcut = launcher.getShortcuts(query, appModel.user)
                 ?.find { it.id == appModel.shortcutId }
             if (shortcut == null) {
-                appContext.showToast(appContext.getString(R.string.shortcut_not_found))
+                onFailure(R.string.shortcut_not_found)
                 return false
             }
             launcher.startShortcut(shortcut, null, null)
             return true
         } catch (_: Exception) {
-            appContext.showToast(appContext.getString(R.string.unable_to_open_shortcut))
+            onFailure(R.string.unable_to_open_shortcut)
             return false
         }
     }
@@ -371,12 +376,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateSwipeApps.postValue(Unit)
     }
 
-    private fun launchApp(packageName: String, activityClassName: String?, userHandle: UserHandle): Boolean {
+    private fun launchApp(
+        packageName: String,
+        activityClassName: String?,
+        userHandle: UserHandle,
+        onFailure: (Int) -> Unit = ::showLaunchFailure,
+    ): Boolean {
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val activityInfo = try {
             launcher.getActivityList(packageName, userHandle)
         } catch (_: Exception) {
-            appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+            onFailure(R.string.unable_to_open_app)
             return false
         }
 
@@ -388,7 +398,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else {
             when (activityInfo.size) {
                 0 -> {
-                    appContext.showToast(appContext.getString(R.string.app_not_found))
+                    onFailure(R.string.app_not_found)
                     return false
                 }
 
@@ -403,11 +413,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 launcher.startMainActivity(component, android.os.Process.myUserHandle(), null, null)
             } catch (e: Exception) {
-                appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+                onFailure(R.string.unable_to_open_app)
                 return false
             }
         } catch (e: Exception) {
-            appContext.showToast(appContext.getString(R.string.unable_to_open_app))
+            onFailure(R.string.unable_to_open_app)
             return false
         }
         return true

@@ -30,7 +30,7 @@ class DockResultsView @JvmOverloads constructor(
     fun rememberRow(child: View, identity: Any) {
         if (revealRows && isShown && child.isAttachedToWindow && seenRows.add(identity)) {
             resetRow(child)
-            LauncherMotion.revealAttached(child, fromAlpha = 0.78f, riseDp = 4f)
+            LauncherMotion.revealAttached(child, fromAlpha = 0.78f, riseDp = 0f)
         }
     }
 
