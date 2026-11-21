@@ -110,5 +110,37 @@
                 android:scaleType="center"
                 app:srcCompat="@drawable/contact_whatsapp" />
         </LinearLayout>
+        <LinearLayout
+            android:id="@+id/renameControls"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:visibility="gone">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/renameConfirm"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="@dimen/bolt_rename_action_width"
+                android:layout_height="match_parent"
+                android:minWidth="0dp"
+                android:paddingHorizontal="2dp"
+                android:text="@string/rename"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/renameCancel"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="@dimen/bolt_rename_action_width"
+                android:layout_height="match_parent"
+                android:minWidth="0dp"
+                android:paddingHorizontal="2dp"
+                android:text="@string/close"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+        </LinearLayout>
     </FrameLayout>
 </app.olauncher.ui.SearchGestureLayout>

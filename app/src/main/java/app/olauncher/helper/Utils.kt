@@ -162,8 +162,7 @@ private suspend fun getPinnedShortcuts(
                             profile.toString()
                         )
                         if (shortcut.isPinned && pinnedShortcuts.none { it.identity == identity }) {
-                            val label = prefs.getAppRenameLabel(identity)
-                                .ifBlank { prefs.getAppRenameLabel(shortcut.id) }
+                            val label = prefs.getAppRenameLabel(identity, legacyKey = shortcut.id)
                                 .takeIf { it.isNotBlank() }
                                 ?: shortcut.shortLabel?.toString()
                                 ?: shortcut.longLabel?.toString().orEmpty()

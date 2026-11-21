@@ -139,6 +139,63 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/searchAppActions"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:visibility="gone">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/searchRename"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingHorizontal="2dp"
+            android:text="@string/rename"
+            android:textAllCaps="false"
+            android:textSize="13sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/searchPlayStore"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingHorizontal="2dp"
+            android:text="@string/bolt_play_store"
+            android:textAllCaps="false"
+            android:textSize="13sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/searchAppInfo"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingHorizontal="2dp"
+            android:text="@string/bolt_app_info"
+            android:textAllCaps="false"
+            android:textSize="13sp" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/searchUninstall"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingHorizontal="2dp"
+            android:text="@string/delete"
+            android:textAllCaps="false"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/renameLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
