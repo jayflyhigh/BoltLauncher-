@@ -1,83 +1,68 @@
 package app.olauncher.ui
 
-import android.content.Context
+import android.app.ActivityOptions
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
-import android.text.Layout
-import android.text.StaticLayout
-import android.text.TextDirectionHeuristic
-import android.text.TextPaint
-import android.text.TextUtils
+import android.view.View
 import androidx.core.content.ContextCompat
 import app.olauncher.R
 import kotlin.math.roundToInt
 
 internal class ThunderLaunchAnimation(
-    context: Context,
-    private val icon: Drawable?,
-    private val rowBounds: RectF,
+    private val source: View,
+    private val icon: Drawable,
     private val iconBounds: RectF,
-    label: CharSequence,
-    labelPaint: TextPaint,
-    textDirection: TextDirectionHeuristic,
-    private val labelX: Float,
-    width: Int,
 ) : Drawable() {
-    private val density = context.resources.displayMetrics.density
-    private val yellow = ContextCompat.getColor(context, R.color.bolt_search_yellow)
-    private val charcoal = ContextCompat.getColor(context, R.color.bolt_search_dock)
-    private val corner = context.resources.getDimension(R.dimen.bolt_search_corner_radius)
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val labelLayout = StaticLayout.Builder.obtain(
-        label, 0, label.length, TextPaint(labelPaint).apply { color = Color.BLACK }, width.coerceAtLeast(1)
-    ).setMaxLines(1)
-        .setEllipsize(TextUtils.TruncateAt.END)
-        .setTextDirection(textDirection)
-        .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-        .build()
+    private val density = source.resources.displayMetrics.density
+    private val lift = 4f * density
+    private val originalAlpha = source.alpha
+    private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(source.context, R.color.bolt_search_yellow)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f * density
+    }
 
-    var progress = 0f
+    init {
+        source.alpha = 0f
+        val width = icon.intrinsicWidth.takeIf { it > 0 } ?: source.width
+        val height = icon.intrinsicHeight.takeIf { it > 0 } ?: source.height
+        val scale = minOf(iconBounds.width() / width, iconBounds.height() / height)
+        val halfWidth = width * scale / 2f
+        val halfHeight = height * scale / 2f
+        icon.setBounds(
+            (iconBounds.centerX() - halfWidth).roundToInt(),
+            (iconBounds.centerY() - halfHeight).roundToInt(),
+            (iconBounds.centerX() + halfWidth).roundToInt(),
+            (iconBounds.centerY() + halfHeight).roundToInt(),
+        )
+    }
+
+    var progress = 0.25f
         set(value) {
             field = value
             invalidateSelf()
         }
 
+    fun launchOptions() = ActivityOptions.makeScaleUpAnimation(
+        source, 0, -lift.roundToInt(), source.width, source.height
+    ).toBundle()
+
+    fun restoreIcon() {
+        source.alpha = originalAlpha
+    }
+
     override fun draw(canvas: Canvas) {
-        paint.color = yellow
-        canvas.drawRoundRect(rowBounds, corner, corner, paint)
-
         canvas.save()
-        canvas.translate(labelX, rowBounds.centerY() - labelLayout.height / 2f)
-        labelLayout.draw(canvas)
+        canvas.translate(0f, -lift * progress)
+        pulsePaint.alpha = (200f * (1f - progress)).roundToInt()
+        canvas.drawCircle(iconBounds.centerX(), iconBounds.centerY(),
+            iconBounds.width() / 2f + density * (1f + 4f * progress), pulsePaint)
+        icon.draw(canvas)
         canvas.restore()
-
-        val image = icon ?: return
-        val x = iconBounds.centerX()
-        val y = iconBounds.centerY() - 25 * density * progress
-        val radius = iconBounds.width() / 2f
-        paint.color = charcoal
-        paint.alpha = (255 * progress).roundToInt()
-        canvas.drawCircle(x, y, radius + 4 * density, paint)
-        paint.color = yellow
-        paint.alpha = (255 * progress).roundToInt()
-        paint.strokeWidth = 2 * density
-        paint.style = Paint.Style.STROKE
-        canvas.drawCircle(x, y, radius + 4 * density, paint)
-        paint.style = Paint.Style.FILL
-
-        val width = image.intrinsicWidth.coerceAtLeast(1)
-        val height = image.intrinsicHeight.coerceAtLeast(1)
-        val scale = (2 * radius) / maxOf(width, height)
-        val halfWidth = width * scale / 2f
-        val halfHeight = height * scale / 2f
-        image.setBounds((x - halfWidth).roundToInt(), (y - halfHeight).roundToInt(),
-            (x + halfWidth).roundToInt(), (y + halfHeight).roundToInt())
-        image.draw(canvas)
     }
 
     override fun setAlpha(alpha: Int) = Unit

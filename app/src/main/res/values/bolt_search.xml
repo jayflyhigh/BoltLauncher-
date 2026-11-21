@@ -3,7 +3,6 @@
     <item type="id" name="bolt_result_identity" />
     <color name="bolt_search_yellow">#FFD640</color>
     <color name="bolt_search_result">#2B2B2B</color>
-    <color name="bolt_contact_selected_surface">#3C3523</color>
     <color name="bolt_search_dock">#242424</color>
     <color name="bolt_search_label">#DEDEDE</color>
     <color name="bolt_search_secondary">#B7B7B7</color>
@@ -14,7 +13,8 @@
     <dimen name="bolt_search_button_width">52dp</dimen>
     <string name="bolt_contact_selected">Contact selected</string>
     <string name="bolt_enter_target">Opens with Enter</string>
-    <string name="bolt_no_matching_apps">No matching apps</string>
+    <string name="bolt_no_matches">No matches</string>
+    <dimen name="bolt_search_result_height">50dp</dimen>
     <string name="bolt_search_web">Search the web</string>
     <string name="bolt_search_web_for">Search the web for “%1$s”</string>
     <string name="bolt_play_store_action_unavailable">Play Store unavailable</string>

@@ -34,12 +34,17 @@ class DockResultsView @JvmOverloads constructor(
         }
     }
 
+    // Show touch-down feedback while RecyclerView decides whether the gesture is a scroll.
+    override fun shouldDelayChildPressedState() = false
+
     override fun onChildAttachedToWindow(child: View) {
         super.onChildAttachedToWindow(child)
         child.getTag(R.id.bolt_result_identity)?.let { rememberRow(child, it) }
     }
 
     override fun onChildDetachedFromWindow(child: View) {
+        child.isPressed = false
+        child.foreground?.jumpToCurrentState()
         resetRow(child)
         super.onChildDetachedFromWindow(child)
     }

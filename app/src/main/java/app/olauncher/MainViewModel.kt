@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.os.Build
+import android.os.Bundle
 import android.os.UserHandle
 import android.os.UserManager
 import androidx.lifecycle.AndroidViewModel
@@ -100,10 +101,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun launchAppResult(appModel: AppModel, onFailure: (Int) -> Unit = ::showLaunchFailure): Boolean =
+    fun launchAppResult(
+        appModel: AppModel,
+        onFailure: (Int) -> Unit = ::showLaunchFailure,
+        options: Bundle? = null,
+    ): Boolean =
         when (appModel) {
-            is AppModel.PinnedShortcut -> launchShortcut(appModel, onFailure)
-            is AppModel.App -> launchApp(appModel.appPackage, appModel.activityClassName, appModel.user, onFailure)
+            is AppModel.PinnedShortcut -> launchShortcut(appModel, onFailure, options)
+            is AppModel.App -> launchApp(
+                appModel.appPackage, appModel.activityClassName, appModel.user, onFailure, options
+            )
             else -> false
         }
 
@@ -111,7 +118,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appContext.showToast(appContext.getString(message))
     }
 
-    private fun launchShortcut(appModel: AppModel.PinnedShortcut, onFailure: (Int) -> Unit): Boolean {
+    private fun launchShortcut(
+        appModel: AppModel.PinnedShortcut,
+        onFailure: (Int) -> Unit,
+        options: Bundle?,
+    ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
             onFailure(R.string.unable_to_open_shortcut)
             return false
@@ -128,7 +139,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onFailure(R.string.shortcut_not_found)
                 return false
             }
-            launcher.startShortcut(shortcut, null, null)
+            launcher.startShortcut(shortcut, null, options)
             return true
         } catch (_: Exception) {
             onFailure(R.string.unable_to_open_shortcut)
@@ -381,6 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activityClassName: String?,
         userHandle: UserHandle,
         onFailure: (Int) -> Unit = ::showLaunchFailure,
+        options: Bundle? = null,
     ): Boolean {
         val launcher = appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
         val activityInfo = try {
@@ -408,10 +420,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         try {
-            launcher.startMainActivity(component, userHandle, null, null)
+            launcher.startMainActivity(component, userHandle, null, options)
         } catch (e: SecurityException) {
             try {
-                launcher.startMainActivity(component, android.os.Process.myUserHandle(), null, null)
+                launcher.startMainActivity(component, android.os.Process.myUserHandle(), null, options)
             } catch (e: Exception) {
                 onFailure(R.string.unable_to_open_app)
                 return false
