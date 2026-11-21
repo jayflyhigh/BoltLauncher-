@@ -180,12 +180,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onNewIntent(intent: Intent?) {
-        // Home button for recents feature disabled
-        // val alreadyHome = navController.currentDestination?.id == R.id.mainFragment
-        backToHomeScreen()
-        // if (alreadyHome && isResumed && prefs.homeButtonShowRecents)
-        //     viewModel.showRecentApps.call()
         super.onNewIntent(intent)
+        // An explicit launcher entry should show Home, even during the search return window.
+        backToHomeScreen(preserveSearchForBack = false)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -347,14 +344,15 @@ class MainActivity : AppCompatActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
-    private fun backToHomeScreen() {
+    private fun backToHomeScreen(preserveSearchForBack: Boolean = true) {
         if (viewModel.isPrivateSpaceToggling || supportFragmentManager.isStateSaved || isDestroyed) return
         messageDialog?.dismiss()
         if (navController.currentDestination?.id != R.id.mainFragment)
             navController.popBackStack(R.id.mainFragment, false)
         val host = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)
-        (host?.childFragmentManager?.primaryNavigationFragment as? app.olauncher.ui.AppDrawerFragment)
-            ?.resetHomeSearchUnlessReturningFromApp()
+        val drawer = host?.childFragmentManager?.primaryNavigationFragment as? app.olauncher.ui.AppDrawerFragment
+        if (preserveSearchForBack) drawer?.resetHomeSearchUnlessReturningFromApp()
+        else drawer?.resetHomeSearch()
     }
 
     private fun setPlainWallpaper() {

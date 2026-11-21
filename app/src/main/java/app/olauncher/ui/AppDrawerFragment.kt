@@ -111,6 +111,10 @@ class AppDrawerFragment : BaseFragment() {
     private var searchRename: SearchRename? = null
 
     private var searchAppLaunch: SearchAppLaunch? = null
+    private var restoreSearchKeyboard = false
+    private val searchWindowFocusListener = android.view.ViewTreeObserver.OnWindowFocusChangeListener { focused ->
+        if (focused) showRestoredSearchKeyboard()
+    }
 
     private data class SearchAppLaunch(val at: Long, val keyboardWasVisible: Boolean) {
         fun isRecent() = SystemClock.elapsedRealtime() - at <= SEARCH_RETURN_WINDOW_MS
@@ -149,6 +153,7 @@ class AppDrawerFragment : BaseFragment() {
         decoratedContact = null
         initAdapter()
         initSearch()
+        binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
         binding.root.onBackBeforeIme = ::dismissSearchEdit
         binding.root.onTap = ::dismissSearchActionsOutside
         initObservers()
@@ -747,13 +752,14 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     fun resetHomeSearchUnlessReturningFromApp() {
-        // Home intents and background callbacks can both arrive before the fragment resumes.
+        // Background callbacks run before we know how the user will return.
         if (searchAppLaunch?.isRecent() != true) resetHomeSearch()
     }
 
-    private fun resetHomeSearch(animateBackdrop: Boolean = false) {
+    fun resetHomeSearch(animateBackdrop: Boolean = false) {
         if (_binding == null || !isHomePage) return
         searchAppLaunch = null
+        restoreSearchKeyboard = false
         dismissSearchEdit()
         expanded = false
         revealedContactShortcuts = false
@@ -795,7 +801,6 @@ class AppDrawerFragment : BaseFragment() {
                     val keyboardWasVisible = imeWasVisible
                     if (!viewModel.launchAppResult(appModel)) return@AppDrawerAdapter
                     searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
-                    binding.search.hideKeyboard()
                 } else {
                     binding.search.hideKeyboard()
                     viewModel.selectedApp(appModel, flag)
@@ -1008,11 +1013,22 @@ class AppDrawerFragment : BaseFragment() {
         if (!launch.isRecent()) {
             resetHomeSearch()
         } else if (launch.keyboardWasVisible && expanded && !thunderMode) {
-            binding.search.showKeyboard()
+            restoreSearchKeyboard = true
+            showRestoredSearchKeyboard()
         }
     }
 
+    private fun showRestoredSearchKeyboard() {
+        if (!restoreSearchKeyboard || _binding == null || !binding.search.hasWindowFocus()) return
+        restoreSearchKeyboard = false
+        if (!expanded || thunderMode) return
+        binding.search.requestFocus()
+        androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.search)
+            .show(androidx.core.view.WindowInsetsCompat.Type.ime())
+    }
+
     override fun onPause() {
+        restoreSearchKeyboard = false
         dismissSearchEdit()
         cancelAutoLaunch()
         super.onPause()
@@ -1026,6 +1042,8 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
+        binding.root.viewTreeObserver.removeOnWindowFocusChangeListener(searchWindowFocusListener)
+        restoreSearchKeyboard = false
         searchRename = null
         searchAppLaunch = null
         cancelAutoLaunch()
