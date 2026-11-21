@@ -204,7 +204,6 @@ class ContactSearchAdapter(
                 }
             } else contact.name
             binding.otherProfileIndicator.visibility = View.GONE
-            binding.resultBolt.visibility = View.GONE
             binding.appHideLayout.visibility = View.GONE
             binding.renameLayout.visibility = View.GONE
             val radius = (36f * 18f / 52f) * binding.root.resources.displayMetrics.density

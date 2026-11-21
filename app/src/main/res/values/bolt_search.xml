@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bolt_search_yellow">#FFD640</color>
+    <color name="bolt_search_result">#242424</color>
+    <dimen name="bolt_search_button_width">52dp</dimen>
+    <string name="bolt_search">Search</string>
+    <string name="bolt_select_app">Select an app</string>
+    <string name="bolt_enable_thunder">Enable Thunder mode</string>
+    <string name="bolt_disable_thunder">Disable Thunder mode</string>
+</resources>

@@ -1,15 +1,74 @@
-<app.olauncher.ui.SearchGestureLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@android:color/transparent" android:paddingTop="16dp">
-<app.olauncher.ui.DockResultsView android:id="@+id/recyclerView" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginHorizontal="16dp" android:layout_marginBottom="8dp" android:background="@drawable/search_results_panel" android:clipToOutline="true" android:clipChildren="true" android:clipToPadding="true" android:paddingTop="8dp" android:paddingBottom="8dp" android:fadingEdgeLength="24dp" android:requiresFadingEdge="vertical"/>
-<TextView android:id="@+id/appRename" style="@style/TextSmall" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/rename" android:visibility="gone"/>
-<app.olauncher.ui.DockLayout android:id="@+id/dock" android:clickable="true" android:layout_width="match_parent" android:layout_height="68dp" android:layout_marginHorizontal="16dp" android:layout_marginBottom="12dp" android:padding="4dp" android:background="@drawable/dock_search_bar" android:layoutDirection="ltr">
-<TextView android:id="@+id/homeSearch" android:layout_width="match_parent" android:layout_height="52dp" android:layout_gravity="center_vertical" android:layout_marginStart="4dp" android:layout_marginEnd="4dp" android:paddingHorizontal="64dp" android:gravity="center_vertical" android:text="Search" android:textSize="16sp" android:textColor="#BDBDBD" android:background="@android:color/transparent" android:contentDescription="Search"/>
-<LinearLayout android:id="@+id/dockKeys" android:layout_width="match_parent" android:layout_height="match_parent">
-<ImageButton android:id="@+id/dockContacts" android:layout_width="52dp" android:layout_height="52dp" android:layout_margin="4dp" android:padding="13dp" android:background="@android:color/transparent" android:src="@drawable/dock_contacts" android:contentDescription="Contacts"/>
-<Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1"/>
-<ImageButton android:id="@+id/dockBolt" android:layout_width="52dp" android:layout_height="52dp" android:layout_margin="4dp" android:padding="13dp" android:background="@android:color/transparent" android:src="@drawable/dock_bolt" android:contentDescription="Bolt"/>
-</LinearLayout>
-<androidx.appcompat.widget.SearchView app:layout="@layout/alias_search_view" android:theme="@style/BoltSearchTheme" android:id="@+id/search" android:layout_width="match_parent" android:layout_height="52dp" android:layout_gravity="center_vertical" android:layout_marginStart="56dp" android:layout_marginEnd="56dp" android:visibility="invisible" android:background="@android:color/transparent" app:iconifiedByDefault="false" app:searchIcon="@null" app:closeIcon="@null" app:queryBackground="@null" app:queryHint="Search" android:imeOptions="actionSearch"/>
-<TextView android:id="@+id/aliasHint" android:layout_width="wrap_content" android:layout_height="52dp" android:layout_gravity="start|center_vertical" android:gravity="center_vertical" android:textColor="#BDBDBD" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" android:clickable="false" android:focusable="false"/>
-<ImageButton android:id="@+id/dockSearch" android:layout_width="52dp" android:layout_height="52dp" android:layout_gravity="end|center_vertical" android:layout_marginEnd="60dp" android:padding="13dp" android:background="@android:color/transparent" android:src="@drawable/dock_web" android:visibility="gone" android:contentDescription="Search destination: Apps. Tap to switch; hold to edit Search within Apps"/>
-<ImageButton android:id="@+id/dockAllContacts" android:layout_width="52dp" android:layout_height="52dp" android:layout_gravity="end|center_vertical" android:layout_marginEnd="4dp" android:padding="13dp" android:background="@android:color/transparent" android:src="@drawable/dock_contacts" android:visibility="gone" android:elevation="16dp" android:contentDescription="Show all contacts"/>
-</app.olauncher.ui.DockLayout></app.olauncher.ui.SearchGestureLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<app.olauncher.ui.SearchGestureLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:focusableInTouchMode="true"
+    android:orientation="vertical">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginBottom="8dp"
+        android:layout_weight="1"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/appRename"
+        style="@style/TextSmall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/rename"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:id="@+id/dock"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bolt_search_idle"
+        android:layoutDirection="ltr">
+
+        <TextView
+            android:id="@+id/homeSearch"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/bolt_search_button_width"
+            android:focusable="true"
+            android:gravity="start|center_vertical"
+            android:paddingHorizontal="16dp"
+            android:text="@string/bolt_search"
+            android:textColor="#BDBDBD"
+            android:textSize="18sp" />
+
+        <app.olauncher.ui.BoltSearchInput
+            android:id="@+id/search"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="@dimen/bolt_search_button_width"
+            android:background="@null"
+            android:gravity="start|center_vertical"
+            android:imeOptions="actionGo|flagNoExtractUi"
+            android:inputType="text|textNoSuggestions"
+            android:paddingHorizontal="16dp"
+            android:saveEnabled="false"
+            android:singleLine="true"
+            android:textCursorDrawable="@drawable/bolt_cursor_yellow"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/dockBolt"
+            android:layout_width="@dimen/bolt_search_button_width"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/bolt_enable_thunder"
+            android:scaleType="center"
+            app:srcCompat="@drawable/bolt_search_lightning"
+            app:tint="@color/bolt_search_yellow" />
+    </FrameLayout>
+</app.olauncher.ui.SearchGestureLayout>
