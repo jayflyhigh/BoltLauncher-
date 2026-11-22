@@ -93,4 +93,19 @@ class AppSearchMatcherTest {
         assertEquals(emptyList<IntRange>(), thunderMatchRanges("Facebook", "bookxyz"))
     }
 
+    @Test
+    fun `regular typo matching tolerates one edit in a label substring`() {
+        val label = "Google Maps".normalizeForSearch()
+        for (query in listOf("mpas", "mapps", "googe", "mops")) {
+            assertTrue(query, SearchTypoMatcher(query).matches(label))
+        }
+    }
+
+    @Test
+    fun `regular typo matching rejects short numeric and distant queries`() {
+        assertFalse(SearchTypoMatcher("mps").matches("Maps"))
+        assertFalse(SearchTypoMatcher("1235").matches("App1234"))
+        assertFalse(SearchTypoMatcher("gzzgle").matches("Google"))
+        assertFalse(ThunderAppLabelMatcher("mpas").matches("Maps", "Maps"))
+    }
 }

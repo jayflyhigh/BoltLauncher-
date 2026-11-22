@@ -2,6 +2,7 @@
 <resources>
     <item type="id" name="bolt_result_identity" />
     <color name="bolt_search_yellow">#FFD640</color>
+    <color name="bolt_search_selected">#B7A071</color>
     <color name="bolt_search_result">#2B2B2B</color>
     <color name="bolt_search_outline">#414141</color>
     <color name="bolt_search_dock">#242424</color>
@@ -12,6 +13,8 @@
     <dimen name="bolt_search_results_inset">6dp</dimen>
     <dimen name="bolt_search_corner_radius">16dp</dimen>
     <dimen name="bolt_search_ime_gap">8dp</dimen>
+    <dimen name="bolt_search_text_inset">16dp</dimen>
+    <dimen name="bolt_search_web_text_gap">8dp</dimen>
     <dimen name="bolt_search_button_width">52dp</dimen>
     <string name="bolt_contact_selected">Contact selected</string>
     <string name="bolt_enter_target">Opens with Enter</string>

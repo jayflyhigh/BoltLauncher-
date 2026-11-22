@@ -73,3 +73,39 @@ internal fun thunderMatchRanges(label: String, query: String): List<IntRange> {
     return if (end < normalized.length) listOf(offsets[start]..offsets[end])
     else listOf(offsets[start]..offsets.last(), offsets.first()..offsets[end - normalized.length])
 }
+
+/** Match one insertion, deletion, substitution or adjacent transposition in a label substring. */
+internal class SearchTypoMatcher(query: String) {
+    private val needle = query.normalizeForSearch()
+
+    fun matches(normalizedLabel: String): Boolean {
+        if (needle.length < 4 || needle.none(Char::isLetter)) return false
+        for (length in needle.length - 1..needle.length + 1) {
+            for (start in 0..normalizedLabel.length - length) {
+                if (matchesWindow(normalizedLabel, start, length)) return true
+            }
+        }
+        return false
+    }
+
+    private fun matchesWindow(label: String, start: Int, length: Int): Boolean {
+        var prefix = 0
+        while (prefix < minOf(length, needle.length) &&
+            needle[prefix].equals(label[start + prefix], ignoreCase = true)) {
+            prefix++
+        }
+        val end = start + length
+        return when {
+            length < needle.length ->
+                label.regionMatches(start + prefix, needle, prefix + 1, length - prefix, ignoreCase = true)
+            length > needle.length ->
+                label.regionMatches(start + prefix + 1, needle, prefix, needle.length - prefix, ignoreCase = true)
+            prefix == length -> true
+            label.regionMatches(start + prefix + 1, needle, prefix + 1, length - prefix - 1, ignoreCase = true) -> true
+            else -> start + prefix + 1 < end &&
+                needle[prefix].equals(label[start + prefix + 1], ignoreCase = true) &&
+                needle[prefix + 1].equals(label[start + prefix], ignoreCase = true) &&
+                label.regionMatches(start + prefix + 2, needle, prefix + 2, length - prefix - 2, ignoreCase = true)
+        }
+    }
+}

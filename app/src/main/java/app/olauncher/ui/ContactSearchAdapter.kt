@@ -5,6 +5,8 @@ import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import app.olauncher.R
+import app.olauncher.helper.SearchTypoMatcher
+import app.olauncher.helper.normalizeForSearch
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -109,14 +111,19 @@ class ContactSearchAdapter(
         filterJob = photoScope.launch {
             val previous = results
             val (filtered, changes) = withContext(Dispatchers.Default) {
-                val next = if (terms.isEmpty()) { if (showAll) source else emptyList() } else source.filter { contact ->
+                val typoMatcher = SearchTypoMatcher(trimmed)
+                val next = if (terms.isEmpty()) {
+                    if (showAll) source else emptyList()
+                } else source.mapNotNull { contact ->
                     ensureActive()
-                    terms.all { contact.name.contains(it, ignoreCase = true) ||
+                    val exact = terms.all { contact.name.contains(it, ignoreCase = true) ||
                         contact.numbers.any { number -> number.contains(it) } }
-                }.map { contact ->
-                    ensureActive()
-                    Triple(contact, app.olauncher.helper.appSearchRank(contact.name, trimmed),
-                        contact.name.lowercase(Locale.ROOT))
+                    val rank = when {
+                        exact -> app.olauncher.helper.appSearchRank(contact.name, trimmed)
+                        trimmed.none(Char::isDigit) && typoMatcher.matches(contact.name.normalizeForSearch()) -> 4
+                        else -> return@mapNotNull null
+                    }
+                    Triple(contact, rank, contact.name.lowercase(Locale.ROOT))
                 }.sortedWith(compareBy<Triple<Contact, Int, String>> { it.second }.thenBy { it.third })
                     .map { it.first }
                 val diff = if (previous == next) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
@@ -214,8 +221,10 @@ class ContactSearchAdapter(
             androidx.core.view.ViewCompat.setStateDescription(binding.root,
                 state?.let(binding.root.resources::getString))
             binding.appTitle.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            binding.appTitle.setTextColor(if (highlighted) Color.WHITE else
+            binding.appTitle.setTextColor(if (highlighted) Color.BLACK else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
+            binding.contactNumber.setTextColor(if (highlighted) 0xFF322817.toInt() else
+                ContextCompat.getColor(binding.root.context, R.color.bolt_search_secondary))
         }
 
         fun bind(contact: Contact) {
