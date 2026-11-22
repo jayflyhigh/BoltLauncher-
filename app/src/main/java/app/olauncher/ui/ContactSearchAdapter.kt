@@ -55,6 +55,7 @@ class ContactSearchAdapter(
     val selectedContact: Contact?
         get() = results.firstOrNull { it.uri == selectedUri }
 
+    val currentList: List<Contact> get() = results
     val firstResult: Contact? get() = results.firstOrNull()
 
     var enterHighlightedResult: Contact? = null

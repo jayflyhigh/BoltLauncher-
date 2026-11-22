@@ -43,6 +43,18 @@
             android:textSize="14sp"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/moveModeHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:gravity="center"
+            android:paddingVertical="4dp"
+            android:text="@string/bolt_move_mode_hint"
+            android:textColor="@color/bolt_search_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <FrameLayout
             android:id="@+id/dock"
             android:layout_width="match_parent"

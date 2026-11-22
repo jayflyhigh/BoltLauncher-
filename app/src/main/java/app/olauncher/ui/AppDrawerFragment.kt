@@ -32,6 +32,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
+import androidx.core.widget.doOnTextChanged
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -100,6 +101,17 @@ class AppDrawerFragment : BaseFragment() {
 
     private var expanded = false
     private var thunderMode = false
+    private var moveMode = false
+    private var strippingMoveSuffix = false
+    private var previousSearchText = ""
+    private var beforeFirstComma: ResultHighlight? = null
+    private var movedHighlight: ResultHighlight? = null
+
+    private data class ResultHighlight(
+        val query: String,
+        val app: AppModel? = null,
+        val contact: Uri? = null,
+    )
     private var shortcutsRequested = false
     private var dismissedShortcutsQuery: String? = null
     private var searchFeedback: Int? = null
@@ -172,6 +184,10 @@ class AppDrawerFragment : BaseFragment() {
         canRename = arguments?.getBoolean(Constants.Key.RENAME, false) ?: false
         expanded = !isHomePage
         thunderMode = false
+        moveMode = false
+        previousSearchText = ""
+        beforeFirstComma = null
+        movedHighlight = null
         shortcutsRequested = false
         dismissedShortcutsQuery = null
         boltProgress = 0f
@@ -182,7 +198,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
         binding.root.onBackBeforeIme = {
             cancelAutoLaunch()
-            dismissSearchEdit() || dismissContactSelection()
+            exitMoveMode() || dismissSearchEdit() || dismissContactSelection()
         }
         binding.root.onTap = ::dismissSearchActionsOutside
         initObservers()
@@ -193,7 +209,8 @@ class AppDrawerFragment : BaseFragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (!dismissSearchEdit() && !dismissContactSelection() && !collapseSearch() && !isHomePage) closeDrawer()
+                    if (exitMoveMode() || dismissSearchEdit() || dismissContactSelection() || collapseSearch()) return
+                    if (!isHomePage) closeDrawer()
                 }
             })
     }
@@ -296,8 +313,20 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         dockIdleColor = ContextCompat.getColor(requireContext(), R.color.bolt_search_dock)
         boltYellow = ContextCompat.getColor(requireContext(), R.color.bolt_search_yellow)
-        binding.search.filters = binding.search.filters + android.text.InputFilter { _, _, _, dest, start, end ->
-            if (thunderCommitted) dest.subSequence(start, end) else null
+        binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
+            if (thunderCommitted) {
+                dest.subSequence(from, to)
+            } else if (moveMode && !strippingMoveSuffix && end - start == 1) {
+                val direction = when (source[start].lowercaseChar()) {
+                    'z' -> 1
+                    'x' -> -1
+                    else -> 0
+                }
+                if (direction == 0) null else {
+                    moveHighlight(direction)
+                    dest.subSequence(from, to)
+                }
+            } else null
         }
         binding.search.setOnClickListener { if (!expanded) openSearch(thunder = false) }
         binding.dockBolt.isVisible = flag == Constants.FLAG_LAUNCH_APP
@@ -329,11 +358,41 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.renameConfirm.setOnClickListener { saveSearchRename() }
         binding.renameCancel.setOnClickListener { finishSearchRename() }
+        var insertedTrailingComma = false
+        binding.search.doOnTextChanged { text, start, _, count ->
+            insertedTrailingComma = text != null && count > 0 && start + count == text.length && text.lastOrNull() == ','
+        }
         binding.search.doAfterTextChanged { text ->
-            if (searchRename != null || thunderCommitted) return@doAfterTextChanged
+            if (searchRename != null || thunderCommitted || strippingMoveSuffix) return@doAfterTextChanged
+            var query = text.toString()
+            if (query == previousSearchText) return@doAfterTextChanged
+            val moveQuery = query.removeSuffix(",,")
+            if (!moveMode && insertedTrailingComma && moveQuery != query && canOpenWebSearch(moveQuery) && text != null) {
+                movedHighlight = beforeFirstComma?.takeIf { it.query == moveQuery }
+                    ?: currentHighlight(moveQuery)
+                beforeFirstComma = null
+                setMoveMode(true)
+                strippingMoveSuffix = true
+                try {
+                    text.delete(moveQuery.length, text.length)
+                } finally {
+                    strippingMoveSuffix = false
+                }
+                query = moveQuery
+                if (query == previousSearchText) {
+                    adapter.closeSearchActions()
+                    updateResultHighlight(query)
+                    return@doAfterTextChanged
+                }
+            } else {
+                beforeFirstComma = if (!moveMode && query == "$previousSearchText,")
+                    currentHighlight(previousSearchText) else null
+                movedHighlight = null
+                if (query.isBlank()) exitMoveMode()
+            }
+            previousSearchText = query
             adapter.closeSearchActions()
             cancelAutoLaunch()
-            val query = text.toString()
             clearThunderEmpty()
             if (thunderMode && expanded && query.isNotBlank()) thunderEditAt = SystemClock.uptimeMillis()
             binding.appRename.isVisible = canRename && query.isNotBlank()
@@ -356,18 +415,89 @@ class AppDrawerFragment : BaseFragment() {
                     saveSearchRename()
                     return@setOnEditorActionListener true
                 }
-                if (adapter.closeSearchActions()) return@setOnEditorActionListener true
+                if (adapter.closeSearchActions() && !moveMode) return@setOnEditorActionListener true
                 val query = binding.search.text.toString()
                 val highlightedContact = contactsAdapter.enterHighlightedResult
                     ?.takeIf { highlightedContactQuery == query && contactsAdapter.committedQuery == query }
                 when {
                     highlightedContact != null -> openContact(highlightedContact)
                     offersWebFallback(query) -> openWebSearch(query)
-                    adapter.committedQuery == query -> adapter.launchFirstInList()
+                    adapter.committedQuery == query -> {
+                        val app = adapter.enterHighlightedResult?.takeIf { it in adapter.currentList }
+                        if (app != null) launchResult(app) else adapter.launchFirstInList()
+                    }
                 }
             }
             true
         }
+    }
+
+    private fun currentHighlight(query: String): ResultHighlight? {
+        val contact = contactsAdapter.enterHighlightedResult
+        if (contact != null && highlightedContactQuery == query && contactsAdapter.committedQuery == query) {
+            return ResultHighlight(query, contact = contact.uri)
+        }
+        val app = adapter.enterHighlightedResult
+        return if (app != null && adapter.committedQuery == query) ResultHighlight(query, app = app) else null
+    }
+
+    private fun setMoveMode(enabled: Boolean) {
+        moveMode = enabled
+        binding.moveModeHint.isVisible = enabled
+    }
+
+    private fun exitMoveMode(): Boolean {
+        if (!moveMode) return false
+        setMoveMode(false)
+        return true
+    }
+
+    private fun moveHighlight(direction: Int) {
+        val query = currentResultsQuery()
+        val appCount = adapter.itemCount.takeIf { adapter.committedQuery == query } ?: return
+        val contacts = contactsAdapter.currentList.takeIf { contactsAdapter.committedQuery == query }.orEmpty()
+        val highlighted = currentHighlight(query) ?: return
+        // The concatenated adapter starts at the bottom. Section headers are outside this index.
+        val currentIndex = if (highlighted.app != null) {
+            adapter.currentList.indexOf(highlighted.app).takeIf { it >= 0 } ?: return
+        } else {
+            val index = contacts.indexOfFirst { it.uri == highlighted.contact }.takeIf { it >= 0 } ?: return
+            appCount + index
+        }
+        val nextIndex = currentIndex + direction
+        if (nextIndex !in 0 until (appCount + contacts.size)) return
+        adapter.closeSearchActions()
+        val position = if (nextIndex < appCount) {
+            movedHighlight = ResultHighlight(query, app = adapter.currentList[nextIndex])
+            nextIndex
+        } else {
+            movedHighlight = ResultHighlight(query, contact = contacts[nextIndex - appCount].uri)
+            nextIndex + appsSection.itemCount
+        }
+        contactsAdapter.clearSelection()
+        dismissedShortcutsQuery = null
+        updateResultHighlight(query)
+        revealHighlight(position)
+    }
+
+    private fun revealHighlight(position: Int) {
+        val results = binding.recyclerView
+        val row = layoutManager.findViewByPosition(position)
+        if (row == null) {
+            layoutManager.scrollToPosition(position)
+            scrolledFromBestMatch = true
+            return
+        }
+        val bounds = Rect()
+        layoutManager.getDecoratedBoundsWithMargins(row, bounds)
+        val bottom = results.height - results.paddingBottom
+        val distance = when {
+            bounds.top < results.paddingTop -> bounds.top - results.paddingTop
+            bounds.bottom > bottom -> bounds.bottom - bottom
+            else -> return
+        }
+        results.scrollBy(0, distance)
+        scrolledFromBestMatch = results.canScrollVertically(1)
     }
 
     private fun openSearch(thunder: Boolean) {
@@ -407,6 +537,9 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun setThunderMode(enabled: Boolean, animate: Boolean = true) {
         if (thunderMode == enabled) return
+        exitMoveMode()
+        movedHighlight = null
+        beforeFirstComma = null
         cancelAutoLaunch()
         adapter.closeSearchActions()
         scrolledFromBestMatch = false
@@ -574,7 +707,10 @@ class AppDrawerFragment : BaseFragment() {
         val query = binding.search.text.toString()
         if (!expanded || thunderMode || contactsAdapter.committedQuery != query) return
         dismissedShortcutsQuery = null
-        contactsAdapter.toggleSelection(contact)
+        val movedContact = movedHighlight?.contact
+        movedHighlight = null
+        if (movedContact == contact.uri) contactsAdapter.clearSelection()
+        else contactsAdapter.toggleSelection(contact)
         updateResultHighlight(query)
     }
 
@@ -667,9 +803,14 @@ class AppDrawerFragment : BaseFragment() {
         val showHighlight = expanded && !thunderMode && flag == Constants.FLAG_LAUNCH_APP && query.isNotBlank()
         val appsReady = showHighlight && adapter.committedQuery == query
         val contactsReady = showHighlight && contactsAdapter.committedQuery == query
-        val selected = if (contactsReady) contactsAdapter.selectedContact else null
+        val moved = movedHighlight?.takeIf { showHighlight && it.query == query }
+        val movedApp = moved?.app?.takeIf { appsReady && it in adapter.currentList }
+        val movedContact = moved?.contact?.takeIf { contactsReady }?.let { uri ->
+            contactsAdapter.currentList.firstOrNull { it.uri == uri }
+        }
+        val selected = if (contactsReady) movedContact ?: contactsAdapter.selectedContact else null
         if (showHighlight && selected == null && !appsReady) return
-        val app = if (appsReady && selected == null) adapter.firstLaunchableResult else null
+        val app = if (appsReady && selected == null) movedApp ?: adapter.firstLaunchableResult else null
         if (showHighlight && selected == null && app == null && !contactsReady &&
             contactsLoaded && hasContactsPermission()) return
         adapter.enterHighlightedResult = app
@@ -885,6 +1026,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun beginSearchRename(app: AppModel) {
+        exitMoveMode()
         searchRename = SearchRename(app, binding.search.text.toString())
         binding.search.imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
         binding.search.text?.clear()
@@ -959,6 +1101,7 @@ class AppDrawerFragment : BaseFragment() {
 
     fun collapseSearch(): Boolean {
         if (_binding == null || !expanded || !isHomePage) return false
+        if (exitMoveMode()) return true
         cancelAutoLaunch()
         val insets = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
         if (insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true) {
@@ -980,6 +1123,7 @@ class AppDrawerFragment : BaseFragment() {
         searchActionReturn = null
         restoreSearchKeyboard = false
         dismissSearchEdit()
+        exitMoveMode()
         expanded = false
         clearThunderEmpty()
         binding.root.removeCallbacks(clearFeedback)

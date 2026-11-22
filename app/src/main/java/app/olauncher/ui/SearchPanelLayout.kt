@@ -17,6 +17,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private lateinit var results: View
     private lateinit var rename: View
     private lateinit var status: View
+    private lateinit var moveModeHint: View
     private lateinit var dock: View
 
     private val surface = ContextCompat.getColor(context, R.color.bolt_search_dock)
@@ -56,6 +57,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         results = findViewById(R.id.recyclerView)
         rename = findViewById(R.id.appRename)
         status = findViewById(R.id.searchStatus)
+        moveModeHint = findViewById(R.id.moveModeHint)
         dock = findViewById(R.id.dock)
     }
 
@@ -74,6 +76,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val statusHeight = measureContent(status, statusWidth, statusSpace)
         remaining -= statusHeight + if (statusInPanel) minOf(rowInset, remaining - statusHeight) else 0
         remaining -= measureContent(rename, exactWidth, remaining)
+        remaining -= measureContent(moveModeHint, exactWidth, remaining)
         resultsHeight = measureContent(results, exactWidth, (remaining - rowInset).coerceAtLeast(0))
         setMeasuredDimension(width, height)
     }
@@ -98,6 +101,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         if (resultsHeight > 0) edge -= rowInset
         updateHeight((height - edge).toFloat())
         if (!statusInPanel) edge = layoutAbove(status, edge)
+        edge = layoutAbove(moveModeHint, edge)
         layoutAbove(rename, edge)
     }
 
