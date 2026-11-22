@@ -46,6 +46,7 @@ import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.BuildConfig
 import app.olauncher.MainViewModel
 import app.olauncher.R
+import app.olauncher.ui.game.ThunderGameView
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
@@ -113,6 +114,7 @@ class AppDrawerFragment : BaseFragment() {
     private val destinationsOnly get() = homeDestinations || activeAlias != null
     private val supportsDestinations get() = flag == Constants.FLAG_LAUNCH_APP && !thunderMode && searchRename == null
 
+    private var thunderGame: ThunderGameView? = null
     private var expanded = false
     private var thunderMode = false
     private var moveMode = false
@@ -291,7 +293,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initHomeSwipe() {
-        binding.root.canSwipeSearch = { isHomePage && !expanded }
+        binding.root.canSwipeSearch = { isHomePage && !expanded && thunderGame == null }
         binding.root.onSwipeUp = { openSearch(thunder = false) }
         val threshold = 64f * resources.displayMetrics.density
         var notificationsOpened = false
@@ -303,7 +305,7 @@ class AppDrawerFragment : BaseFragment() {
                 }
 
                 override fun onLongPress(event: android.view.MotionEvent) {
-                    if (isHomePage && !expanded) showHomeSettings()
+                    if (isHomePage && !expanded && thunderGame == null) showHomeSettings()
                 }
 
                 override fun onScroll(
@@ -324,7 +326,7 @@ class AppDrawerFragment : BaseFragment() {
             })
         detector.setOnDoubleTapListener(null)
         binding.root.setOnTouchListener { _, event ->
-            isHomePage && !expanded && detector.onTouchEvent(event)
+            isHomePage && !expanded && thunderGame == null && detector.onTouchEvent(event)
         }
     }
 
@@ -359,6 +361,18 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.dockBolt.setOnClickListener {
             if (!thunderCommitted) openSearch(thunder = !thunderMode)
+        }
+        binding.dockBolt.setOnLongClickListener {
+            if (!isHomePage || expanded || thunderGame != null) return@setOnLongClickListener false
+            binding.search.hideKeyboard()
+            val game = ThunderGameView(requireContext(), ::closeThunderGame)
+            thunderGame = game
+            binding.searchPanel.isVisible = false
+            binding.root.addView(game, android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+            ))
+            game.requestFocus()
+            true
         }
         binding.dockSearchDestinations.setOnClickListener {
             homeDestinations = true
@@ -728,7 +742,11 @@ class AppDrawerFragment : BaseFragment() {
     private fun applySearchColors() {
         binding.search.setThunderCursor(thunderMode)
         binding.dockBolt.contentDescription = getString(
-            if (thunderMode) R.string.bolt_disable_thunder else R.string.bolt_enable_thunder
+            when {
+                thunderMode -> R.string.bolt_disable_thunder
+                isHomePage && !expanded -> R.string.thunder_game_hold
+                else -> R.string.bolt_enable_thunder
+            }
         )
     }
 
@@ -1286,7 +1304,19 @@ class AppDrawerFragment : BaseFragment() {
         if (!launch()) searchActionReturn = null
     }
 
+    private fun closeThunderGame() {
+        val game = thunderGame ?: return
+        thunderGame = null
+        binding.root.removeView(game)
+        binding.searchPanel.isVisible = true
+        binding.root.requestFocus()
+    }
+
     fun collapseSearch(): Boolean {
+        if (thunderGame != null) {
+            closeThunderGame()
+            return true
+        }
         if (_binding == null || !expanded || !isHomePage) return false
         if (exitMoveMode()) return true
         cancelAutoLaunch()
@@ -1653,6 +1683,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onPause() {
+        thunderGame?.pauseGame()
         restoreSearchKeyboard = false
         dismissSearchEdit()
         cancelAutoLaunch()
@@ -1667,6 +1698,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
+        closeThunderGame()
         clearThunderEmpty()
         binding.root.viewTreeObserver.removeOnWindowFocusChangeListener(searchWindowFocusListener)
         restoreSearchKeyboard = false
