@@ -54,6 +54,7 @@ class AppDrawerAdapter(
     private val appRenameListener: (AppModel, String) -> Unit,
     private val canShowSearchActions: () -> Boolean = { false },
     private val searchRenameListener: (AppModel) -> Unit = {},
+    private val appAliasListener: (AppModel.App) -> Unit = {},
     private val appPlayStoreListener: (AppModel) -> Unit = {},
     private val resultsChanged: (String) -> Unit = {},
     private val privateSpaceToggleListener: () -> Unit = {},
@@ -316,6 +317,7 @@ class AppDrawerAdapter(
                         { action -> runSearchAction(appModel, action) },
                         searchRenameListener,
                         appPlayStoreListener,
+                        appAliasListener,
                         iconScope,
                         iconCache,
                         thunderMode, committedQuery.orEmpty(), !thunderMode && appModel == enterHighlightedResult,
@@ -447,6 +449,8 @@ class AppDrawerAdapter(
         }
 
         fun bindSearchActions(app: AppModel, show: Boolean) = with(binding) {
+            searchAddAlias.isVisible = app is AppModel.App &&
+                app.user == android.os.Process.myUserHandle()
             if (show) {
                 if (!searchAppActions.isVisible) {
                     val context = root.context
@@ -485,6 +489,7 @@ class AppDrawerAdapter(
             runSearchAction: (() -> Unit) -> Unit,
             searchRenameListener: (AppModel) -> Unit,
             appPlayStoreListener: (AppModel) -> Unit,
+            appAliasListener: (AppModel.App) -> Unit,
             iconScope: CoroutineScope,
             iconCache: LruCache<IconKey, Drawable.ConstantState>,
             thunderMode: Boolean,
@@ -635,6 +640,10 @@ class AppDrawerAdapter(
                     )
                     renameLayout.visibility = View.GONE
                 }
+            }
+            val aliasApp = (appModel as? AppModel.App)?.takeIf { it.user == myUserHandle }
+            searchAddAlias.setOnClickListener {
+                aliasApp?.let { runSearchAction { appAliasListener(it) } }
             }
             searchRename.setOnClickListener { runSearchAction { searchRenameListener(appModel) } }
             searchPlayStore.setOnClickListener { runSearchAction { appPlayStoreListener(appModel) } }

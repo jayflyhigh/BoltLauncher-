@@ -12,90 +12,76 @@ import app.olauncher.helper.InAppSearch
 import app.olauncher.helper.AppIconColor
 
 object AppSearchEditor {
-    fun show(context: Context, apps: List<AppModel.App>, search: InAppSearch,
-             initial: InAppSearch.Target?, selectedApp: AppModel.App? = null, onChanged: () -> Unit): AlertDialog {
+    fun show(context: Context, search: InAppSearch, initial: InAppSearch.Target?,
+             app: AppModel.App? = null, onChanged: () -> Unit): AlertDialog {
+        val packageName = initial?.packageName ?: requireNotNull(app).appPackage
+        val appLabel = initial?.appLabel ?: requireNotNull(app).appLabel
         val density = context.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
-        val nested = mutableListOf<AlertDialog>()
         val panel = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(4), dp(20), dp(12))
         }
-        fun label(text: String) { panel.addView(TextView(context).apply { this.text = text; setPadding(0, dp(14), 0, dp(6)) }) }
-        var chosen: AppModel.App? = selectedApp ?: initial?.app
-        var color = initial?.color ?: AppIconColor.primary(context, chosen)
-        label("1. Choose an app")
-        val appButton = Button(context).apply { isAllCaps = false; text = chosen?.appLabel ?: "Choose app" }
-        panel.addView(appButton)
-        label("2. Search URL")
+        fun label(text: String) {
+            panel.addView(TextView(context).apply { this.text = text; setPadding(0, dp(14), 0, dp(6)) })
+        }
+        label("Alias code")
+        val alias = EditText(context).apply {
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setText(initial?.code.orEmpty())
+        }
+        panel.addView(alias)
+        var color = initial?.color ?: AppIconColor.primary(context, app)
+        label("Badge color")
+        val colorButton = Button(context).apply { isAllCaps = false }
+        fun refreshColor() {
+            colorButton.text = String.format("#%06X", color and 0xFFFFFF)
+            colorButton.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
+            colorButton.setTextColor(InAppSearch.foreground(color))
+        }
+        refreshColor()
+        panel.addView(colorButton)
+        var colorDialog: AlertDialog? = null
+        colorButton.setOnClickListener {
+            colorDialog = showColor(context, color, alias.text.toString()) { color = it; refreshColor() }
+        }
         val url = EditText(context).apply {
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
             hint = "https://example.com/search?q={query}"
             setText(initial?.template.orEmpty())
         }
-        panel.addView(url)
-        panel.addView(TextView(context).apply {
-            text = "Use {query} or %s where the search text goes. If neither is present, the search text is appended to the URL."
-            textSize = 12f
-        })
-        label("3. Alias code")
-        val alias = EditText(context).apply {
-            setSingleLine(true)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            hint = "Your alias code"
-            setText(initial?.code.orEmpty())
+        if (initial?.builtIn != true) {
+            label("Search URL")
+            panel.addView(url)
         }
-        panel.addView(alias)
-        label("4. Code background color")
-        val colorButton = Button(context).apply { isAllCaps = false }
-        fun refreshColor() {
-            colorButton.text = "Color wheel / ${String.format("#%06X", color and 0xFFFFFF)}"
-            colorButton.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
-            colorButton.setTextColor(InAppSearch.foreground(color))
-        }
-        refreshColor(); panel.addView(colorButton)
         val error = TextView(context).apply { setTextColor(Color.rgb(255, 110, 100)); visibility = View.GONE }
         panel.addView(error)
-        appButton.setOnClickListener {
-            if (apps.isEmpty()) { error.text = "No apps available"; error.visibility = View.VISIBLE; return@setOnClickListener }
-            val picker = AlertDialog.Builder(context).setTitle("Choose app")
-                .setItems(apps.map { it.appLabel }.toTypedArray()) { _, index ->
-                    chosen = apps[index]; appButton.text = chosen!!.appLabel
-                    val saved = search.targets[chosen!!.appPackage]
-                    url.setText(saved?.template.orEmpty()); alias.setText(saved?.code.orEmpty())
-                    color = saved?.color ?: AppIconColor.primary(context, chosen); refreshColor()
-                    error.visibility = View.GONE
-                }.setNegativeButton(android.R.string.cancel, null).create()
-            nested.add(picker); picker.show()
-        }
-        colorButton.setOnClickListener {
-            nested.add(showColor(context, color, alias.text.toString().trim()) { color = it; refreshColor() })
-        }
-        val remove = Button(context).apply { text = "Remove command for selected app"; isAllCaps = false }
-        panel.addView(remove)
-        val dialog = AlertDialog.Builder(context).setTitle("Search within Apps")
+        val builder = AlertDialog.Builder(context).setTitle(appLabel)
             .setView(ScrollView(context).apply { addView(panel) })
-            .setPositiveButton("Apply", null).setNegativeButton(android.R.string.cancel, null).create()
-        remove.setOnClickListener {
-            val app = chosen
-            if (app == null || search.targets[app.appPackage] == null) {
-                error.text = "Choose an app with a saved command"; error.visibility = View.VISIBLE
-            } else { search.remove(app.appPackage); onChanged(); dialog.dismiss() }
+            .setPositiveButton(if (initial?.hidden == true) "Show" else "Save", null)
+            .setNegativeButton(android.R.string.cancel, null)
+        if (initial != null && !initial.hidden) {
+            builder.setNeutralButton(if (initial.builtIn) "Hide" else "Delete") { _, _ ->
+                search.remove(initial)
+                onChanged()
+            }
         }
+        val dialog = builder.create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val app = chosen
-                if (app == null) { error.text = "Choose an app first"; error.visibility = View.VISIBLE; return@setOnClickListener }
                 try {
-                    search.save(app, url.text.toString(), color, alias.text.toString())
-                    onChanged(); dialog.dismiss()
+                    search.save(packageName, appLabel, url.text.toString(), color, alias.text.toString())
+                    onChanged()
+                    dialog.dismiss()
                 } catch (e: IllegalArgumentException) {
-                    error.text = e.message; error.visibility = View.VISIBLE
+                    error.text = e.message
+                    error.visibility = View.VISIBLE
                 }
             }
         }
-        dialog.setOnDismissListener { nested.forEach { it.dismiss() } }
+        dialog.setOnDismissListener { colorDialog?.dismiss() }
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         dialog.show()
         return dialog

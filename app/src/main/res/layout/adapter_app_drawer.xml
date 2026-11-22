@@ -159,85 +159,60 @@
         android:gravity="center_vertical"
         android:visibility="gone">
 
-        <androidx.appcompat.widget.AppCompatButton
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/searchRename"
-            style="?android:attr/borderlessButtonStyle"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:minWidth="0dp"
-            android:paddingHorizontal="2dp"
-            android:text="@string/rename"
-            android:textAllCaps="false"
-            android:textColor="@color/bolt_search_action_label"
-            android:textSize="12sp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:paddingVertical="4dp"
-            android:drawablePadding="1dp"
-            app:drawableTint="@color/bolt_search_action_label"
-            app:drawableTopCompat="@drawable/ic_rename" />
+            android:background="?attr/selectableItemBackground"
+            android:scaleType="center"
+            android:contentDescription="@string/rename"
+            app:tint="@color/bolt_search_action_label"
+            app:srcCompat="@drawable/ic_rename" />
 
-        <androidx.appcompat.widget.AppCompatButton
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/searchPlayStore"
-            style="?android:attr/borderlessButtonStyle"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:minWidth="0dp"
-            android:paddingHorizontal="2dp"
-            android:text="@string/bolt_play_store"
-            android:textAllCaps="false"
-            android:textColor="@color/bolt_search_action_label"
-            android:textSize="12sp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:paddingVertical="4dp"
-            android:drawablePadding="1dp"
-            app:drawableTint="@color/bolt_search_action_label"
-            app:drawableTopCompat="@drawable/bolt_play_store_icon" />
+            android:background="?attr/selectableItemBackground"
+            android:scaleType="center"
+            android:contentDescription="@string/bolt_play_store"
+            app:tint="@color/bolt_search_action_label"
+            app:srcCompat="@drawable/bolt_play_store_icon" />
 
-        <androidx.appcompat.widget.AppCompatButton
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/searchAddAlias"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:scaleType="center"
+            android:contentDescription="@string/bolt_add_alias"
+            app:tint="@color/bolt_search_action_label"
+            app:srcCompat="@drawable/bolt_add_alias_icon" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/searchAppInfo"
-            style="?android:attr/borderlessButtonStyle"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:minWidth="0dp"
-            android:paddingHorizontal="2dp"
-            android:text="@string/bolt_app_info"
-            android:textAllCaps="false"
-            android:textColor="@color/bolt_search_action_label"
-            android:textSize="12sp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:paddingVertical="4dp"
-            android:drawablePadding="1dp"
-            app:drawableTint="@color/bolt_search_action_label"
-            app:drawableTopCompat="@drawable/ic_info" />
+            android:background="?attr/selectableItemBackground"
+            android:scaleType="center"
+            android:contentDescription="@string/bolt_app_info"
+            app:tint="@color/bolt_search_action_label"
+            app:srcCompat="@drawable/ic_info" />
 
-        <androidx.appcompat.widget.AppCompatButton
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/searchUninstall"
-            style="?android:attr/borderlessButtonStyle"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:minWidth="0dp"
-            android:paddingHorizontal="2dp"
-            android:text="@string/delete"
-            android:textAllCaps="false"
-            android:textColor="@color/bolt_search_action_uninstall"
-            android:textSize="12sp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:gravity="center"
-            android:paddingVertical="4dp"
-            android:drawablePadding="1dp"
-            app:drawableTint="@color/bolt_search_action_uninstall"
-            app:drawableTopCompat="@drawable/ic_delete" />
+            android:background="?attr/selectableItemBackground"
+            android:scaleType="center"
+            android:contentDescription="@string/delete"
+            app:tint="@color/bolt_search_action_uninstall"
+            app:srcCompat="@drawable/ic_delete" />
 
     </LinearLayout>
 

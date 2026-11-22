@@ -1,7 +1,5 @@
 package app.olauncher.helper
 
-import java.net.URLEncoder
-
 /** Search URLs only, never home pages or a guessed custom URI scheme. */
 object InAppSearchLinks {
     private val prefixes = mapOf(
@@ -12,7 +10,14 @@ object InAppSearchLinks {
         "com.pinterest" to "https://www.pinterest.com/search/pins/?q="
     )
 
-    fun url(packageName: String, query: String): String? = prefixes[packageName]?.let {
-        it + URLEncoder.encode(query, "UTF-8").replace("+", "%20")
+    fun template(packageName: String): String? = prefixes[packageName]?.plus("{query}")
+
+    fun url(packageName: String, query: String): String? =
+        template(packageName)?.let { SearchCommandUrl.build(it, query) }
+
+    fun appTemplate(packageName: String): String? = when (packageName) {
+        "com.android.vending" -> "market://search?q={query}&c=apps"
+        "com.google.android.apps.maps" -> "geo:0,0?q={query}"
+        else -> null
     }
 }

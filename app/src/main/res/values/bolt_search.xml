@@ -43,4 +43,12 @@
     <dimen name="bolt_contact_action_divider_width">1dp</dimen>
     <string name="bolt_apps_section">Apps</string>
     <string name="bolt_contacts_section">Contacts</string>
+    <string name="bolt_search_section">Search</string>
+    <string name="bolt_search_in_app">Search in %1$s</string>
+    <string name="bolt_search_destinations">Search in apps</string>
+    <string name="bolt_search_destination_unavailable">Search destination unavailable</string>
+    <string name="bolt_add_alias">Add Alias</string>
+    <string name="bolt_activate_alias">Activate alias %1$s</string>
+    <string name="bolt_clear_alias">Clear alias %1$s</string>
+    <string name="bolt_hidden_destinations">Hidden search destinations</string>
 </resources>

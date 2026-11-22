@@ -3,6 +3,7 @@ package app.olauncher.ui
 import android.content.Context
 import android.os.Build
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
@@ -16,10 +17,27 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     private val cursorPaint = android.graphics.Paint().apply { color = android.graphics.Color.BLACK }
 
     var onImeCommit: (() -> Unit)? = null
+    var onEmptyBackspace: (() -> Boolean)? = null
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DEL && consumeEmptyBackspace()) return true
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun consumeEmptyBackspace(): Boolean =
+        text.isNullOrEmpty() && onEmptyBackspace?.invoke() == true
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val connection = super.onCreateInputConnection(outAttrs) ?: return null
         return object : InputConnectionWrapper(connection, false) {
+            override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean =
+                (beforeLength > 0 && afterLength == 0 && consumeEmptyBackspace()) ||
+                    super.deleteSurroundingText(beforeLength, afterLength)
+
+            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean =
+                (beforeLength > 0 && afterLength == 0 && consumeEmptyBackspace()) ||
+                    super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+
             override fun finishComposingText(): Boolean {
                 return super.finishComposingText().also { if (it) onImeCommit?.invoke() }
             }

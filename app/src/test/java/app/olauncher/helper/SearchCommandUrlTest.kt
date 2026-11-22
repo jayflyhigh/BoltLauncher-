@@ -28,18 +28,25 @@ class SearchCommandUrlTest {
         assertFalse(SearchCommandUrl.valid("javascript:alert('{query}')"))
         assertFalse(SearchCommandUrl.valid("file:///data/{query}"))
     }
-    @Test fun `custom aliases support symbols unicode and spaces but stay unique`() {
+    @Test fun `aliases reject spaces and case insensitive duplicates`() {
         assertTrue(SearchCommandUrl.validAlias("動画!", emptyList()))
-        assertTrue(SearchCommandUrl.validAlias("my app", emptyList()))
-        assertFalse(SearchCommandUrl.validAlias(" YT ", listOf("yt")))
-        assertFalse(SearchCommandUrl.validAlias(" \t", emptyList()))
+        assertFalse(SearchCommandUrl.validAlias("my app", emptyList()))
+        assertFalse(SearchCommandUrl.validAlias(" yt ", emptyList()))
+        assertFalse(SearchCommandUrl.validAlias("YT", listOf("yt")))
     }
-    @Test fun `confirmation picks full longest alias and preserves original query`() {
-        assertEquals("my app" to "red flowers", SearchCommandUrl.confirmed("MY APP.red flowers", listOf("my", "my app")))
-        assertEquals("yt" to "", SearchCommandUrl.confirmed("YT.", listOf("yt")))
-        assertNull(SearchCommandUrl.confirmed("yt", listOf("yt")))
-        assertNull(SearchCommandUrl.confirmed("yt ", listOf("yt")))
-        assertNull(SearchCommandUrl.confirmed("yt. ", listOf("other")))
-        assertEquals("yt" to "cats", SearchCommandUrl.confirmed("yt.cats", listOf("yt")))
+
+    @Test fun `default aliases skip previously reserved codes`() {
+        assertEquals("play", SearchCommandUrl.availableAlias("play", emptyList()))
+        assertEquals("play3", SearchCommandUrl.availableAlias("play", listOf("PLAY", "Play2")))
+    }
+
+    @Test fun `confirmation consumes one space and preserves the rest of the query`() {
+        assertEquals("rd" to "café & cats", SearchCommandUrl.confirmed("RD café & cats", listOf("rd")))
+        assertEquals("rd" to "", SearchCommandUrl.confirmed("rd ", listOf("rd")))
+        assertEquals("rd" to " cats", SearchCommandUrl.confirmed("rd  cats", listOf("rd")))
+        assertNull(SearchCommandUrl.confirmed("rd", listOf("rd")))
+        assertNull(SearchCommandUrl.confirmed("rd.cats", listOf("rd")))
+        assertNull(SearchCommandUrl.confirmed("read cats", listOf("rd")))
+        assertNull(SearchCommandUrl.confirmed("cats rd hello", listOf("rd")))
     }
 }
