@@ -146,7 +146,6 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var contactsSection: SearchSectionAdapter
     private var highlightedContactQuery: String? = null
     private var autoLaunch: Runnable? = null
-    private var thunderLaunchAnimation: ThunderLaunchAnimation? = null
     private var thunderLaunchAnimator: ValueAnimator? = null
     private var thunderEditAt: Long? = null
     private var thunderCommitted = false
@@ -1105,34 +1104,44 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun cancelAutoLaunch(clearAnimation: Boolean = true) {
+    private fun cancelAutoLaunch() {
         autoLaunch?.let { _binding?.root?.removeCallbacks(it) }
         autoLaunch = null
         thunderEditAt = null
         thunderCommitted = false
-        if (clearAnimation) clearThunderLaunchAnimation()
+        clearThunderLaunchAnimation()
     }
 
     private fun clearThunderLaunchAnimation() {
-        thunderLaunchAnimator?.cancel()
+        val animator = thunderLaunchAnimator
+        thunderLaunchAnimator = null
+        animator?.cancel()
     }
 
-    private fun showThunderLaunchAnimation(app: AppModel) {
+    private fun showThunderLaunchAnimation(app: AppModel, onComplete: (ThunderLaunchAnimation?) -> Unit) {
         val root = binding.root
-        if (!LauncherMotion.isEnabled(root.context)) return
-        val animation = adapter.launchAnimation(binding.recyclerView, root, app) ?: return
+        val animation = if (LauncherMotion.isEnabled(root.context)) {
+            adapter.launchAnimation(binding.recyclerView, root, app)
+        } else null
+        if (animation == null) {
+            onComplete(null)
+            return
+        }
         animation.setBounds(0, 0, root.width, root.height)
         root.overlay.add(animation)
-        thunderLaunchAnimation = animation
         thunderLaunchAnimator = ValueAnimator.ofFloat(animation.progress, 1f).apply {
             duration = THUNDER_LIFT_MS
             interpolator = LauncherMotion.settle
             addUpdateListener { animation.progress = it.animatedValue as Float }
-            doOnEnd {
+            doOnEnd { animator ->
+                // Cancellation also invokes the end listener.
+                val completed = thunderLaunchAnimator === animator
                 root.overlay.remove(animation)
                 animation.restoreIcon()
-                thunderLaunchAnimation = null
-                thunderLaunchAnimator = null
+                if (completed) {
+                    thunderLaunchAnimator = null
+                    onComplete(animation)
+                }
             }
         }
         thunderLaunchAnimator?.start()
@@ -1150,14 +1159,18 @@ class AppDrawerFragment : BaseFragment() {
         val result = adapter.firstLaunchableResult ?: return
         val committedAt = SystemClock.uptimeMillis()
         val launchDeadline = editedAt + THUNDER_QUIET_MS
+        fun isLaunchCurrent(): Boolean {
+            val view = _binding ?: return false
+            return thunderMode && expanded && searchRename == null &&
+                adapter.actionPosition == RecyclerView.NO_POSITION && adapter.committedQuery == query &&
+                view.search.text.toString() == query && view.root.hasWindowFocus() &&
+                adapter.itemCount == 1 && adapter.firstLaunchableResult == result &&
+                viewLifecycleOwner.lifecycle.currentState == Lifecycle.State.RESUMED
+        }
         val task = object : Runnable {
             override fun run() {
                 val view = _binding ?: return
-                if (!thunderMode || !expanded || searchRename != null ||
-                    adapter.actionPosition != RecyclerView.NO_POSITION || adapter.committedQuery != query ||
-                    view.search.text.toString() != query || !view.root.hasWindowFocus() ||
-                    adapter.itemCount != 1 || adapter.firstLaunchableResult != result ||
-                    viewLifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
+                if (!isLaunchCurrent()) {
                     cancelAutoLaunch()
                     return
                 }
@@ -1170,14 +1183,15 @@ class AppDrawerFragment : BaseFragment() {
                     return
                 }
                 thunderCommitted = true
-                showThunderLaunchAnimation(result)
                 view.dock.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
-                val launchAt = SystemClock.uptimeMillis()
-                val launched = launchResult(result)
-                cancelAutoLaunch(clearAnimation = !launched)
-                if (launched && BuildConfig.DEBUG) {
-                    Log.d("BoltThunderTiming", "editToCommitMs=${committedAt - editedAt} " +
-                        "commitToLaunchRequestMs=${launchAt - committedAt}")
+                showThunderLaunchAnimation(result) { animation ->
+                    val launchAt = SystemClock.uptimeMillis()
+                    val launched = isLaunchCurrent() && launchResult(result, animation)
+                    cancelAutoLaunch()
+                    if (launched && BuildConfig.DEBUG) {
+                        Log.d("BoltThunderTiming", "editToCommitMs=${committedAt - editedAt} " +
+                            "commitToLaunchRequestMs=${launchAt - committedAt}")
+                    }
                 }
             }
         }
@@ -1327,21 +1341,23 @@ class AppDrawerFragment : BaseFragment() {
         dialog.show()
     }
 
-    private fun launchResult(appModel: AppModel): Boolean {
-        val animatingThunderLaunch = thunderLaunchAnimation != null
-        if (!thunderCommitted) cancelAutoLaunch(clearAnimation = !animatingThunderLaunch)
+    private fun launchResult(
+        appModel: AppModel,
+        thunderAnimation: ThunderLaunchAnimation? = null,
+    ): Boolean {
+        if (!thunderCommitted) cancelAutoLaunch()
         if (flag == Constants.FLAG_LAUNCH_APP && expanded) {
             val keyboardWasVisible = imeWasVisible
             if (!viewModel.launchAppResult(
-                    appModel, ::showSearchFeedback, thunderLaunchAnimation?.launchOptions()
+                    appModel, ::showSearchFeedback, thunderAnimation?.launchOptions()
                 )) return false
             if (isHomePage && !thunderMode) {
                 searchAppLaunch = SearchAppLaunch(SystemClock.elapsedRealtime(), keyboardWasVisible)
-            } else if (!animatingThunderLaunch) {
+            } else if (thunderAnimation == null) {
                 binding.search.hideKeyboard()
             }
         } else {
-            if (!animatingThunderLaunch) binding.search.hideKeyboard()
+            if (thunderAnimation == null) binding.search.hideKeyboard()
             viewModel.selectedApp(appModel, flag)
         }
         if (flag == Constants.FLAG_LAUNCH_APP || flag == Constants.FLAG_HIDDEN_APPS)
@@ -1605,7 +1621,7 @@ class AppDrawerFragment : BaseFragment() {
     override fun onPause() {
         restoreSearchKeyboard = false
         dismissSearchEdit()
-        cancelAutoLaunch(clearAnimation = false)
+        cancelAutoLaunch()
         super.onPause()
     }
 

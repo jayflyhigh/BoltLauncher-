@@ -98,7 +98,7 @@ suspend fun getAppsList(
                         val appModel = AppModel.App(
                             appLabel = appLabelShown,
                             originalLabel = app.label.toString(),
-                            key = collator.getCollationKey(app.label.toString()),
+                            key = collator.getCollationKey(appLabelShown),
                             appPackage = app.applicationInfo.packageName,
                             activityClassName = app.componentName.className,
                             isNew = (System.currentTimeMillis() - app.firstInstallTime) < Constants.ONE_HOUR_IN_MILLIS,
@@ -132,7 +132,7 @@ suspend fun getAppsList(
                 appList.addAll(pinned)
             }
 
-            appList.sortWith(compareBy(collator) { it.appLabel })
+            appList.sort()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -254,7 +254,7 @@ suspend fun getPrivateSpaceApps(
                     AppModel.App(
                         appLabel = appLabelShown,
                         originalLabel = app.label.toString(),
-                        key = collator.getCollationKey(app.label.toString()),
+                        key = collator.getCollationKey(appLabelShown),
                         appPackage = app.applicationInfo.packageName,
                         activityClassName = app.componentName.className,
                         isNew = false,
@@ -262,7 +262,7 @@ suspend fun getPrivateSpaceApps(
                     )
                 )
             }
-            appList.sortWith(compareBy(collator) { it.appLabel })
+            appList.sort()
         } catch (e: Exception) {
             e.printStackTrace()
         }
