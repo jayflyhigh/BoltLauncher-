@@ -49,10 +49,12 @@ import app.olauncher.R
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
+import app.olauncher.databinding.DialogHomeSettingsBinding
 import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.ContactLoadResult
 import app.olauncher.helper.InAppSearch
 import app.olauncher.helper.deletePinnedShortcut
+import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isEinkDisplay
 import app.olauncher.helper.isSystemApp
@@ -327,7 +329,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initSearch() {
-        dockIdleColor = ContextCompat.getColor(requireContext(), R.color.bolt_search_dock)
+        dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         boltYellow = ContextCompat.getColor(requireContext(), R.color.bolt_search_yellow)
         binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
             if (thunderCommitted) {
@@ -1298,19 +1300,28 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun showHomeSettings() {
         cancelAutoLaunch()
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setItems(arrayOf("Launcher settings", "System settings")) { _, which ->
-                if (which == 0) {
-                    findNavController().navigate(if (isHomePage) R.id.action_mainFragment_to_settingsFragment
-                        else R.id.action_appListFragment_to_settingsFragment2)
-                } else {
-                    try {
-                        startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS))
-                    } catch (_: android.content.ActivityNotFoundException) {
-                        requireContext().showToast("System settings are unavailable")
-                    }
-                }
-            }.show()
+        val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        val menu = DialogHomeSettingsBinding.inflate(LayoutInflater.from(builder.context))
+        val dialog = builder.setView(menu.root).create()
+        menu.launcherSettings.setOnClickListener {
+            dialog.dismiss()
+            findNavController().navigate(R.id.action_mainFragment_to_settingsFragment)
+        }
+        menu.systemSettings.setOnClickListener {
+            dialog.dismiss()
+            try {
+                startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
+            } catch (_: ActivityNotFoundException) {
+                requireContext().showToast(getString(R.string.bolt_system_settings_unavailable))
+            }
+        }
+        menu.frostedGlass.isChecked = prefs.frostedGlass
+        menu.frostedGlass.setOnCheckedChangeListener { _, enabled ->
+            prefs.frostedGlass = enabled
+            dialog.dismiss()
+            requireActivity().recreate()
+        }
+        dialog.show()
     }
 
     private fun launchResult(appModel: AppModel): Boolean {

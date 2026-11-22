@@ -18,6 +18,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingHorizontal="@dimen/bolt_search_results_inset"
+            android:paddingBottom="@dimen/bolt_result_dock_gap"
             android:visibility="invisible" />
 
         <TextView
