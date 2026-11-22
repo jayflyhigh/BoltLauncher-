@@ -681,10 +681,20 @@ class AppDrawerFragment : BaseFragment() {
         if (web.isVisible && (web.layoutParams as FrameLayout.LayoutParams).marginEnd != actionMargin) {
             web.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = actionMargin }
         }
-        // Keep the input viewport stable when a contact becomes the target or is deselected.
-        val inputActionMargin = if (web.isVisible && searchRename == null && hasContactsPermission())
-            contactWidth else actionMargin
-        val margin = inputActionMargin + if (web.isVisible) web.layoutParams.width else 0
+        val divider = binding.dockWebDivider
+        divider.isVisible = web.isVisible
+        val webStart = actionMargin + if (web.isVisible) web.layoutParams.width else 0
+        if (divider.isVisible && (divider.layoutParams as FrameLayout.LayoutParams).marginEnd != webStart) {
+            divider.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = webStart }
+        }
+        val margin = webStart + if (divider.isVisible) divider.layoutParams.width else 0
+        val endPadding = resources.getDimensionPixelSize(
+            if (web.isVisible) R.dimen.bolt_search_web_text_gap else R.dimen.bolt_search_text_inset
+        )
+        val search = binding.search
+        if (search.paddingEnd != endPadding) {
+            search.setPaddingRelative(search.paddingStart, search.paddingTop, endPadding, search.paddingBottom)
+        }
         if ((binding.search.layoutParams as FrameLayout.LayoutParams).marginEnd != margin) {
             binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = margin }
         }

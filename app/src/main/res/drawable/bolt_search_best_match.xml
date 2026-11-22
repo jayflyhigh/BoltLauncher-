@@ -1,9 +1,8 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true">
         <shape>
-            <solid android:color="@color/bolt_search_result" />
+            <solid android:color="@color/bolt_search_selected" />
             <corners android:radius="@dimen/bolt_search_corner_radius" />
-            <stroke android:width="2dp" android:color="@color/bolt_search_yellow" />
         </shape>
     </item>
     <item>

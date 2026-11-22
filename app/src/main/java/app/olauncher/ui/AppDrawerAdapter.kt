@@ -38,6 +38,7 @@ import app.olauncher.helper.AppLabelMatcher
 import app.olauncher.helper.ThunderAppLabelMatcher
 import app.olauncher.helper.thunderMatchRanges
 import app.olauncher.helper.normalizeForSearch
+import app.olauncher.helper.SearchTypoMatcher
 import app.olauncher.helper.appSearchRank
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isSystemApp
@@ -175,12 +176,16 @@ class AppDrawerAdapter(
                 val items = if (trimmed.isEmpty()) apps else {
                     val matches: (String, String) -> Boolean = if (thunder)
                         ThunderAppLabelMatcher(trimmed)::matches else AppLabelMatcher(trimmed)::matches
-                    apps.asSequence().filter { app ->
+                    val typoMatcher = SearchTypoMatcher(trimmed).takeUnless { thunder }
+                    apps.asSequence().mapNotNull { app ->
                         ensureActive()
-                        app !is AppModel.PrivateSpaceHeader &&
-                            matches(app.appLabel, labels.getValue(app.appLabel))
-                    }.map { app ->
-                        app to appSearchRank(app.appLabel, trimmed)
+                        if (app is AppModel.PrivateSpaceHeader) return@mapNotNull null
+                        val label = labels.getValue(app.appLabel)
+                        when {
+                            matches(app.appLabel, label) -> app to appSearchRank(app.appLabel, trimmed)
+                            typoMatcher?.matches(label) == true -> app to 4
+                            else -> null
+                        }
                     }.sortedWith(compareBy<Pair<AppModel, Int>> { it.second }
                         .thenBy { it.first }).map { it.first }.toList()
                 }
@@ -388,7 +393,7 @@ class AppDrawerAdapter(
             animateHighlight: Boolean = false,
         ) = with(binding) {
             LauncherMotion.setRowHighlight(root, enterHighlighted, animate = animateHighlight)
-            appTitle.setTextColor(if (enterHighlighted) Color.WHITE else
+            appTitle.setTextColor(if (enterHighlighted) Color.BLACK else
                 androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
             appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
             androidx.core.view.ViewCompat.setStateDescription(root,
