@@ -685,26 +685,33 @@ class AppDrawerFragment : BaseFragment() {
             dismissedShortcutsQuery != currentResultsQuery()
         binding.renameControls.isVisible = searchRename != null
         val shortcuts = binding.contactShortcuts
-        val animate = expanded && !thunderMode && searchRename == null &&
-            LauncherMotion.isEnabled(shortcuts.context)
-        if (shortcutsRequested != showShortcuts || (!animate && shortcuts.isVisible != showShortcuts)) {
+        val slot = binding.contactShortcutSlot
+        val shortcutWidth = 3 * resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width)
+        val animate = canOpenWebSearch(currentResultsQuery()) && LauncherMotion.isEnabled(shortcuts.context)
+        if (shortcutsRequested != showShortcuts || (!animate && slot.isVisible != showShortcuts)) {
             shortcutsRequested = showShortcuts
-            if (showShortcuts) {
-                val fromAlpha = if (shortcuts.isVisible) shortcuts.alpha else 0f
-                shortcuts.isVisible = true
-                LauncherMotion.reveal(shortcuts, fromAlpha = fromAlpha, duration = 120L)
-            } else if (animate) {
-                shortcuts.animate().cancel()
-                shortcuts.animate().alpha(0f).setDuration(100L)
+            shortcuts.animate().cancel()
+            if (!animate) {
+                slot.isVisible = showShortcuts
+                LauncherMotion.reset(shortcuts)
+            } else if (showShortcuts) {
+                if (!slot.isVisible) {
+                    shortcuts.translationX = shortcutWidth.toFloat()
+                    slot.isVisible = true
+                }
+                shortcuts.animate().translationX(0f)
+                    .setDuration(LauncherMotion.MODE_DURATION)
+                    .setInterpolator(LauncherMotion.settle)
+                    .start()
+            } else {
+                shortcuts.animate().translationX(shortcutWidth.toFloat())
+                    .setDuration(LauncherMotion.MODE_DURATION)
                     .setInterpolator(LauncherMotion.settle)
                     .withEndAction {
-                        shortcuts.isVisible = false
+                        slot.isVisible = false
                         LauncherMotion.reset(shortcuts)
                         updateDockButtons()
                     }.start()
-            } else {
-                shortcuts.isVisible = false
-                LauncherMotion.reset(shortcuts)
             }
         }
         val hasNumber = showShortcuts && contact?.numbers?.isNotEmpty() == true
@@ -713,28 +720,26 @@ class AppDrawerFragment : BaseFragment() {
             if (showShortcuts) it.alpha = if (hasNumber) 1f else 0.4f
         }
         updateBoltVisibility()
-        val contactWidth = resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width) * 3 +
-            resources.getDimensionPixelSize(R.dimen.bolt_contact_action_divider_width)
-        val actionMargin = when {
+        val web = binding.dockWeb
+        val showWeb = canOpenWebSearch(currentResultsQuery())
+        val actions = binding.dockActions
+        actions.isVisible = showWeb
+        web.isVisible = showWeb
+        actions.setBackgroundResource(if (slot.isVisible) R.drawable.bolt_contact_action_group else 0)
+        actions.setPadding(0, 0, 0, 0)
+        val actionsWidth = when {
+            showWeb -> web.layoutParams.width + if (slot.isVisible) shortcutWidth else 0
             searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2
-            shortcuts.isVisible -> contactWidth
-            thunderMode -> resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
-            !expanded && flag == Constants.FLAG_LAUNCH_APP ->
+            thunderMode || (!expanded && flag == Constants.FLAG_LAUNCH_APP) ->
                 resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
             else -> 0
         }
-        val web = binding.dockWeb
-        web.isVisible = canOpenWebSearch(currentResultsQuery())
-        if (web.isVisible && (web.layoutParams as FrameLayout.LayoutParams).marginEnd != actionMargin) {
-            web.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = actionMargin }
-        }
         val divider = binding.dockWebDivider
-        divider.isVisible = web.isVisible
-        val webStart = actionMargin + if (web.isVisible) web.layoutParams.width else 0
-        if (divider.isVisible && (divider.layoutParams as FrameLayout.LayoutParams).marginEnd != webStart) {
-            divider.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = webStart }
+        divider.isVisible = showWeb
+        if (showWeb && (divider.layoutParams as FrameLayout.LayoutParams).marginEnd != actionsWidth) {
+            divider.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = actionsWidth }
         }
-        val margin = webStart + if (divider.isVisible) divider.layoutParams.width else 0
+        val margin = actionsWidth + if (showWeb) divider.layoutParams.width else 0
         val endPadding = resources.getDimensionPixelSize(
             if (web.isVisible) R.dimen.bolt_search_web_text_gap else R.dimen.bolt_search_text_inset
         )
