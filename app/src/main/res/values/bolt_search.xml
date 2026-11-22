@@ -17,6 +17,7 @@
     <dimen name="bolt_search_web_text_gap">8dp</dimen>
     <dimen name="bolt_search_button_width">52dp</dimen>
     <string name="bolt_contact_selected">Contact selected</string>
+    <string name="bolt_move_mode_hint">Z ↑ · X ↓ · Enter to select</string>
     <string name="bolt_enter_target">Opens with Enter</string>
     <string name="bolt_typo_match">Did you mean?</string>
     <string name="bolt_no_apps_found">No apps found</string>
