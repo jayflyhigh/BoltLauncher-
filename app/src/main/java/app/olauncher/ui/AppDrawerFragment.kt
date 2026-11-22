@@ -107,6 +107,13 @@ class AppDrawerFragment : BaseFragment() {
         searchFeedback = null
         if (_binding != null) updateSearchStatus()
     }
+    private var thunderEmptyQuery: String? = null
+    private val showThunderEmpty = Runnable {
+        if (_binding != null && thunderMode && hasEmptySearchResults(currentResultsQuery())) {
+            thunderEmptyQuery = currentResultsQuery()
+            updateSearchStatus()
+        }
+    }
     private var scrolledFromBestMatch = false
     private var displayedQuery: String? = null
     private lateinit var appsSection: SearchSectionAdapter
@@ -321,6 +328,7 @@ class AppDrawerFragment : BaseFragment() {
             adapter.closeSearchActions()
             cancelAutoLaunch()
             val query = text.toString()
+            clearThunderEmpty()
             if (thunderMode && expanded && query.isNotBlank()) thunderEditAt = SystemClock.uptimeMillis()
             binding.appRename.isVisible = canRename && query.isNotBlank()
             highlightedContactQuery = null
@@ -397,6 +405,8 @@ class AppDrawerFragment : BaseFragment() {
         adapter.closeSearchActions()
         scrolledFromBestMatch = false
         thunderMode = enabled
+        clearThunderEmpty()
+        updateSearchStatus()
         updateDockButtons()
         adapter.setThunderMode(enabled)
         applySearchColors()
@@ -460,6 +470,14 @@ class AppDrawerFragment : BaseFragment() {
         }
         displayedQuery = query
         updateResultHighlight(query)
+        if (thunderMode && hasEmptySearchResults(query)) {
+            if (thunderEmptyQuery != query) {
+                binding.root.removeCallbacks(showThunderEmpty)
+                binding.root.postDelayed(showThunderEmpty, 240L)
+            }
+        } else {
+            clearThunderEmpty()
+        }
         updateSearchStatus()
         scheduleAutoLaunch(query)
     }
@@ -572,19 +590,28 @@ class AppDrawerFragment : BaseFragment() {
     private fun offersWebFallback(query: String): Boolean =
         canOpenWebSearch(query) && searchFeedback == null && hasEmptySearchResults(query)
 
+    private fun clearThunderEmpty() {
+        binding.root.removeCallbacks(showThunderEmpty)
+        thunderEmptyQuery = null
+    }
+
     private fun updateSearchStatus() {
         val query = currentResultsQuery()
         val feedback = searchFeedback.takeIf { expanded }
         val offerWeb = offersWebFallback(query)
+        val thunderEmpty = thunderMode && thunderEmptyQuery == query && hasEmptySearchResults(query)
+        val statusIsResult = offerWeb || (thunderEmpty && feedback == null)
+        binding.searchPanel.statusIsResult = statusIsResult
         binding.searchStatus.apply {
-            isVisible = feedback != null || offerWeb
+            isVisible = feedback != null || offerWeb || thunderEmpty
             text = when {
                 feedback != null -> getString(feedback)
                 offerWeb -> getString(R.string.bolt_search_web_for, query.trim())
+                thunderEmpty -> getString(R.string.bolt_no_apps_found)
                 else -> ""
             }
-            setBackgroundResource(if (offerWeb) R.drawable.bolt_search_best_match else 0)
-            minimumHeight = if (offerWeb) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
+            setBackgroundResource(if (statusIsResult) R.drawable.bolt_search_best_match else 0)
+            minimumHeight = if (statusIsResult) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
             setOnClickListener(if (offerWeb) View.OnClickListener { openWebSearch(query) } else null)
             isClickable = offerWeb
             isFocusable = offerWeb
@@ -791,7 +818,8 @@ class AppDrawerFragment : BaseFragment() {
         autoLaunch?.let(binding.root::removeCallbacks)
         autoLaunch = null
         clearThunderLaunchAnimation()
-        if (!thunderMode || !expanded || query.isBlank() || adapter.itemCount != 1 ||
+        if (!thunderMode || !expanded || searchRename != null ||
+            adapter.actionPosition != RecyclerView.NO_POSITION || query.isBlank() || adapter.itemCount != 1 ||
             adapter.firstLaunchableResult == null) return
         val result = adapter.firstLaunchableResult ?: return
         val committedAt = SystemClock.uptimeMillis()
@@ -799,7 +827,8 @@ class AppDrawerFragment : BaseFragment() {
         val task = object : Runnable {
             override fun run() {
                 val view = _binding ?: return
-                if (!thunderMode || !expanded || adapter.committedQuery != query ||
+                if (!thunderMode || !expanded || searchRename != null ||
+                    adapter.actionPosition != RecyclerView.NO_POSITION || adapter.committedQuery != query ||
                     view.search.text.toString() != query || !view.root.hasWindowFocus() ||
                     adapter.itemCount != 1 || adapter.firstLaunchableResult != result ||
                     viewLifecycleOwner.lifecycle.currentState != Lifecycle.State.RESUMED) {
@@ -916,6 +945,7 @@ class AppDrawerFragment : BaseFragment() {
         restoreSearchKeyboard = false
         dismissSearchEdit()
         expanded = false
+        clearThunderEmpty()
         binding.root.removeCallbacks(clearFeedback)
         searchFeedback = null
         scrolledFromBestMatch = false
@@ -1047,7 +1077,11 @@ class AppDrawerFragment : BaseFragment() {
             },
             appRenameListener = ::saveAppLabel,
             searchRenameListener = ::beginSearchRename,
-            canShowSearchActions = { expanded && !thunderMode && flag == Constants.FLAG_LAUNCH_APP },
+            canShowSearchActions = {
+                (expanded && searchRename == null && flag == Constants.FLAG_LAUNCH_APP).also {
+                    if (it && thunderMode) cancelAutoLaunch()
+                }
+            },
             appPlayStoreListener = ::openPlayStore,
             resultsChanged = ::onResultsChanged,
             privateSpaceToggleListener = { viewModel.togglePrivateSpaceLock() },
@@ -1209,6 +1243,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
+        clearThunderEmpty()
         binding.root.viewTreeObserver.removeOnWindowFocusChangeListener(searchWindowFocusListener)
         restoreSearchKeyboard = false
         searchRename = null
