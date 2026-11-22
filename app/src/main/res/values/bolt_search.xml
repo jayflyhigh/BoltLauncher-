@@ -54,7 +54,10 @@
     <string name="bolt_launcher_settings">Launcher Settings</string>
     <string name="bolt_system_settings">System Settings</string>
     <string name="bolt_system_settings_unavailable">System settings are unavailable</string>
+    <string name="bolt_theme">Theme</string>
+    <string name="bolt_theme_default">Default</string>
     <string name="bolt_frosted_glass">Frosted Glass</string>
+    <string name="bolt_smoked_glass">Smoked Glass</string>
     <dimen name="bolt_result_row_margin">2dp</dimen>
     <dimen name="bolt_result_dock_gap">3dp</dimen>
 </resources>

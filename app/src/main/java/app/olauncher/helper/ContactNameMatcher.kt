@@ -11,20 +11,21 @@ internal class ContactNameMatcher(private val query: String) {
     private val typoMatcher = SearchTypoMatcher(query)
     private val allowTypos = query.length >= 4 && query.none(Char::isDigit)
 
-    fun rank(name: String, numbers: List<String>): Int? {
+    class SearchName(val raw: String) {
+        val normalized = raw.normalizeForSearch()
+        val initials = nameWords.findAll(raw).map { it.value.first() }.joinToString("").normalizeForSearch()
+    }
+
+    fun rank(name: SearchName, numbers: List<String>): Int? {
         // Match individual terms so a surname-first query finds the same contact.
         if (terms.all { term ->
-                name.contains(term, ignoreCase = true) || numbers.any { it.contains(term) }
-            }) return appSearchRank(name, query)
-        val normalizedName = name.normalizeForSearch()
-        if (normalizedTerms.all { it.isNotEmpty() && normalizedName.contains(it, ignoreCase = true) }) {
-            return appSearchRank(normalizedName, initialsQuery)
+                name.raw.contains(term, ignoreCase = true) || numbers.any { it.contains(term) }
+            }) return appSearchRank(name.raw, query)
+        if (normalizedTerms.all { it.isNotEmpty() && name.normalized.contains(it, ignoreCase = true) }) {
+            return appSearchRank(name.normalized, initialsQuery)
         }
-        if (allowInitials) {
-            val initials = nameWords.findAll(name).map { it.value.first() }.joinToString("")
-            if (initials.normalizeForSearch().equals(initialsQuery, ignoreCase = true)) return 4
-        }
-        return TYPO_MATCH.takeIf { allowTypos && typoMatcher.matches(normalizedName) }
+        if (allowInitials && name.initials.equals(initialsQuery, ignoreCase = true)) return 4
+        return TYPO_MATCH.takeIf { allowTypos && typoMatcher.matches(name.normalized) }
     }
 
     companion object {

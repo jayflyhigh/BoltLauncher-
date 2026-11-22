@@ -439,7 +439,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appListJob?.cancel()
         appListJob = viewModelScope.launch {
             val apps = getAppsList(appContext, prefs, includeRegularApps = true, includeHiddenApps)
-            appList.value = apps
+            if (appList.value != apps) appList.value = apps
         }
         getPrivateSpaceAppList()
     }
@@ -515,15 +515,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun getPrivateSpaceAppList() {
         privateSpaceJob?.cancel()
         privateSpaceJob = viewModelScope.launch {
-            val handle = getPrivateSpaceUserHandle(appContext)
-            privateSpaceAvailable.value = handle != null
-            if (handle != null) {
-                privateSpaceLocked.value = isPrivateSpaceLocked(appContext, handle)
-                privateSpaceApps.value = getPrivateSpaceApps(appContext, prefs)
-            } else {
-                privateSpaceLocked.value = true
-                privateSpaceApps.value = emptyList()
+            val (handle, locked) = withContext(Dispatchers.IO) {
+                val profile = getPrivateSpaceUserHandle(appContext)
+                profile to (profile == null || isPrivateSpaceLocked(appContext, profile))
             }
+            val available = handle != null
+            if (privateSpaceAvailable.value != available) privateSpaceAvailable.value = available
+            if (privateSpaceLocked.value != locked) privateSpaceLocked.value = locked
+            val apps = if (handle != null && !locked) getPrivateSpaceApps(appContext, prefs, handle) else emptyList()
+            if (privateSpaceApps.value != apps) privateSpaceApps.value = apps
         }
     }
 

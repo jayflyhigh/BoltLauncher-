@@ -33,6 +33,11 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private val stroke = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glassReflection = context.getColorFromAttr(R.attr.boltGlassReflectionColor)
+    private val dockEdge = if (context.getColorFromAttr(R.attr.boltSmokedControlColor) != 0) {
+        context.getColorFromAttr(R.attr.boltGlassTopEdgeColor)
+    } else {
+        outline
+    }
     // Cache the gradients. The panel moves with the keyboard and changes height while typing.
     private val glassSheen = if (glassReflection != 0) {
         LinearGradient(0f, 0f, 240f * stroke, 64f * stroke,
@@ -40,7 +45,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     } else null
     private val glassEdge = if (glassSheen != null) {
         LinearGradient(0f, 0f, 0f, 52f * stroke,
-            0xD3EDF7FF.toInt(), outline, Shader.TileMode.CLAMP)
+            context.getColorFromAttr(R.attr.boltGlassTopEdgeColor), outline, Shader.TileMode.CLAMP)
     } else null
     private val glassGrain = if (glassSheen != null) {
         val size = 64
@@ -54,6 +59,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     } else null
     private val shape = Path()
     private val bounds = RectF()
+    private val edgeBounds = RectF()
     private var animator: ValueAnimator? = null
     private var visibleHeight = 0f
     private var targetHeight = 0f
@@ -166,9 +172,14 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         if (visibleHeight <= stroke || width <= stroke) return
         val panelTop = height - visibleHeight
         val dockTop = dock.top.toFloat()
-        bounds.set(0f, panelTop, width.toFloat(), height.toFloat())
-        shape.rewind()
-        shape.addRoundRect(bounds, radius, radius, Path.Direction.CW)
+        if (bounds.top != panelTop || bounds.right != width.toFloat() || bounds.bottom != height.toFloat()) {
+            bounds.set(0f, panelTop, width.toFloat(), height.toFloat())
+            shape.rewind()
+            shape.addRoundRect(bounds, radius, radius, Path.Direction.CW)
+            edgeBounds.set(bounds)
+            edgeBounds.inset(stroke / 2f, stroke / 2f)
+            if (glassEdge != null) edgeBounds.offset(0f, -edgeBounds.top)
+        }
         val save = canvas.save()
         canvas.clipPath(shape)
         if (panelTop < dockTop) {
@@ -181,28 +192,25 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         drawGlassSheen(canvas, dockTop, height.toFloat(), dividerAlpha)
         // In Thunder mode the transition from charcoal to yellow already separates the bar.
         if (dividerAlpha > 0 && (resultsHeight > 0 || statusInPanel)) {
-            paint.color = outline
+            paint.color = dockEdge
             paint.alpha = paint.alpha * dividerAlpha / 255
             canvas.drawRect(rowInset.toFloat(), dockTop, (width - rowInset).toFloat(), dockTop + stroke, paint)
         }
         canvas.restoreToCount(save)
         super.dispatchDraw(canvas)
 
-        bounds.inset(stroke / 2f, stroke / 2f)
         paint.color = outline
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = stroke
         if (glassEdge == null) {
-            canvas.drawRoundRect(bounds, radius - stroke / 2f, radius - stroke / 2f, paint)
+            canvas.drawRoundRect(edgeBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
         } else {
             // Draw in panel-local coordinates so the bright rim tracks its top edge.
-            val top = bounds.top
-            bounds.offset(0f, -top)
             val edgeSave = canvas.save()
-            canvas.translate(0f, top)
+            canvas.translate(0f, panelTop + stroke / 2f)
             paint.color = Color.WHITE
             paint.shader = glassEdge
-            canvas.drawRoundRect(bounds, radius - stroke / 2f, radius - stroke / 2f, paint)
+            canvas.drawRoundRect(edgeBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
             paint.shader = null
             canvas.restoreToCount(edgeSave)
         }

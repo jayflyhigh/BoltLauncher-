@@ -76,7 +76,11 @@ class MainActivity : AppCompatActivity() {
         if (isEinkDisplay()) prefs.appTheme = AppCompatDelegate.MODE_NIGHT_NO
         AppCompatDelegate.setDefaultNightMode(prefs.appTheme)
         super.onCreate(savedInstanceState)
-        if (prefs.frostedGlass) theme.applyStyle(R.style.FrostedGlassOverlay, true)
+        when (prefs.launcherTheme) {
+            Prefs.LauncherTheme.DEFAULT -> Unit
+            Prefs.LauncherTheme.FROSTED_GLASS -> theme.applyStyle(R.style.FrostedGlassOverlay, true)
+            Prefs.LauncherTheme.SMOKED_GLASS -> theme.applyStyle(R.style.SmokedGlassOverlay, true)
+        }
         if (prefs.boldFont) theme.applyStyle(R.style.BoldFontOverlay, true)
         if (isEinkDisplay() || isSystemAnimationsDisabled()) theme.applyStyle(R.style.NoAnimationOverlay, true)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -106,7 +110,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         initObservers(viewModel)
-        viewModel.getAppList()
         registerShortcutCallback()
         setupOrientation()
 

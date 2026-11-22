@@ -42,7 +42,14 @@ class ThunderAppLabelMatcher(query: CharSequence) {
     fun matches(label: String, normalizedLabel: String): Boolean {
         if (regularMatcher.matches(label, normalizedLabel)) return true
         if (needle.isEmpty() || needle.length > normalizedLabel.length) return false
-        return (normalizedLabel + normalizedLabel.dropLast(1)).contains(needle, ignoreCase = true)
+        // Regular matching already checked non-wrapping positions.
+        for (suffixLength in 1 until needle.length) {
+            val start = normalizedLabel.length - suffixLength
+            if (normalizedLabel.regionMatches(start, needle, 0, suffixLength, ignoreCase = true) &&
+                normalizedLabel.regionMatches(0, needle, suffixLength, needle.length - suffixLength, ignoreCase = true)
+            ) return true
+        }
+        return false
     }
 }
 
@@ -77,9 +84,10 @@ internal fun thunderMatchRanges(label: String, query: String): List<IntRange> {
 /** Match one insertion, deletion, substitution or adjacent transposition in a label substring. */
 internal class SearchTypoMatcher(query: String) {
     private val needle = query.normalizeForSearch()
+    private val eligible = needle.length >= 4 && needle.any(Char::isLetter)
 
     fun matches(normalizedLabel: String): Boolean {
-        if (needle.length < 4 || needle.none(Char::isLetter)) return false
+        if (!eligible) return false
         for (length in needle.length - 1..needle.length + 1) {
             for (start in 0..normalizedLabel.length - length) {
                 if (matchesWindow(normalizedLabel, start, length)) return true

@@ -41,7 +41,9 @@ import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
 import app.olauncher.data.shortcutIdentity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.InputStream
@@ -84,6 +86,7 @@ suspend fun getAppsList(
 
             // Catch errors per profile and per app, so one bad entry doesn't empty the whole list
             for (profile in userManager.userProfiles) {
+                ensureActive()
                 if (isPrivateSpaceProfile(context, profile)) continue
                 val activityList = try {
                     launcherApps.getActivityList(null, profile)
@@ -92,12 +95,14 @@ suspend fun getAppsList(
                     continue
                 }
                 for (app in activityList) {
+                    ensureActive()
                     try {
+                        val originalLabel = app.label.toString()
                         val appLabelShown = prefs.getAppRenameLabel(app.applicationInfo.packageName)
-                            .ifBlank { app.label.toString() }
+                            .ifBlank { originalLabel }
                         val appModel = AppModel.App(
                             appLabel = appLabelShown,
-                            originalLabel = app.label.toString(),
+                            originalLabel = originalLabel,
                             key = collator.getCollationKey(appLabelShown),
                             appPackage = app.applicationInfo.packageName,
                             activityClassName = app.componentName.className,
@@ -132,7 +137,10 @@ suspend fun getAppsList(
                 appList.addAll(pinned)
             }
 
+            ensureActive()
             appList.sort()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -239,21 +247,23 @@ fun getPrivateSpaceUserHandle(context: Context): UserHandle? {
 suspend fun getPrivateSpaceApps(
     context: Context,
     prefs: Prefs,
+    privateSpaceHandle: UserHandle,
 ): MutableList<AppModel> {
     return withContext(Dispatchers.IO) {
         val appList: MutableList<AppModel> = mutableListOf()
         try {
-            val privateSpaceHandle = getPrivateSpaceUserHandle(context) ?: return@withContext appList
             val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
             val collator = Collator.getInstance()
 
             for (app in launcherApps.getActivityList(null, privateSpaceHandle)) {
+                ensureActive()
+                val originalLabel = app.label.toString()
                 val appLabelShown = prefs.getAppRenameLabel(app.applicationInfo.packageName)
-                    .ifBlank { app.label.toString() }
+                    .ifBlank { originalLabel }
                 appList.add(
                     AppModel.App(
                         appLabel = appLabelShown,
-                        originalLabel = app.label.toString(),
+                        originalLabel = originalLabel,
                         key = collator.getCollationKey(appLabelShown),
                         appPackage = app.applicationInfo.packageName,
                         activityClassName = app.componentName.className,
@@ -262,7 +272,10 @@ suspend fun getPrivateSpaceApps(
                     )
                 )
             }
+            ensureActive()
             appList.sort()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             e.printStackTrace()
         }

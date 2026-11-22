@@ -140,6 +140,7 @@ class AppDrawerFragment : BaseFragment() {
             updateSearchStatus()
         }
     }
+    private val scrollAnchorBounds = Rect()
     private var scrolledFromBestMatch = false
     private var displayedQuery: String? = null
     private lateinit var appsSection: SearchSectionAdapter
@@ -346,6 +347,12 @@ class AppDrawerFragment : BaseFragment() {
             } else null
         }
         binding.search.setOnClickListener { if (!expanded) openSearch(thunder = false) }
+        binding.searchStatus.setOnClickListener {
+            val query = currentResultsQuery()
+            if (offersWebFallback(query)) openWebSearch(query)
+        }
+        binding.searchStatus.isClickable = false
+        binding.searchStatus.isFocusable = false
         binding.dockBolt.isVisible = flag == Constants.FLAG_LAUNCH_APP
         if (!binding.dockBolt.isVisible) {
             binding.search.updateLayoutParams<FrameLayout.LayoutParams> { marginEnd = 0 }
@@ -826,18 +833,22 @@ class AppDrawerFragment : BaseFragment() {
         val results = binding.recyclerView
         if (scrolledFromBestMatch) {
             // DiffUtil maps the still-attached holders to the new adapter positions.
-            val anchor = (0 until results.childCount).asSequence()
-                .map(results::getChildAt)
-                .filter { it.bottom > results.paddingTop && it.top < results.height - results.paddingBottom }
-                .sortedByDescending { it.bottom }
-                .firstOrNull { results.getChildAdapterPosition(it) != RecyclerView.NO_POSITION }
+            val visibleBottom = results.height - results.paddingBottom
+            var anchor: View? = null
+            var anchorPosition = RecyclerView.NO_POSITION
+            for (index in 0 until results.childCount) {
+                val child = results.getChildAt(index)
+                if (child.bottom <= results.paddingTop || child.top >= visibleBottom ||
+                    child.bottom <= (anchor?.bottom ?: Int.MIN_VALUE)) continue
+                val position = results.getChildAdapterPosition(child)
+                if (position != RecyclerView.NO_POSITION) {
+                    anchor = child
+                    anchorPosition = position
+                }
+            }
             if (anchor != null) {
-                val bounds = Rect()
-                layoutManager.getDecoratedBoundsWithMargins(anchor, bounds)
-                layoutManager.scrollToPositionWithOffset(
-                    results.getChildAdapterPosition(anchor),
-                    results.height - results.paddingBottom - bounds.bottom,
-                )
+                layoutManager.getDecoratedBoundsWithMargins(anchor, scrollAnchorBounds)
+                layoutManager.scrollToPositionWithOffset(anchorPosition, visibleBottom - scrollAnchorBounds.bottom)
                 return
             }
             scrolledFromBestMatch = false
@@ -877,11 +888,10 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun hasEmptySearchResults(query: String): Boolean {
-        val noApps = adapter.committedQuery == query && adapter.itemCount == 0
-        val noContacts = thunderMode || !hasContactsPermission() ||
-            (contactsAdapter.committedQuery == query && contactsAdapter.itemCount == 0)
         return expanded && flag == Constants.FLAG_LAUNCH_APP && searchRename == null &&
-            query.isNotBlank() && noApps && noContacts
+            query.isNotBlank() && adapter.committedQuery == query && adapter.itemCount == 0 &&
+            (thunderMode || (contactsAdapter.committedQuery == query && contactsAdapter.itemCount == 0) ||
+                !hasContactsPermission())
     }
 
     private fun canOpenWebSearch(query: String): Boolean =
@@ -908,20 +918,23 @@ class AppDrawerFragment : BaseFragment() {
         val offerWeb = offersWebFallback(query)
         val thunderEmpty = thunderMode && thunderEmptyQuery == query && hasEmptySearchResults(query)
         val statusIsResult = offerWeb || (thunderEmpty && feedback == null)
-        binding.searchPanel.statusIsResult = statusIsResult
+        val panel = binding.searchPanel
         binding.searchStatus.apply {
-            isVisible = feedback != null || offerWeb || thunderEmpty
-            text = when {
+            val status = when {
                 feedback != null -> getString(feedback)
                 offerWeb -> getString(R.string.bolt_search_web_for, query.trim())
                 thunderEmpty -> getString(R.string.bolt_no_apps_found)
                 else -> ""
             }
-            setBackgroundResource(if (statusIsResult) R.drawable.bolt_search_best_match else 0)
-            minimumHeight = if (statusIsResult) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
-            setOnClickListener(if (offerWeb) View.OnClickListener { openWebSearch(query) } else null)
-            isClickable = offerWeb
-            isFocusable = offerWeb
+            if (text != status) text = status
+            isVisible = feedback != null || offerWeb || thunderEmpty
+            if (panel.statusIsResult != statusIsResult) {
+                panel.statusIsResult = statusIsResult
+                setBackgroundResource(if (statusIsResult) R.drawable.bolt_search_best_match else 0)
+                minimumHeight = if (statusIsResult) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
+            }
+            if (isClickable != offerWeb) isClickable = offerWeb
+            if (isFocusable != offerWeb) isFocusable = offerWeb
         }
     }
 
@@ -1332,13 +1345,34 @@ class AppDrawerFragment : BaseFragment() {
                 requireContext().showToast(getString(R.string.bolt_system_settings_unavailable))
             }
         }
-        menu.frostedGlass.isChecked = prefs.frostedGlass
-        menu.frostedGlass.setOnCheckedChangeListener { _, enabled ->
-            prefs.frostedGlass = enabled
+        menu.launcherTheme.setOnClickListener {
             dialog.dismiss()
-            requireActivity().recreate()
+            showThemePicker()
         }
         dialog.show()
+    }
+
+    private fun showThemePicker() {
+        val options = listOf(
+            Prefs.LauncherTheme.DEFAULT to R.string.bolt_theme_default,
+            Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
+            Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
+        )
+        val current = prefs.launcherTheme
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(R.string.bolt_theme)
+            .setSingleChoiceItems(
+                options.map { getString(it.second) }.toTypedArray(),
+                options.indexOfFirst { it.first == current },
+            ) { picker, position ->
+                picker.dismiss()
+                val selected = options[position].first
+                if (selected != current) {
+                    prefs.launcherTheme = selected
+                    requireActivity().recreate()
+                }
+            }
+            .show()
     }
 
     private fun launchResult(
