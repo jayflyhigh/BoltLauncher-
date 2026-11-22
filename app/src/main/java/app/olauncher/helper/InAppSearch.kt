@@ -1,171 +1,169 @@
 package app.olauncher.helper
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.ComponentName
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import app.olauncher.data.AppModel
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
+import java.util.Locale
 
-/** Built-in and user-configured search commands, restricted to the chosen app. */
 class InAppSearch(private val context: Context) {
-    data class Target(val app: AppModel.App, val template: String, val color: Int, val code: String)
+    data class Target(
+        val packageName: String,
+        val appLabel: String,
+        val template: String,
+        val color: Int,
+        val code: String,
+        val builtIn: Boolean,
+        val hidden: Boolean,
+    )
+
     private val prefs = context.getSharedPreferences("in_app_search", Context.MODE_PRIVATE)
-    var targets: Map<String, Target> = emptyMap()
-        private set
+    private val installedLabels = mutableMapOf<String, String>()
+    private var configs = readConfigurations().toMutableList()
+    private var cachedTargets: List<Target>? = null
 
-    private fun configurations(): List<JSONObject> = try {
-        val array = JSONArray(prefs.getString("custom_commands", "[]"))
-        (0 until array.length()).mapNotNull { array.optJSONObject(it) }
-    } catch (_: Exception) { emptyList() }
-
-    fun load(apps: List<AppModel>) {
-        targets = buildTargets(apps)
-    }
-
-    suspend fun loadAsync(apps: List<AppModel>) {
-        val loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { buildTargets(apps) }
-        targets = loaded
-    }
-
-    private fun buildTargets(apps: List<AppModel>): Map<String, Target> {
-        val installed = apps.filterIsInstance<AppModel.App>()
-            .filter { it.user == android.os.Process.myUserHandle() }.associateBy { it.appPackage }
-        seedDefaults(installed.keys)
-        val browsers = context.packageManager.queryIntentActivities(
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER), 0
-        ).map { it.activityInfo.packageName }.toSet() + "com.sec.android.app.sbrowser"
-        return configurations().mapNotNull { config ->
-            val app = installed[config.optString("package")] ?: return@mapNotNull null
-            if (app.appPackage in browsers) return@mapNotNull null
-            val url = config.optString("url")
-            val code = config.optString("alias")
-            if (!SearchCommandUrl.valid(url) || code.isBlank()) return@mapNotNull null
-            app.appPackage to Target(app, url, config.optInt("color", Color.DKGRAY), code)
-        }.toMap()
-    }
-
-    /** Seed each installed app once; edits and removals remain the user's choice. */
-    private fun seedDefaults(installedPackages: Set<String>) {
-        val seeded = prefs.getStringSet("seeded_defaults", emptySet()).orEmpty().toMutableSet()
-        val configs = configurations().toMutableList()
+    init {
+        val seeded = prefs.getStringSet("seeded_defaults", emptySet()).orEmpty()
+        val usedCodes = configs.map { it.optString("alias") }.toMutableList()
         var changed = false
         for (preset in defaults) {
-            if (preset.packageName !in installedPackages || preset.packageName in seeded) continue
-            if (configs.none { it.optString("package") == preset.packageName } &&
-                configs.none { it.optString("alias").equals(preset.code, true) }) {
-                configs.add(JSONObject().put("package", preset.packageName)
-                    .put("url", preset.url).put("color", Color.parseColor(preset.color))
-                    .put("alias", preset.code))
-            }
-            seeded.add(preset.packageName)
+            if (configs.any { it.optString("package") == preset.packageName }) continue
+            val code = SearchCommandUrl.availableAlias(preset.code, usedCodes)
+            // Older versions also marked a default as seeded when its code collided.
+            val skipped = usedCodes.any { it.equals(preset.previousCode, ignoreCase = true) }
+            usedCodes.add(code)
+            configs.add(configuration(preset.packageName, preset.label, preset.template, preset.color,
+                code, hidden = preset.packageName in seeded && !skipped))
             changed = true
         }
-        if (changed) prefs.edit()
-            .putString("custom_commands", JSONArray(configs).toString())
-            .putStringSet("seeded_defaults", seeded).apply()
+        if (changed) persist()
     }
 
-    fun alias(target: Target) = target.code
-    fun find(code: String) = targets.values.firstOrNull { it.code.equals(code, true) }
+    private fun readConfigurations(): List<JSONObject> = try {
+        val array = JSONArray(prefs.getString("custom_commands", "[]"))
+        (0 until array.length()).mapNotNull { array.optJSONObject(it) }
+    } catch (_: JSONException) {
+        emptyList()
+    }
+
+    fun reload() {
+        configs = readConfigurations().toMutableList()
+        cachedTargets = null
+    }
+
+    fun updateApps(apps: List<AppModel>) {
+        cachedTargets = null
+        installedLabels.clear()
+        apps.filterIsInstance<AppModel.App>()
+            .filter { it.user == android.os.Process.myUserHandle() }
+            .associateTo(installedLabels) { it.appPackage to it.appLabel }
+    }
+
+    val targets: List<Target>
+        get() = cachedTargets ?: buildTargets().also { cachedTargets = it }
+
+    private fun buildTargets(): List<Target> = configs.mapNotNull { config ->
+        val pkg = config.optString("package")
+        val preset = defaults.firstOrNull { it.packageName == pkg }
+        val label = preset?.label ?: installedLabels[pkg] ?: config.optString("label").ifBlank { null }
+            ?: return@mapNotNull null
+        val template = config.optString("url")
+        val code = config.optString("alias")
+        if (!SearchCommandUrl.valid(template) || code.isBlank()) return@mapNotNull null
+        Target(pkg, label, template, config.optInt("color", Color.DKGRAY), code,
+            preset != null, config.optBoolean("hidden"))
+    }
+
     fun confirmed(text: String): Pair<Target, String>? {
-        val result = SearchCommandUrl.confirmed(text, targets.values.map { it.code }) ?: return null
-        return find(result.first)?.let { it to result.second }
+        if (' ' !in text) return null
+        val enabled = targets.filterNot { it.hidden }
+        val (code, query) = SearchCommandUrl.confirmed(text, enabled.map { it.code }) ?: return null
+        return enabled.first { it.code == code } to query
     }
 
-    fun save(app: AppModel.App, template: String, color: Int, code: String): Target {
-        require(SearchCommandUrl.valid(template)) { "Enter a valid search URL" }
-        val others = configurations().filter { it.optString("package") != app.appPackage }.map { it.optString("alias") }
-        require(SearchCommandUrl.validAlias(code, others)) { "Enter a unique, non-empty alias" }
-        require(resolve(app.appPackage, SearchCommandUrl.build(template, "test")) != null) {
-            "This app cannot open that URL. Check its search URL or URL scheme."
+    fun save(packageName: String, label: String, template: String, color: Int, code: String) {
+        reload()
+        val previous = configs.firstOrNull { it.optString("package") == packageName }
+        val builtIn = defaults.any { it.packageName == packageName }
+        require((builtIn || "{query}" in template) && SearchCommandUrl.valid(template)) {
+            "Enter a valid search URL with {query}."
         }
-        val target = Target(app, template.trim(), color, code.trim())
-        val configs = configurations().filter { it.optString("package") != app.appPackage }.toMutableList()
-        configs.add(JSONObject().put("package", app.appPackage).put("url", target.template).put("color", color).put("alias", target.code))
-        prefs.edit().putString("custom_commands", JSONArray(configs).toString()).apply()
-        targets = targets + (app.appPackage to target)
-        return target
-    }
-
-    fun remove(packageName: String) {
-        val configs = configurations().filter { it.optString("package") != packageName }
-        prefs.edit().putString("custom_commands", JSONArray(configs).toString()).apply()
-        targets = targets - packageName
-    }
-
-    private fun resolve(pkg: String, url: String): Intent? {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage(pkg)
-        val activity = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-            .firstOrNull {
-                val info = it.activityInfo
-                info.packageName == pkg && info.exported && info.enabled && info.applicationInfo.enabled &&
-                    (info.permission == null || context.checkSelfPermission(info.permission) == PackageManager.PERMISSION_GRANTED)
-            }?.activityInfo ?: return null
-        return intent.setComponent(ComponentName(activity.packageName, activity.name))
-    }
-
-    fun launchBrowser(query: String): Boolean {
-        if (query.isBlank()) return true
-        return try {
-            // Let Android resolve ACTION_VIEW through the user's actual default browser.
-            // CATEGORY_APP_BROWSER can resolve to a different app or chooser.
-            val intent = Intent(Intent.ACTION_VIEW,
-                Uri.parse(SearchCommandUrl.build("https://www.google.com/search?q={query}", query)))
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            true
-        } catch (_: android.content.ActivityNotFoundException) { false }
-          catch (_: SecurityException) { false }
-    }
-
-    fun launch(target: Target, query: String): Boolean = try {
-        if (target.app.appPackage == "com.google.android.apps.bard" &&
-            target.template == "https://gemini.google.com/app") {
-            val share = Intent(Intent.ACTION_SEND).setType("text/plain")
-                .putExtra(Intent.EXTRA_TEXT, query).setPackage(target.app.appPackage)
-            if (share.resolveActivity(context.packageManager) != null) {
-                context.startActivity(share.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                true
-            } else {
-                val launch = context.packageManager.getLaunchIntentForPackage(target.app.appPackage)
-                if (launch == null) false else {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Gemini prompt", query))
-                    context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    android.widget.Toast.makeText(context, "Prompt copied. Paste it into Gemini.", android.widget.Toast.LENGTH_LONG).show()
-                    true
-                }
-            }
-        } else {
-            val intent = resolve(target.app.appPackage, SearchCommandUrl.build(target.template, query))
-            if (intent == null) false else {
-                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                true
-            }
+        val otherCodes = configs.filter { it !== previous }.map { it.optString("alias") }
+        require(SearchCommandUrl.validAlias(code, otherCodes)) {
+            "Enter a unique alias of 1–16 characters with no spaces."
         }
-    } catch (_: android.content.ActivityNotFoundException) { false }
-      catch (_: SecurityException) { false }
+        configs.remove(previous)
+        configs.add(configuration(packageName, label, template.trim(), color, code, hidden = false))
+        persist()
+    }
 
-    private data class Preset(val packageName: String, val url: String, val color: String, val code: String)
+    fun remove(target: Target) {
+        reload()
+        val config = configs.firstOrNull { it.optString("package") == target.packageName } ?: return
+        if (target.builtIn) config.put("hidden", true) else configs.remove(config)
+        persist()
+    }
+
+    private fun persist() {
+        cachedTargets = null
+        prefs.edit().putString("custom_commands", JSONArray(configs).toString()).apply()
+    }
+
+    fun launch(target: Target, query: String): Boolean {
+        val url = SearchCommandUrl.build(target.template, query)
+        val nativeTemplate = InAppSearchLinks.appTemplate(target.packageName)
+            ?.takeIf { target.template == InAppSearchLinks.template(target.packageName) }
+        if (nativeTemplate != null && open(SearchCommandUrl.build(nativeTemplate, query), target.packageName)) {
+            return true
+        }
+        val webLink = Uri.parse(url).scheme?.lowercase(Locale.ROOT) in setOf("http", "https")
+        return open(url, target.packageName) || (webLink && open(url))
+    }
+
+    private fun open(url: String, packageName: String? = null): Boolean = try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .setPackage(packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    }
+
+    private data class Preset(
+        val packageName: String,
+        val label: String,
+        val color: Int,
+        val code: String,
+        val previousCode: String = code,
+    ) {
+        val template = requireNotNull(InAppSearchLinks.template(packageName))
+    }
 
     companion object {
         private val defaults = listOf(
-            Preset("com.android.vending", "https://play.google.com/store/search?q={query}", "#34A853", "PS"),
-            Preset("com.google.android.apps.maps", "https://www.google.com/maps/search/?api=1&query={query}", "#4285F4", "MAP"),
-            Preset("com.google.android.apps.bard", "https://gemini.google.com/app", "#8E75FF", "GEM"),
-            Preset("com.reddit.frontpage", "https://www.reddit.com/search/?q={query}", "#FF4500", "RD"),
-            Preset("com.pinterest", "https://www.pinterest.com/search/pins/?q={query}", "#E60023", "PIN"),
-            Preset("com.zhiliaoapp.musically", "https://www.tiktok.com/search?q={query}", "#000000", "Tik")
+            Preset("com.android.vending", "Google Play Store", 0xFF34A853.toInt(), "play", previousCode = "PS"),
+            Preset("com.google.android.apps.maps", "Google Maps", 0xFF4285F4.toInt(), "maps", previousCode = "MAP"),
+            Preset("com.pinterest", "Pinterest", 0xFFE60023.toInt(), "pin"),
+            Preset("com.reddit.frontpage", "Reddit", 0xFFFF4500.toInt(), "rd"),
         )
+
+        private fun configuration(pkg: String, label: String, url: String, color: Int, alias: String, hidden: Boolean) =
+            JSONObject().put("package", pkg).put("label", label).put("url", url)
+                .put("color", color).put("alias", alias).put("hidden", hidden)
 
         fun background(color: Int, density: Float) = GradientDrawable().apply {
             setColor(color)
             cornerRadius = 18f * density
         }
-        fun foreground(color: Int): Int = if (androidx.core.graphics.ColorUtils.calculateLuminance(color) > .45) Color.BLACK else Color.WHITE
+
+        fun foreground(color: Int): Int =
+            if (androidx.core.graphics.ColorUtils.calculateLuminance(color) >= 0.179) Color.BLACK else Color.WHITE
     }
 }

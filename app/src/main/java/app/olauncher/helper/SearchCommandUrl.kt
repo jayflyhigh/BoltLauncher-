@@ -20,9 +20,14 @@ object SearchCommandUrl {
     } catch (_: Exception) { false }
 
     fun validAlias(alias: String, otherAliases: Collection<String>): Boolean =
-        alias.isNotBlank() && alias.none { it.isISOControl() } && otherAliases.none { it.equals(alias.trim(), true) }
+        alias.length in 1..16 && alias.none { it.isWhitespace() || it.isISOControl() } &&
+            otherAliases.none { it.equals(alias, ignoreCase = true) }
+
+    fun availableAlias(preferred: String, used: Collection<String>): String =
+        generateSequence(1) { it + 1 }.map { if (it == 1) preferred else "$preferred$it" }
+            .first { candidate -> used.none { it.equals(candidate, ignoreCase = true) } }
 
     fun confirmed(text: String, aliases: Collection<String>): Pair<String, String>? =
-        aliases.sortedByDescending { it.length }.firstOrNull { text.startsWith("$it.", true) }
+        aliases.sortedByDescending { it.length }.firstOrNull { text.startsWith("$it ", ignoreCase = true) }
             ?.let { it to text.substring(it.length + 1) }
 }
