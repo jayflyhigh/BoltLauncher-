@@ -75,18 +75,6 @@
                 android:scaleType="center"
                 app:srcCompat="@drawable/bolt_search_lightning"
                 app:tint="@color/bolt_search_yellow" />
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/dockWeb"
-                android:layout_width="@dimen/bolt_contact_action_width"
-                android:layout_height="match_parent"
-                android:layout_gravity="end"
-                android:background="@drawable/bolt_search_press"
-                android:contentDescription="@string/bolt_search_web"
-                android:scaleType="center"
-                android:visibility="gone"
-                app:srcCompat="@drawable/dock_web"
-                app:tint="@color/bolt_search_label" />
-
             <View
                 android:id="@+id/dockWebDivider"
                 android:layout_width="@dimen/bolt_contact_action_divider_width"
@@ -97,50 +85,70 @@
                 android:visibility="gone" />
 
             <LinearLayout
-                android:id="@+id/contactShortcuts"
+                android:id="@+id/dockActions"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_gravity="end"
-                android:gravity="center_vertical"
                 android:visibility="gone">
 
-                <View
-                    android:layout_width="@dimen/bolt_contact_action_divider_width"
-                    android:layout_height="18dp"
-                    android:background="#474747" />
+                <FrameLayout
+                    android:id="@+id/contactShortcutSlot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:clipChildren="true"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:id="@+id/contactShortcuts"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical">
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:id="@+id/contactCall"
+                            android:layout_width="@dimen/bolt_contact_action_width"
+                            android:layout_height="match_parent"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/bolt_action_call"
+                            android:scaleType="centerInside"
+                            android:paddingHorizontal="9dp"
+                            app:srcCompat="@drawable/contact_call"
+                            app:tint="@color/bolt_search_label" />
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:id="@+id/contactMessage"
+                            android:layout_width="@dimen/bolt_contact_action_width"
+                            android:layout_height="match_parent"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/bolt_action_message"
+                            android:scaleType="centerInside"
+                            android:paddingHorizontal="9dp"
+                            app:srcCompat="@drawable/contact_message"
+                            app:tint="@color/bolt_search_label" />
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:id="@+id/contactWhatsapp"
+                            android:layout_width="@dimen/bolt_contact_action_width"
+                            android:layout_height="match_parent"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/bolt_action_whatsapp"
+                            android:scaleType="centerInside"
+                            android:paddingHorizontal="9dp"
+                            app:srcCompat="@drawable/contact_whatsapp"
+                            app:tint="@color/bolt_search_whatsapp" />
+                    </LinearLayout>
+                </FrameLayout>
 
                 <androidx.appcompat.widget.AppCompatImageButton
-                    android:id="@+id/contactCall"
-                    android:layout_width="@dimen/bolt_contact_action_width"
+                    android:id="@+id/dockWeb"
+                    android:layout_width="@dimen/bolt_web_action_width"
                     android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/bolt_action_call"
+                    android:background="@drawable/bolt_search_press"
+                    android:contentDescription="@string/bolt_search_web"
                     android:scaleType="centerInside"
-                    android:paddingHorizontal="13dp"
-                    app:srcCompat="@drawable/contact_call"
+                    android:paddingHorizontal="9dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/dock_web"
                     app:tint="@color/bolt_search_label" />
-
-                <androidx.appcompat.widget.AppCompatImageButton
-                    android:id="@+id/contactMessage"
-                    android:layout_width="@dimen/bolt_contact_action_width"
-                    android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/bolt_action_message"
-                    android:scaleType="centerInside"
-                    android:paddingHorizontal="13dp"
-                    app:srcCompat="@drawable/contact_message"
-                    app:tint="@color/bolt_search_label" />
-
-                <androidx.appcompat.widget.AppCompatImageButton
-                    android:id="@+id/contactWhatsapp"
-                    android:layout_width="@dimen/bolt_contact_action_width"
-                    android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/bolt_action_whatsapp"
-                    android:scaleType="centerInside"
-                    android:paddingHorizontal="13dp"
-                    app:srcCompat="@drawable/contact_whatsapp"
-                    app:tint="@color/bolt_search_whatsapp" />
             </LinearLayout>
             <LinearLayout
                 android:id="@+id/renameControls"

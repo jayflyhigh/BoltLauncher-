@@ -37,7 +37,8 @@
     <string name="bolt_action_message">Message</string>
     <string name="bolt_action_whatsapp">WhatsApp message</string>
     <string name="bolt_action_unavailable">No app available for this action</string>
-    <dimen name="bolt_contact_action_width">48dp</dimen>
+    <dimen name="bolt_contact_action_width">40dp</dimen>
+    <dimen name="bolt_web_action_width">44dp</dimen>
     <dimen name="bolt_contact_action_divider_width">1dp</dimen>
     <string name="bolt_apps_section">Apps</string>
     <string name="bolt_contacts_section">Contacts</string>

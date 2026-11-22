@@ -1,0 +1,10 @@
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetTop="7dp"
+    android:insetBottom="7dp"
+    android:insetLeft="3dp"
+    android:insetRight="5dp">
+    <shape>
+        <solid android:color="@color/bolt_search_result" />
+        <corners android:radius="13dp" />
+    </shape>
+</inset>
