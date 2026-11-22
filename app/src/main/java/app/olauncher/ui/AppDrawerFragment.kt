@@ -720,6 +720,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun applySearchColors() {
+        binding.search.setThunderCursor(thunderMode)
         binding.dockBolt.contentDescription = getString(
             if (thunderMode) R.string.bolt_disable_thunder else R.string.bolt_enable_thunder
         )
@@ -731,8 +732,10 @@ class AppDrawerFragment : BaseFragment() {
         val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, boltYellow, progress)
         binding.searchPanel.setDockAppearance(dockColor, progress)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
-        binding.search.setThunderCursor(lightDock)
         binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
+        val renameActionColor = if (lightDock) 0xFF303030.toInt() else Color.WHITE
+        binding.renameConfirm.setTextColor(renameActionColor)
+        binding.renameCancel.setTextColor(renameActionColor)
         binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
         bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else boltYellow)
         updateBoltVisibility()

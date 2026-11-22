@@ -49,6 +49,9 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     fun setThunderCursor(enabled: Boolean) {
+        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isCursorVisible) {
+            isCursorVisible = true
+        }
         if (thunderCursor == enabled) return
         thunderCursor = enabled
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
