@@ -1,0 +1,19 @@
+<resources>
+    <string name="thunder_game_title">Thunder Blocks</string>
+    <string name="thunder_game_hold">Thunder mode. Hold for Thunder Blocks.</string>
+    <string name="thunder_game_next">Next</string>
+    <string name="thunder_game_pause">Pause</string>
+    <string name="thunder_game_resume">Resume</string>
+    <string name="thunder_game_restart">Restart</string>
+    <string name="thunder_game_exit">Exit</string>
+    <string name="thunder_game_dock_drop">Tap to drop</string>
+    <string name="thunder_game_drop">Drop piece</string>
+    <string name="thunder_game_drop_icon">⚡↓</string>
+    <string name="thunder_game_music_on">Music on</string>
+    <string name="thunder_game_music_off">Music off</string>
+    <string name="thunder_game_sound_on">Sound on</string>
+    <string name="thunder_game_sound_off">Sound off</string>
+    <string name="thunder_game_stats">Level %1$d\nScore %2$d\nLines %3$d\nBest %4$d</string>
+    <string name="thunder_game_over">Game over</string>
+    <string name="thunder_game_paused">Paused</string>
+</resources>
