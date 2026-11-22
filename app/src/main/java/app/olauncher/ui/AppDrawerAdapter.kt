@@ -172,8 +172,8 @@ class AppDrawerAdapter(
         val labels = normalizedLabels
         val previous = displayedItems
         filterJob = iconScope.launch {
-            val (items, changes) = withContext(Dispatchers.Default) {
-                val items = if (trimmed.isEmpty()) apps else {
+            val (items, changes, fuzzy) = withContext(Dispatchers.Default) {
+                val ranked = if (trimmed.isEmpty()) emptyList() else {
                     val matches: (String, String) -> Boolean = if (thunder)
                         ThunderAppLabelMatcher(trimmed)::matches else AppLabelMatcher(trimmed)::matches
                     val typoMatcher = SearchTypoMatcher(trimmed).takeUnless { thunder }
@@ -183,12 +183,17 @@ class AppDrawerAdapter(
                         val label = labels.getValue(app.appLabel)
                         when {
                             matches(app.appLabel, label) -> app to appSearchRank(app.appLabel, trimmed)
-                            typoMatcher?.matches(label) == true -> app to 4
+                            matches(app.originalLabel, labels.getValue(app.originalLabel)) ->
+                                app to (4 + appSearchRank(app.originalLabel, trimmed))
+                            typoMatcher?.matches(label) == true -> app to 8
+                            typoMatcher?.matches(labels.getValue(app.originalLabel)) == true -> app to 9
                             else -> null
                         }
                     }.sortedWith(compareBy<Pair<AppModel, Int>> { it.second }
-                        .thenBy { it.first }).map { it.first }.toList()
+                        .thenBy { it.first }).toList()
                 }
+                val items = if (trimmed.isEmpty()) apps else ranked.map { it.first }
+                val fuzzy = ranked.filter { it.second >= 8 }.mapTo(mutableSetOf()) { it.first }
                 val changes = if (previous == items) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                     override fun getOldListSize(): Int { ensureActive(); return previous.size }
                     override fun getNewListSize(): Int { ensureActive(); return items.size }
@@ -201,14 +206,21 @@ class AppDrawerAdapter(
                         return DIFF_CALLBACK.areContentsTheSame(previous[old], items[new])
                     }
                 }, true)
-                items to changes
+                Triple(items, changes, fuzzy)
             }
             if (generation != filterGeneration) return@launch
             if (actionApp?.let { it !in items } == true) closeSearchActions()
+            val previousTypoMatches = typoMatches
+            typoMatches = fuzzy
             displayedItems = items
             committedQuery = query
             changes?.dispatchUpdatesTo(this@AppDrawerAdapter)
             if (thunder) notifyItemRangeChanged(0, itemCount, SEARCH_STYLE)
+            else if (previousTypoMatches != fuzzy) {
+                items.forEachIndexed { index, app ->
+                    if ((app in previousTypoMatches) != (app in fuzzy)) notifyItemChanged(index, SEARCH_STYLE)
+                }
+            }
             resultsChanged(query)
         }
     }
@@ -220,6 +232,18 @@ class AppDrawerAdapter(
     }
 
     private val myUserHandle = android.os.Process.myUserHandle()
+
+    private var typoMatches: Set<AppModel> = emptySet()
+    val hasDirectMatches: Boolean get() = itemCount > typoMatches.size
+    var showTypoHints = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (typoMatches.isEmpty()) return
+            displayedItems.forEachIndexed { index, app ->
+                if (app in typoMatches) notifyItemChanged(index, SEARCH_STYLE)
+            }
+        }
 
     private var normalizedLabels: Map<String, String> = emptyMap()
     var appsList: List<AppModel> = emptyList()
@@ -258,6 +282,7 @@ class AppDrawerAdapter(
             val highlighted = !thunderMode && app == enterHighlightedResult
             holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), highlighted, animateHighlight = true)
             holder.bindSearchActions(app, app == actionApp)
+            holder.bindTypoHint(showTypoHints && app in typoMatches && app != actionApp)
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -276,25 +301,28 @@ class AppDrawerAdapter(
                     )
                 }
 
-                is ViewHolder -> holder.bind(
-                    flag,
-                    appLabelGravity,
-                    myUserHandle,
-                    appModel,
-                    appClickListener,
-                    appDeleteListener,
-                    appInfoListener,
-                    appHideListener,
-                    appRenameListener,
-                    ::showSearchActions,
-                    { action -> runSearchAction(appModel, action) },
-                    searchRenameListener,
-                    appPlayStoreListener,
-                    iconScope,
-                    iconCache,
-                    thunderMode, committedQuery.orEmpty(), !thunderMode && appModel == enterHighlightedResult,
-                    appModel == actionApp
-                )
+                is ViewHolder -> {
+                    holder.bind(
+                        flag,
+                        appLabelGravity,
+                        myUserHandle,
+                        appModel,
+                        appClickListener,
+                        appDeleteListener,
+                        appInfoListener,
+                        appHideListener,
+                        appRenameListener,
+                        ::showSearchActions,
+                        { action -> runSearchAction(appModel, action) },
+                        searchRenameListener,
+                        appPlayStoreListener,
+                        iconScope,
+                        iconCache,
+                        thunderMode, committedQuery.orEmpty(), !thunderMode && appModel == enterHighlightedResult,
+                        appModel == actionApp
+                    )
+                    holder.bindTypoHint(showTypoHints && appModel in typoMatches && appModel != actionApp)
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -311,7 +339,8 @@ class AppDrawerAdapter(
     fun setAppList(appsList: MutableList<AppModel>) {
         iconCache.evictAll()
         this.appsList = appsList.toList()
-        normalizedLabels = appsList.associate { it.appLabel to it.appLabel.normalizeForSearch() }
+        normalizedLabels = appsList.asSequence().flatMap { sequenceOf(it.appLabel, it.originalLabel) }
+            .distinct().associateWith { it.normalizeForSearch() }
         filterApps(requestedQuery)
     }
 
@@ -384,6 +413,8 @@ class AppDrawerAdapter(
             iconJob?.cancel()
             iconJob = null
         }
+
+        fun bindTypoHint(show: Boolean) = binding.updateTypoHint(show)
 
         fun bindSearchStyle(
             appModel: AppModel,

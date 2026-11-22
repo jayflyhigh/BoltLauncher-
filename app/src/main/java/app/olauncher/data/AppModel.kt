@@ -5,6 +5,7 @@ import java.text.CollationKey
 
 sealed class AppModel : Comparable<AppModel> {
     abstract val appLabel: String
+    open val originalLabel: String get() = appLabel
     abstract val key: CollationKey?
     abstract val appPackage: String
     abstract val user: UserHandle
@@ -17,6 +18,7 @@ sealed class AppModel : Comparable<AppModel> {
         val activityClassName: String?,
         override val isNew: Boolean = false,
         override val user: UserHandle,
+        override val originalLabel: String = appLabel,
     ) : AppModel()
 
     data class PinnedShortcut(
@@ -26,6 +28,7 @@ sealed class AppModel : Comparable<AppModel> {
         val shortcutId: String,
         override val isNew: Boolean = false,
         override val user: UserHandle,
+        override val originalLabel: String = appLabel,
     ) : AppModel() {
         val identity: String
             get() = shortcutIdentity(appPackage, shortcutId, user.toString())

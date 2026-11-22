@@ -129,6 +129,12 @@ class AppDrawerFragment : BaseFragment() {
     private var searchRename: SearchRename? = null
 
     private var searchAppLaunch: SearchAppLaunch? = null
+    private data class SearchActionReturn(
+        val query: String,
+        val scrollState: android.os.Parcelable?,
+        val keyboardWasVisible: Boolean,
+    )
+    private var searchActionReturn: SearchActionReturn? = null
     private var restoreSearchKeyboard = false
     private val searchWindowFocusListener = android.view.ViewTreeObserver.OnWindowFocusChangeListener { focused ->
         if (focused) showRestoredSearchKeyboard()
@@ -529,7 +535,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun positionResults() {
-        if (!layoutManager.reverseLayout) return
+        if (!layoutManager.reverseLayout || searchActionReturn != null) return
         val results = binding.recyclerView
         if (scrolledFromBestMatch) {
             // DiffUtil maps the still-attached holders to the new adapter positions.
@@ -549,7 +555,12 @@ class AppDrawerFragment : BaseFragment() {
             }
             scrolledFromBestMatch = false
         }
-        layoutManager.scrollToPositionWithOffset(0, 0)
+        val bestMatch = layoutManager.findViewByPosition(0)
+        if (bestMatch == null ||
+            layoutManager.getDecoratedBottom(bestMatch) + (bestMatch.layoutParams as RecyclerView.LayoutParams).bottomMargin !=
+            results.height - results.paddingBottom) {
+            layoutManager.scrollToPositionWithOffset(0, 0)
+        }
     }
 
     private fun updateSearchSections() {
@@ -597,6 +608,12 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun updateSearchStatus() {
         val query = currentResultsQuery()
+        val showTypoHints = expanded && !thunderMode && searchRename == null && query.isNotBlank() &&
+            adapter.committedQuery == query && !adapter.hasDirectMatches &&
+            (flag != Constants.FLAG_LAUNCH_APP || !hasContactsPermission() ||
+                (contactsAdapter.committedQuery == query && !contactsAdapter.hasDirectMatches))
+        adapter.showTypoHints = showTypoHints
+        contactsAdapter.showTypoHints = showTypoHints
         val feedback = searchFeedback.takeIf { expanded }
         val offerWeb = offersWebFallback(query)
         val thunderEmpty = thunderMode && thunderEmptyQuery == query && hasEmptySearchResults(query)
@@ -626,13 +643,16 @@ class AppDrawerFragment : BaseFragment() {
         launchSearchAction(Intent(Intent.ACTION_VIEW, url), R.string.bolt_web_unavailable)
     }
 
-    private fun launchSearchAction(intent: Intent, unavailable: Int) {
-        try {
+    private fun launchSearchAction(intent: Intent, unavailable: Int): Boolean {
+        return try {
             startActivity(intent)
+            true
         } catch (_: ActivityNotFoundException) {
             showSearchFeedback(unavailable)
+            false
         } catch (_: SecurityException) {
             showSearchFeedback(unavailable)
+            false
         }
     }
 
@@ -919,7 +939,17 @@ class AppDrawerFragment : BaseFragment() {
             .appendQueryParameter("id", app.appPackage)
             .build()
         val intent = Intent(Intent.ACTION_VIEW, uri).setPackage("com.android.vending")
-        launchSearchAction(intent, R.string.bolt_play_store_action_unavailable)
+        launchExternalAppAction {
+            launchSearchAction(intent, R.string.bolt_play_store_action_unavailable)
+        }
+    }
+
+    private fun launchExternalAppAction(launch: () -> Boolean) {
+        val originalState = if (expanded && flag == Constants.FLAG_LAUNCH_APP) {
+            SearchActionReturn(currentResultsQuery(), layoutManager.onSaveInstanceState(), imeWasVisible)
+        } else null
+        searchActionReturn = originalState
+        if (!launch()) searchActionReturn = null
     }
 
     fun collapseSearch(): Boolean {
@@ -936,12 +966,13 @@ class AppDrawerFragment : BaseFragment() {
 
     fun resetHomeSearchUnlessReturningFromApp() {
         // Background callbacks run before we know how the user will return.
-        if (searchAppLaunch?.isRecent() != true) resetHomeSearch()
+        if (searchActionReturn == null && searchAppLaunch?.isRecent() != true) resetHomeSearch()
     }
 
     fun resetHomeSearch() {
         if (_binding == null || !isHomePage) return
         searchAppLaunch = null
+        searchActionReturn = null
         restoreSearchKeyboard = false
         dismissSearchEdit()
         expanded = false
@@ -1007,13 +1038,11 @@ class AppDrawerFragment : BaseFragment() {
             appClickListener = { appModel ->
                 if (searchRename == null && !thunderCommitted) launchResult(appModel)
             },
-            appInfoListener = {
-                openAppInfo(
-                    requireContext(),
-                    it.user,
-                    it.appPackage
-                )
-                findNavController().popBackStack(R.id.mainFragment, false)
+            appInfoListener = { app ->
+                launchExternalAppAction { openAppInfo(requireContext(), app.user, app.appPackage) }
+                if (flag != Constants.FLAG_LAUNCH_APP || !expanded) {
+                    findNavController().popBackStack(R.id.mainFragment, false)
+                }
             },
             appDeleteListener = { appModel ->
                 when (appModel) {
@@ -1204,11 +1233,21 @@ class AppDrawerFragment : BaseFragment() {
             else contactsAdapter.clearContacts()
         }
         binding.recyclerView.updateRowMotion(expanded)
-        if (expanded && searchAppLaunch == null) binding.search.showKeyboard(prefs.autoShowKeyboard)
+        if (expanded && searchAppLaunch == null && searchActionReturn == null) {
+            binding.search.showKeyboard(prefs.autoShowKeyboard)
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        searchActionReturn?.let { state ->
+            searchActionReturn = null
+            if (expanded && currentResultsQuery() == state.query) {
+                state.scrollState?.let(layoutManager::onRestoreInstanceState)
+                restoreSearchKeyboard = state.keyboardWasVisible
+                showRestoredSearchKeyboard()
+            }
+        }
         val launch = searchAppLaunch ?: return
         searchAppLaunch = null
         if (!launch.isRecent()) {
@@ -1222,7 +1261,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun showRestoredSearchKeyboard() {
         if (!restoreSearchKeyboard || _binding == null || !binding.search.hasWindowFocus()) return
         restoreSearchKeyboard = false
-        if (!expanded || thunderMode) return
+        if (!expanded) return
         binding.search.requestFocus()
         androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.search)
             .show(androidx.core.view.WindowInsetsCompat.Type.ime())
@@ -1248,6 +1287,7 @@ class AppDrawerFragment : BaseFragment() {
         restoreSearchKeyboard = false
         searchRename = null
         searchAppLaunch = null
+        searchActionReturn = null
         cancelAutoLaunch()
         binding.root.removeCallbacks(clearFeedback)
         searchFeedback = null

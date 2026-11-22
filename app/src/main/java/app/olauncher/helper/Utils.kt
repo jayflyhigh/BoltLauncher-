@@ -97,6 +97,7 @@ suspend fun getAppsList(
                             .ifBlank { app.label.toString() }
                         val appModel = AppModel.App(
                             appLabel = appLabelShown,
+                            originalLabel = app.label.toString(),
                             key = collator.getCollationKey(app.label.toString()),
                             appPackage = app.applicationInfo.packageName,
                             activityClassName = app.componentName.className,
@@ -162,13 +163,14 @@ private suspend fun getPinnedShortcuts(
                             profile.toString()
                         )
                         if (shortcut.isPinned && pinnedShortcuts.none { it.identity == identity }) {
-                            val label = prefs.getAppRenameLabel(identity, legacyKey = shortcut.id)
-                                .takeIf { it.isNotBlank() }
-                                ?: shortcut.shortLabel?.toString()
+                            val originalLabel = shortcut.shortLabel?.toString()
                                 ?: shortcut.longLabel?.toString().orEmpty()
+                            val label = prefs.getAppRenameLabel(identity, legacyKey = shortcut.id)
+                                .ifBlank { originalLabel }
                             pinnedShortcuts.add(
                                 AppModel.PinnedShortcut(
                                     appLabel = label,
+                                    originalLabel = originalLabel,
                                     key = collator.getCollationKey(label),
                                     appPackage = shortcut.`package`,
                                     shortcutId = shortcut.id,
@@ -251,6 +253,7 @@ suspend fun getPrivateSpaceApps(
                 appList.add(
                     AppModel.App(
                         appLabel = appLabelShown,
+                        originalLabel = app.label.toString(),
                         key = collator.getCollationKey(app.label.toString()),
                         appPackage = app.applicationInfo.packageName,
                         activityClassName = app.componentName.className,
@@ -333,13 +336,19 @@ fun getChangedAppTheme(context: Context, currentAppTheme: Int): Int {
     }
 }
 
-fun openAppInfo(context: Context, userHandle: UserHandle, packageName: String) {
+fun openAppInfo(context: Context, userHandle: UserHandle, packageName: String): Boolean {
     val launcher = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-    val component = launcher.getActivityList(packageName, userHandle).firstOrNull()?.componentName
-    if (component != null)
-        launcher.startAppDetailsActivity(component, userHandle, null, null)
-    else
-        context.showToast(context.getString(R.string.unable_to_open_app_info))
+    try {
+        val component = launcher.getActivityList(packageName, userHandle).firstOrNull()?.componentName
+        if (component != null) {
+            launcher.startAppDetailsActivity(component, userHandle, null, null)
+            return true
+        }
+    } catch (_: android.content.ActivityNotFoundException) {
+    } catch (_: SecurityException) {
+    }
+    context.showToast(context.getString(R.string.unable_to_open_app_info))
+    return false
 }
 
 suspend fun getBitmapFromURL(src: String?): Bitmap? {
