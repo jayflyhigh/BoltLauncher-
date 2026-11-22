@@ -5,8 +5,7 @@ import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import app.olauncher.R
-import app.olauncher.helper.SearchTypoMatcher
-import app.olauncher.helper.normalizeForSearch
+import app.olauncher.helper.ContactNameMatcher
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -38,6 +37,18 @@ class ContactSearchAdapter(
     data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>)
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
+    private var typoMatches: Set<Uri> = emptySet()
+    val hasDirectMatches: Boolean get() = itemCount > typoMatches.size
+    var showTypoHints = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (typoMatches.isEmpty()) return
+            results.forEachIndexed { index, contact ->
+                if (contact.uri in typoMatches) notifyItemChanged(index, HIGHLIGHT)
+            }
+        }
+
     private var selectedUri: Uri? = null
     var committedQuery: String? = null
         private set
@@ -79,6 +90,7 @@ class ContactSearchAdapter(
         filterJob?.cancel()
         val previousSize = results.size
         results = emptyList()
+        typoMatches = emptySet()
         committedQuery = null
         enterHighlightedResult = null
         selectedUri = null
@@ -99,7 +111,6 @@ class ContactSearchAdapter(
 
     private var filterJob: Job? = null
     private var filterGeneration = 0L
-    private val termSeparator = Regex("\\s+")
 
     fun filter(query: String, showAll: Boolean = true, applied: () -> Unit = {}) {
         filterJob?.cancel()
@@ -107,25 +118,18 @@ class ContactSearchAdapter(
         val generation = ++filterGeneration
         val source = contacts
         val trimmed = query.trim()
-        val terms = trimmed.split(termSeparator).filter { it.isNotEmpty() }
         filterJob = photoScope.launch {
             val previous = results
-            val (filtered, changes) = withContext(Dispatchers.Default) {
-                val typoMatcher = SearchTypoMatcher(trimmed)
-                val next = if (terms.isEmpty()) {
-                    if (showAll) source else emptyList()
-                } else source.mapNotNull { contact ->
+            val (filtered, changes, fuzzy) = withContext(Dispatchers.Default) {
+                val matcher = ContactNameMatcher(trimmed)
+                val ranked = if (trimmed.isEmpty()) emptyList() else source.mapNotNull { contact ->
                     ensureActive()
-                    val exact = terms.all { contact.name.contains(it, ignoreCase = true) ||
-                        contact.numbers.any { number -> number.contains(it) } }
-                    val rank = when {
-                        exact -> app.olauncher.helper.appSearchRank(contact.name, trimmed)
-                        trimmed.none(Char::isDigit) && typoMatcher.matches(contact.name.normalizeForSearch()) -> 4
-                        else -> return@mapNotNull null
-                    }
+                    val rank = matcher.rank(contact.name, contact.numbers) ?: return@mapNotNull null
                     Triple(contact, rank, contact.name.lowercase(Locale.ROOT))
                 }.sortedWith(compareBy<Triple<Contact, Int, String>> { it.second }.thenBy { it.third })
-                    .map { it.first }
+                val next = if (trimmed.isEmpty() && showAll) source else ranked.map { it.first }
+                val fuzzy = ranked.filter { it.second == ContactNameMatcher.TYPO_MATCH }
+                    .mapTo(mutableSetOf()) { it.first.uri }
                 val diff = if (previous == next) null else DiffUtil.calculateDiff(object : DiffUtil.Callback() {
                     override fun getOldListSize() = previous.size
                     override fun getNewListSize() = next.size
@@ -138,12 +142,21 @@ class ContactSearchAdapter(
                         return previous[old] == next[new]
                     }
                 }, true)
-                next to diff
+                Triple(next, diff, fuzzy)
             }
             if (generation != filterGeneration || source !== contacts) return@launch
+            val previousTypoMatches = typoMatches
+            typoMatches = fuzzy
             if (results != filtered) {
                 results = filtered
                 changes?.dispatchUpdatesTo(this@ContactSearchAdapter)
+            }
+            if (previousTypoMatches != fuzzy) {
+                filtered.forEachIndexed { index, contact ->
+                    if ((contact.uri in previousTypoMatches) != (contact.uri in fuzzy)) {
+                        notifyItemChanged(index, HIGHLIGHT)
+                    }
+                }
             }
             committedQuery = query
             applied()
@@ -223,6 +236,7 @@ class ContactSearchAdapter(
             binding.appTitle.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             binding.appTitle.setTextColor(if (highlighted) Color.BLACK else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
+            binding.updateTypoHint(showTypoHints && contact.uri in typoMatches)
             binding.contactNumber.setTextColor(if (highlighted) 0xFF322817.toInt() else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_secondary))
         }
@@ -231,11 +245,11 @@ class ContactSearchAdapter(
             binding.root.setTag(R.id.bolt_result_identity, contact.uri)
             (binding.root.parent as? DockResultsView)?.rememberRow(binding.root, contact.uri)
             photoJob?.cancel()
-            bindHighlight(contact)
             val number = contact.numbers.firstOrNull().orEmpty()
             binding.contactNumber.text = formatContactNumber(number)
             binding.contactNumber.visibility = if (number.isEmpty()) View.GONE else View.VISIBLE
             binding.appTitle.text = contact.name
+            bindHighlight(contact)
             binding.otherProfileIndicator.visibility = View.GONE
             binding.appHideLayout.visibility = View.GONE
             binding.renameLayout.visibility = View.GONE
