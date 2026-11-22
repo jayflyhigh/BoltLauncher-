@@ -52,4 +52,27 @@
         <item name="boltSettingsCardOutlineColor">@color/bolt_glass_settings_outline</item>
         <item name="boltHomeMenuTextColor">?attr/primaryColor</item>
     </style>
+
+    <style name="SmokedGlassOverlay">
+        <item name="boltDockColor">#E818191C</item>
+        <item name="boltPanelColor">#90191A1D</item>
+        <item name="boltPanelOutlineColor">#406E7076</item>
+        <item name="boltGlassReflectionColor">#25FFFFFF</item>
+        <item name="boltGlassTopEdgeColor">#5AC8C9CC</item>
+        <item name="boltRowColor">#D033353A</item>
+        <item name="boltRowBottomColor">#D027292E</item>
+        <item name="boltRowOutlineColor">#366F7279</item>
+        <item name="boltSelectedRowColor">#DF454247</item>
+        <item name="boltSelectedRowOutlineWidth">1dp</item>
+        <item name="boltSelectedRowOutlineColor">#BDAA76</item>
+        <item name="boltSelectedRowTextColor">#FFF8E8</item>
+        <item name="boltSelectedRowSecondaryColor">#E3D8C3</item>
+        <item name="boltSmokedControlColor">#AC36383D</item>
+        <item name="boltDialogTopColor">#EC323439</item>
+        <item name="boltDialogBottomColor">#EF24262B</item>
+        <item name="boltDialogOutlineColor">#726F7379</item>
+        <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
+        <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
+        <item name="boltPopupOutlineColor">?attr/boltDialogOutlineColor</item>
+    </style>
 </resources>

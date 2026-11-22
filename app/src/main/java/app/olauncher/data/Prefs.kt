@@ -192,9 +192,27 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(SWIPE_RIGHT_ENABLED, true)
         set(value) = prefs.edit { putBoolean(SWIPE_RIGHT_ENABLED, value).apply() }
 
-    var frostedGlass: Boolean
-        get() = prefs.getBoolean("FROSTED_GLASS", false)
-        set(value) = prefs.edit { putBoolean("FROSTED_GLASS", value) }
+    enum class LauncherTheme(val key: String) {
+        DEFAULT("default"),
+        FROSTED_GLASS("frosted_glass"),
+        SMOKED_GLASS("smoked_glass"),
+    }
+
+    var launcherTheme: LauncherTheme
+        get() {
+            val saved = prefs.getString("LAUNCHER_THEME", null)
+            if (saved != null) {
+                return LauncherTheme.entries.firstOrNull { it.key == saved } ?: LauncherTheme.DEFAULT
+            }
+            val migrated = if (prefs.getBoolean("FROSTED_GLASS", false)) {
+                LauncherTheme.FROSTED_GLASS
+            } else {
+                LauncherTheme.DEFAULT
+            }
+            prefs.edit { putString("LAUNCHER_THEME", migrated.key) }
+            return migrated
+        }
+        set(value) = prefs.edit { putString("LAUNCHER_THEME", value.key) }
 
     var appTheme: Int
         get() = prefs.getInt(APP_THEME, AppCompatDelegate.MODE_NIGHT_YES)

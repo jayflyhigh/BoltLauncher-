@@ -5,6 +5,7 @@ import android.graphics.Typeface
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import app.olauncher.R
+import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.ContactNameMatcher
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -24,9 +25,11 @@ import app.olauncher.databinding.AdapterAppDrawerBinding
 import kotlinx.coroutines.*
 import java.util.Locale
 
+private val phoneNumberSeparator = Regex("(?:\\s+|\\)\\s*)")
+
 internal fun formatContactNumber(number: String): String {
     val formatted = PhoneNumberUtils.formatNumber(number, Locale.getDefault().country) ?: number
-    return formatted.replace(Regex("(?:\\s+|\\)\\s*)"), "-").replace("(", "")
+    return formatted.replace(phoneNumberSeparator, "-").replace("(", "")
 }
 
 /** Contact rows share the app result layout and dock-key silhouette. */
@@ -34,7 +37,10 @@ class ContactSearchAdapter(
     private val tap: (Contact) -> Unit,
     private val hold: (Contact) -> Unit,
 ) : RecyclerView.Adapter<ContactSearchAdapter.Holder>() {
-    data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>)
+    data class Contact(val name: String, val uri: Uri, val photo: Uri?, val numbers: List<String>) {
+        internal val searchName = ContactNameMatcher.SearchName(name)
+        internal val sortName = name.lowercase(Locale.ROOT)
+    }
     var contacts: List<Contact> = emptyList()
     private var results: List<Contact> = emptyList()
     private var typoMatches: Set<Uri> = emptySet()
@@ -125,9 +131,9 @@ class ContactSearchAdapter(
                 val matcher = ContactNameMatcher(trimmed)
                 val ranked = if (trimmed.isEmpty()) emptyList() else source.mapNotNull { contact ->
                     ensureActive()
-                    val rank = matcher.rank(contact.name, contact.numbers) ?: return@mapNotNull null
-                    Triple(contact, rank, contact.name.lowercase(Locale.ROOT))
-                }.sortedWith(compareBy<Triple<Contact, Int, String>> { it.second }.thenBy { it.third })
+                    val rank = matcher.rank(contact.searchName, contact.numbers) ?: return@mapNotNull null
+                    contact to rank
+                }.sortedWith(compareBy<Pair<Contact, Int>> { it.second }.thenBy { it.first.sortName })
                 val next = if (trimmed.isEmpty() && showAll) source else ranked.map { it.first }
                 val fuzzy = ranked.filter { it.second == ContactNameMatcher.TYPO_MATCH }
                     .mapTo(mutableSetOf()) { it.first.uri }
@@ -207,6 +213,7 @@ class ContactSearchAdapter(
                 setPadding(0, (4 * density).toInt(), 0, (4 * density).toInt())
             }
             binding.appTitle.apply {
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 maxLines = 2
                 setPaddingRelative(0, 0, 0, 0)
             }
@@ -223,6 +230,9 @@ class ContactSearchAdapter(
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
         }
+        private val selectedText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+        private val selectedNumber = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowSecondaryColor)
+
         fun bindHighlight(contact: Contact, animateHighlight: Boolean = false) {
             val selected = contact.uri == selectedUri
             val highlighted = contact == enterHighlightedResult
@@ -234,11 +244,10 @@ class ContactSearchAdapter(
             }
             androidx.core.view.ViewCompat.setStateDescription(binding.root,
                 state?.let(binding.root.resources::getString))
-            binding.appTitle.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            binding.appTitle.setTextColor(if (highlighted) Color.BLACK else
+            binding.appTitle.setTextColor(if (highlighted) selectedText else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
             binding.updateTypoHint(showTypoHints && contact.uri in typoMatches)
-            binding.contactNumber.setTextColor(if (highlighted) 0xFF322817.toInt() else
+            binding.contactNumber.setTextColor(if (highlighted) selectedNumber else
                 ContextCompat.getColor(binding.root.context, R.color.bolt_search_secondary))
         }
 

@@ -30,6 +30,7 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.R
+import app.olauncher.helper.getColorFromAttr
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.databinding.AdapterAppDrawerBinding
@@ -170,11 +171,12 @@ class AppDrawerAdapter(
         val trimmed = query.trim()
         requestedQuery = query
         val apps = appsList
-        val labels = normalizedLabels
+        val labelIndex = normalizedLabels
         val previous = displayedItems
         filterJob = iconScope.launch {
             val (items, changes, fuzzy) = withContext(Dispatchers.Default) {
                 val ranked = if (trimmed.isEmpty()) emptyList() else {
+                    val labels = labelIndex.value
                     val matches: (String, String) -> Boolean = if (thunder)
                         ThunderAppLabelMatcher(trimmed)::matches else AppLabelMatcher(trimmed)::matches
                     val typoMatcher = SearchTypoMatcher(trimmed).takeUnless { thunder }
@@ -182,12 +184,14 @@ class AppDrawerAdapter(
                         ensureActive()
                         if (app is AppModel.PrivateSpaceHeader) return@mapNotNull null
                         val label = labels.getValue(app.appLabel)
+                        val original = app.originalLabel
+                        val originalNormalized = if (original == app.appLabel) null else labels.getValue(original)
                         when {
                             matches(app.appLabel, label) -> app to appSearchRank(app.appLabel, trimmed)
-                            matches(app.originalLabel, labels.getValue(app.originalLabel)) ->
-                                app to (4 + appSearchRank(app.originalLabel, trimmed))
+                            originalNormalized != null && matches(original, originalNormalized) ->
+                                app to (4 + appSearchRank(original, trimmed))
                             typoMatcher?.matches(label) == true -> app to 8
-                            typoMatcher?.matches(labels.getValue(app.originalLabel)) == true -> app to 9
+                            originalNormalized != null && typoMatcher?.matches(originalNormalized) == true -> app to 9
                             else -> null
                         }
                     }.sortedWith(compareBy<Pair<AppModel, Int>> { it.second }
@@ -246,7 +250,7 @@ class AppDrawerAdapter(
             }
         }
 
-    private var normalizedLabels: Map<String, String> = emptyMap()
+    private var normalizedLabels = lazy { emptyMap<String, String>() }
     var appsList: List<AppModel> = emptyList()
         private set
 
@@ -340,9 +344,13 @@ class AppDrawerAdapter(
 
     fun setAppList(appsList: MutableList<AppModel>) {
         iconCache.evictAll()
-        this.appsList = appsList.toList()
-        normalizedLabels = appsList.asSequence().flatMap { sequenceOf(it.appLabel, it.originalLabel) }
-            .distinct().associateWith { it.normalizeForSearch() }
+        val snapshot = appsList.toList()
+        this.appsList = snapshot
+        // Build the index on the search dispatcher only when a nonblank query needs it.
+        normalizedLabels = lazy(LazyThreadSafetyMode.PUBLICATION) {
+            snapshot.asSequence().flatMap { sequenceOf(it.appLabel, it.originalLabel) }
+                .distinct().associateWith { it.normalizeForSearch() }
+        }
         filterApps(requestedQuery)
     }
 
@@ -376,8 +384,11 @@ class AppDrawerAdapter(
         RecyclerView.ViewHolder(binding.root) {
         init {
             LauncherMotion.configureResultPress(binding.root)
+            binding.appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
 
+        private val selectedText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+        private val normalText = androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.bolt_search_label)
         private var iconJob: Job? = null
         private var renameWatcher: TextWatcher? = null
 
@@ -426,18 +437,13 @@ class AppDrawerAdapter(
             animateHighlight: Boolean = false,
         ) = with(binding) {
             LauncherMotion.setRowHighlight(root, enterHighlighted, animate = animateHighlight)
-            appTitle.setTextColor(if (enterHighlighted) Color.BLACK else
-                androidx.core.content.ContextCompat.getColor(root.context, R.color.bolt_search_label))
-            appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            val textColor = if (enterHighlighted) selectedText else normalText
+            if (appTitle.currentTextColor != textColor) appTitle.setTextColor(textColor)
             androidx.core.view.ViewCompat.setStateDescription(root,
                 if (enterHighlighted) root.resources.getString(R.string.bolt_enter_target) else null)
-            // Show indicators in title based on app type and state
-            appTitle.text = buildString {
-                append(appModel.appLabel)
-                if (appModel.isNew) append(" ✦")
-            }
+            val title = if (appModel.isNew) "${appModel.appLabel} ✦" else appModel.appLabel
             if (thunderMode && !enterHighlighted && query.isNotBlank()) {
-                appTitle.text = android.text.SpannableString(appTitle.text).apply {
+                appTitle.text = android.text.SpannableString(title).apply {
                     thunderMatchRanges(appModel.appLabel, query).forEach { range ->
                         setSpan(android.text.style.ForegroundColorSpan(Color.WHITE), range.first, range.last + 1,
                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -445,6 +451,8 @@ class AppDrawerAdapter(
                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                     }
                 }
+            } else if (appTitle.text != title) {
+                appTitle.text = title
             }
         }
 
@@ -518,7 +526,6 @@ class AppDrawerAdapter(
             appTitle.visibility = View.VISIBLE
 
             cancelIconLoad()
-            appIcon.setImageDrawable(null)
             appIcon.isVisible = appModel.appPackage.isNotEmpty()
             if (appModel.appPackage.isNotEmpty()) {
                 val key = IconKey(appModel.appPackage, appModel.user, root.resources.displayMetrics.densityDpi)
@@ -543,6 +550,8 @@ class AppDrawerAdapter(
                         if (icon != null) appIcon.setImageDrawable(icon)
                     }
                 }
+            } else {
+                appIcon.setImageDrawable(null)
             }
             appTitle.gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
             otherProfileIndicator.isVisible = appModel.user != myUserHandle

@@ -1,14 +1,18 @@
 package app.olauncher.ui
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.R
 import app.olauncher.databinding.AdapterSearchDestinationBinding
 import app.olauncher.helper.InAppSearch
+import app.olauncher.helper.getColorFromAttr
+import kotlin.math.roundToInt
 
 internal class SearchDestinationAdapter(
     private val launch: (InAppSearch.Target) -> Unit,
@@ -43,8 +47,19 @@ internal class SearchDestinationAdapter(
 }
 
 internal fun TextView.bindAliasBadge(target: InAppSearch.Target, description: Int) {
+    if (tag == target) return
+    tag = target
     text = target.code
     contentDescription = context.getString(description, target.code)
-    background = InAppSearch.background(target.color, resources.displayMetrics.density)
-    setTextColor(InAppSearch.foreground(target.color))
+    val density = resources.displayMetrics.density
+    val smokedSurface = context.getColorFromAttr(R.attr.boltSmokedControlColor)
+    if (smokedSurface != 0) {
+        background = InAppSearch.background(smokedSurface, density).apply {
+            setStroke(density.roundToInt(), ColorUtils.blendARGB(target.color, Color.WHITE, 0.35f))
+        }
+        setTextColor(Color.WHITE)
+    } else {
+        background = InAppSearch.background(target.color, density)
+        setTextColor(InAppSearch.foreground(target.color))
+    }
 }
