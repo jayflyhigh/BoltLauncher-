@@ -33,6 +33,13 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private var resultsHeight = 0
     private var statusInPanel = false
 
+    var statusIsResult = false
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
+
     private var dockColor = surface
     private var dividerAlpha = 255
 
@@ -60,11 +67,14 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             minOf(dock.layoutParams.height, height), MeasureSpec.EXACTLY
         ))
         var remaining = height - dock.measuredHeight
-        val statusHeight = measureContent(status, exactWidth, remaining)
-        remaining -= statusHeight
+        statusInPanel = status.visibility == View.VISIBLE && statusIsResult
+        val statusInset = if (statusInPanel) rowInset.coerceAtMost(width / 2) else 0
+        val statusWidth = MeasureSpec.makeMeasureSpec(width - 2 * statusInset, MeasureSpec.EXACTLY)
+        val statusSpace = if (statusInPanel) (remaining - rowInset).coerceAtLeast(0) else remaining
+        val statusHeight = measureContent(status, statusWidth, statusSpace)
+        remaining -= statusHeight + if (statusInPanel) minOf(rowInset, remaining - statusHeight) else 0
         remaining -= measureContent(rename, exactWidth, remaining)
         resultsHeight = measureContent(results, exactWidth, (remaining - rowInset).coerceAtLeast(0))
-        statusInPanel = status.visibility == View.VISIBLE && status.isClickable
         setMeasuredDimension(width, height)
     }
 
@@ -78,7 +88,12 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val dockTop = height - dock.measuredHeight
         dock.layout(0, dockTop, width, height)
         var edge = dockTop
-        if (statusInPanel) edge = layoutAbove(status, edge)
+        if (statusInPanel) {
+            val inset = (width - status.measuredWidth) / 2
+            val statusTop = edge - status.measuredHeight
+            status.layout(inset, statusTop, width - inset, edge)
+            edge = (statusTop - rowInset).coerceAtLeast(0)
+        }
         edge = layoutAbove(results, edge)
         if (resultsHeight > 0) edge -= rowInset
         updateHeight((height - edge).toFloat())
