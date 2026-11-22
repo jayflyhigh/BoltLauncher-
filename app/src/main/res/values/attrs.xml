@@ -12,4 +12,22 @@
     <attr name="dialogShadeColor" format="color" />
     <attr name="primaryShadeDarkColor" format="color" />
     <attr name="mainFontFamily" format="string" />
+    <attr name="boltDockColor" format="color" />
+    <attr name="boltPanelColor" format="color" />
+    <attr name="boltPanelOutlineColor" format="color" />
+    <attr name="boltRowColor" format="color" />
+    <attr name="boltDialogTopColor" format="color" />
+    <attr name="boltDialogBottomColor" format="color" />
+    <attr name="boltDialogOutlineColor" format="color" />
+    <attr name="boltPopupTopColor" format="color" />
+    <attr name="boltPopupBottomColor" format="color" />
+    <attr name="boltPopupOutlineColor" format="color" />
+    <attr name="boltSettingsSurfaceColor" format="color" />
+    <attr name="boltSettingsCardColor" format="color" />
+    <attr name="boltSettingsCardOutlineColor" format="color" />
+    <attr name="boltHomeMenuTextColor" format="color" />
+    <attr name="boltGlassReflectionColor" format="color" />
+    <attr name="boltRowBottomColor" format="color" />
+    <attr name="boltRowOutlineColor" format="color" />
+    <attr name="boltSettingsCardBottomColor" format="color" />
 </resources>

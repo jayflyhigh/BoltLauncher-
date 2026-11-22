@@ -45,6 +45,25 @@
 
         <item name="mainFontFamily">sans-serif-medium</item>
 
+        <item name="boltSettingsSurfaceColor">?attr/primaryShadeDarkColor</item>
+        <item name="boltSettingsCardColor">?attr/primaryShadeDarkColor</item>
+        <item name="boltSettingsCardOutlineColor">?attr/primaryColorTrans50</item>
+        <item name="boltHomeMenuTextColor">@color/bolt_search_label</item>
+        <item name="boltGlassReflectionColor">#00000000</item>
+        <item name="boltRowBottomColor">@color/bolt_search_result</item>
+        <item name="boltRowOutlineColor">#00000000</item>
+        <item name="boltSettingsCardBottomColor">?attr/primaryShadeDarkColor</item>
+        <item name="boltDockColor">@color/bolt_search_dock</item>
+        <item name="boltPanelColor">@color/bolt_search_dock</item>
+        <item name="boltPanelOutlineColor">@color/bolt_search_outline</item>
+        <item name="boltRowColor">@color/bolt_search_result</item>
+        <item name="boltDialogTopColor">#292535</item>
+        <item name="boltDialogBottomColor">#292535</item>
+        <item name="boltDialogOutlineColor">#605471</item>
+        <item name="boltPopupTopColor">#2B2737</item>
+        <item name="boltPopupBottomColor">#2B2737</item>
+        <item name="boltPopupOutlineColor">#554A66</item>
+
         <!-- Popup menus and dialogs used by settings -->
         <item name="popupMenuStyle">@style/OlPopupMenu</item>
         <item name="textAppearanceLargePopupMenu">@style/OlPopupMenuText</item>

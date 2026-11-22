@@ -13,7 +13,6 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -77,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         if (isEinkDisplay()) prefs.appTheme = AppCompatDelegate.MODE_NIGHT_NO
         AppCompatDelegate.setDefaultNightMode(prefs.appTheme)
         super.onCreate(savedInstanceState)
+        if (prefs.frostedGlass) theme.applyStyle(R.style.FrostedGlassOverlay, true)
         if (prefs.boldFont) theme.applyStyle(R.style.BoldFontOverlay, true)
         if (isEinkDisplay() || isSystemAnimationsDisabled()) theme.applyStyle(R.style.NoAnimationOverlay, true)
         binding = ActivityMainBinding.inflate(layoutInflater)

@@ -13,4 +13,43 @@
         <item name="android:textSize">12sp</item>
         <item name="android:foreground">@drawable/bolt_search_press</item>
     </style>
+
+    <style name="BoltHomeMenuRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:drawablePadding">14dp</item>
+        <item name="android:background">@drawable/bolt_search_press</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:fontFamily">?attr/mainFontFamily</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">?attr/boltHomeMenuTextColor</item>
+        <item name="drawableTint">?attr/boltHomeMenuTextColor</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="FrostedGlassOverlay">
+        <item name="boltGlassReflectionColor">#619AC5FA</item>
+        <item name="boltRowBottomColor">#17233961</item>
+        <item name="boltRowOutlineColor">#4BB5D3F3</item>
+        <item name="boltSettingsCardBottomColor">@color/bolt_glass_settings_card_bottom</item>
+        <item name="boltDockColor">#CD26344B</item>
+        <item name="boltPanelColor">#D21A273C</item>
+        <item name="boltPanelOutlineColor">#6D9AB9D9</item>
+        <item name="boltRowColor">#54667D9E</item>
+        <item name="boltDialogTopColor">@color/bolt_glass_dialog_top</item>
+        <item name="boltDialogBottomColor">@color/bolt_glass_dialog_bottom</item>
+        <item name="boltDialogOutlineColor">@color/bolt_glass_dialog_outline</item>
+        <item name="boltPopupTopColor">@color/bolt_glass_dialog_top</item>
+        <item name="boltPopupBottomColor">@color/bolt_glass_dialog_bottom</item>
+        <item name="boltPopupOutlineColor">@color/bolt_glass_dialog_outline</item>
+        <item name="boltSettingsSurfaceColor">@color/bolt_glass_settings_surface</item>
+        <item name="boltSettingsCardColor">@color/bolt_glass_settings_card</item>
+        <item name="boltSettingsCardOutlineColor">@color/bolt_glass_settings_outline</item>
+        <item name="boltHomeMenuTextColor">?attr/primaryColor</item>
+    </style>
 </resources>

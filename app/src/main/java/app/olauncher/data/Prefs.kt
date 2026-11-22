@@ -192,6 +192,10 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(SWIPE_RIGHT_ENABLED, true)
         set(value) = prefs.edit { putBoolean(SWIPE_RIGHT_ENABLED, value).apply() }
 
+    var frostedGlass: Boolean
+        get() = prefs.getBoolean("FROSTED_GLASS", false)
+        set(value) = prefs.edit { putBoolean("FROSTED_GLASS", value) }
+
     var appTheme: Int
         get() = prefs.getInt(APP_THEME, AppCompatDelegate.MODE_NIGHT_YES)
         set(value) = prefs.edit { putInt(APP_THEME, value).apply() }
