@@ -1,14 +1,12 @@
 package app.olauncher.ui
 
 import android.content.Context
-import android.os.Build
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import androidx.appcompat.widget.AppCompatEditText
-import app.olauncher.R
 
 class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     AppCompatEditText(context, attrs) {
@@ -49,17 +47,10 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     fun setThunderCursor(enabled: Boolean) {
-        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isCursorVisible) {
-            isCursorVisible = true
-        }
+        // Keep the framework cursor yellow so it cannot retain Thunder's black drawable.
+        isCursorVisible = !enabled
         if (thunderCursor == enabled) return
         thunderCursor = enabled
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            setTextCursorDrawable(if (enabled) R.drawable.bolt_cursor_black else R.drawable.bolt_cursor_yellow)
-            return
-        }
-        // Android 7–9 cannot change the framework cursor drawable at runtime.
-        isCursorVisible = !enabled
         blinkStart = android.os.SystemClock.uptimeMillis()
         invalidate()
     }
@@ -84,7 +75,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q || !thunderCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
+        if (!thunderCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
             selectionStart != selectionEnd) return
         val textLayout = layout ?: return
         val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart
