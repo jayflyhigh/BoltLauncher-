@@ -6,164 +6,165 @@
     android:focusableInTouchMode="true"
     android:orientation="vertical">
 
-    <app.olauncher.ui.DockResultsView
-        android:id="@+id/recyclerView"
+    <app.olauncher.ui.SearchPanelLayout
+        android:id="@+id/searchPanel"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginHorizontal="8dp"
-        android:layout_marginBottom="4dp"
-        android:layout_weight="1"
-        android:visibility="invisible" />
+        android:layout_height="match_parent"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="@dimen/bolt_search_ime_gap">
 
-    <TextView
-        android:id="@+id/appRename"
-        style="@style/TextSmall"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/rename"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/searchStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="8dp"
-        android:layout_marginBottom="4dp"
-        android:foreground="@drawable/bolt_search_press"
-        android:accessibilityLiveRegion="polite"
-        android:ellipsize="end"
-        android:gravity="center_vertical"
-        android:maxLines="2"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
-        android:textColor="@color/bolt_search_secondary"
-        android:textSize="14sp"
-        android:visibility="gone" />
-
-    <FrameLayout
-        android:id="@+id/dock"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginHorizontal="8dp"
-        android:layout_marginBottom="@dimen/bolt_search_ime_gap"
-        android:background="@drawable/bolt_search_idle"
-        android:layoutDirection="ltr">
-
-        <app.olauncher.ui.BoltSearchInput
-            android:id="@+id/search"
+        <app.olauncher.ui.DockResultsView
+            android:id="@+id/recyclerView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="@dimen/bolt_search_button_width"
-            android:background="@null"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="@dimen/bolt_search_results_inset"
+            android:visibility="invisible" />
+
+        <TextView
+            android:id="@+id/appRename"
+            style="@style/TextSmall"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/rename"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/searchStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:foreground="@drawable/bolt_search_press"
-            android:gravity="start|center_vertical"
-            android:imeOptions="actionGo|flagNoExtractUi"
-            android:inputType="text|textNoSuggestions"
-            android:paddingHorizontal="16dp"
-            android:saveEnabled="false"
-            android:singleLine="true"
-            android:textCursorDrawable="@drawable/bolt_cursor_yellow"
-            android:textSize="18sp" />
-
-        <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/dockBolt"
-            android:layout_width="@dimen/bolt_search_button_width"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
-            android:background="@drawable/bolt_search_press"
-            android:contentDescription="@string/bolt_enable_thunder"
-            android:scaleType="center"
-            app:srcCompat="@drawable/bolt_search_lightning"
-            app:tint="@color/bolt_search_yellow" />
-        <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/dockWeb"
-            android:layout_width="@dimen/bolt_contact_action_width"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
-            android:background="@drawable/bolt_search_press"
-            android:contentDescription="@string/bolt_search_web"
-            android:scaleType="center"
-            android:visibility="gone"
-            app:srcCompat="@drawable/dock_web"
-            app:tint="@color/bolt_search_label" />
-
-        <LinearLayout
-            android:id="@+id/contactShortcuts"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
+            android:accessibilityLiveRegion="polite"
+            android:ellipsize="end"
             android:gravity="center_vertical"
-            android:visibility="gone">
+            android:maxLines="2"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:textColor="@color/bolt_search_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
 
-            <View
-                android:layout_width="@dimen/bolt_contact_action_divider_width"
-                android:layout_height="18dp"
-                android:background="#474747" />
+        <FrameLayout
+            android:id="@+id/dock"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layoutDirection="ltr">
+
+            <app.olauncher.ui.BoltSearchInput
+                android:id="@+id/search"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="@dimen/bolt_search_button_width"
+                android:background="@null"
+                android:foreground="@drawable/bolt_search_press"
+                android:gravity="start|center_vertical"
+                android:imeOptions="actionGo|flagNoExtractUi"
+                android:inputType="text|textNoSuggestions"
+                android:paddingHorizontal="16dp"
+                android:saveEnabled="false"
+                android:singleLine="true"
+                android:textCursorDrawable="@drawable/bolt_cursor_yellow"
+                android:textSize="18sp" />
 
             <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/contactCall"
+                android:id="@+id/dockBolt"
+                android:layout_width="@dimen/bolt_search_button_width"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:background="@drawable/bolt_search_press"
+                android:contentDescription="@string/bolt_enable_thunder"
+                android:scaleType="center"
+                app:srcCompat="@drawable/bolt_search_lightning"
+                app:tint="@color/bolt_search_yellow" />
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/dockWeb"
                 android:layout_width="@dimen/bolt_contact_action_width"
                 android:layout_height="match_parent"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/bolt_action_call"
-                android:scaleType="centerInside"
-                android:paddingHorizontal="13dp"
-                app:srcCompat="@drawable/contact_call"
+                android:layout_gravity="end"
+                android:background="@drawable/bolt_search_press"
+                android:contentDescription="@string/bolt_search_web"
+                android:scaleType="center"
+                android:visibility="gone"
+                app:srcCompat="@drawable/dock_web"
                 app:tint="@color/bolt_search_label" />
 
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/contactMessage"
-                android:layout_width="@dimen/bolt_contact_action_width"
+            <LinearLayout
+                android:id="@+id/contactShortcuts"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/bolt_action_message"
-                android:scaleType="centerInside"
-                android:paddingHorizontal="13dp"
-                app:srcCompat="@drawable/contact_message"
-                app:tint="@color/bolt_search_label" />
+                android:layout_gravity="end"
+                android:gravity="center_vertical"
+                android:visibility="gone">
 
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/contactWhatsapp"
-                android:layout_width="@dimen/bolt_contact_action_width"
+                <View
+                    android:layout_width="@dimen/bolt_contact_action_divider_width"
+                    android:layout_height="18dp"
+                    android:background="#474747" />
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/contactCall"
+                    android:layout_width="@dimen/bolt_contact_action_width"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/bolt_action_call"
+                    android:scaleType="centerInside"
+                    android:paddingHorizontal="13dp"
+                    app:srcCompat="@drawable/contact_call"
+                    app:tint="@color/bolt_search_label" />
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/contactMessage"
+                    android:layout_width="@dimen/bolt_contact_action_width"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/bolt_action_message"
+                    android:scaleType="centerInside"
+                    android:paddingHorizontal="13dp"
+                    app:srcCompat="@drawable/contact_message"
+                    app:tint="@color/bolt_search_label" />
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/contactWhatsapp"
+                    android:layout_width="@dimen/bolt_contact_action_width"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/bolt_action_whatsapp"
+                    android:scaleType="centerInside"
+                    android:paddingHorizontal="13dp"
+                    app:srcCompat="@drawable/contact_whatsapp"
+                    app:tint="@color/bolt_search_whatsapp" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/renameControls"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/bolt_action_whatsapp"
-                android:scaleType="centerInside"
-                android:paddingHorizontal="13dp"
-                app:srcCompat="@drawable/contact_whatsapp"
-                app:tint="@color/bolt_search_whatsapp" />
-        </LinearLayout>
-        <LinearLayout
-            android:id="@+id/renameControls"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="end"
-            android:visibility="gone">
+                android:layout_gravity="end"
+                android:visibility="gone">
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/renameConfirm"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="@dimen/bolt_rename_action_width"
-                android:layout_height="match_parent"
-                android:minWidth="0dp"
-                android:paddingHorizontal="2dp"
-                android:text="@string/rename"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/renameConfirm"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="@dimen/bolt_rename_action_width"
+                    android:layout_height="match_parent"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="2dp"
+                    android:text="@string/rename"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
 
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/renameCancel"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="@dimen/bolt_rename_action_width"
-                android:layout_height="match_parent"
-                android:minWidth="0dp"
-                android:paddingHorizontal="2dp"
-                android:text="@string/close"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp" />
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/renameCancel"
+                    style="?android:attr/borderlessButtonStyle"
+                    android:layout_width="@dimen/bolt_rename_action_width"
+                    android:layout_height="match_parent"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="2dp"
+                    android:text="@string/close"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
 
-        </LinearLayout>
-    </FrameLayout>
+            </LinearLayout>
+        </FrameLayout>
+    </app.olauncher.ui.SearchPanelLayout>
 </app.olauncher.ui.SearchGestureLayout>

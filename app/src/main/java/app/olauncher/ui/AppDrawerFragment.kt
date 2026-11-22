@@ -12,7 +12,6 @@ import android.provider.ContactsContract
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Rect
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.telephony.PhoneNumberUtils
 import java.util.Locale
@@ -110,7 +109,8 @@ class AppDrawerFragment : BaseFragment() {
     }
     private var scrolledFromBestMatch = false
     private var displayedQuery: String? = null
-    private var decoratedContact: Pair<Int, Uri>? = null
+    private lateinit var appsSection: SearchSectionAdapter
+    private lateinit var contactsSection: SearchSectionAdapter
     private var highlightedContactQuery: String? = null
     private var autoLaunch: Runnable? = null
     private var thunderLaunchAnimation: ThunderLaunchAnimation? = null
@@ -137,11 +137,8 @@ class AppDrawerFragment : BaseFragment() {
         const val THUNDER_QUIET_MS = 220L
         const val COMPOSITION_RECHECK_MS = 100L
     }
-    private var backdropAnimator: ValueAnimator? = null
-    private val searchBackdrop = ColorDrawable(Color.BLACK)
     private var boltAnimator: ValueAnimator? = null
     private var boltProgress = 0f
-    private lateinit var dockBackground: android.graphics.drawable.GradientDrawable
     private var dockIdleColor = 0
     private var boltYellow = 0
 
@@ -167,7 +164,6 @@ class AppDrawerFragment : BaseFragment() {
         boltProgress = 0f
         scrolledFromBestMatch = false
         displayedQuery = null
-        decoratedContact = null
         initAdapter()
         initSearch()
         binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
@@ -180,7 +176,6 @@ class AppDrawerFragment : BaseFragment() {
         initClickListeners()
         initHomeSwipe()
         applyDockInsets()
-        binding.root.background = searchBackdrop
         updateSearchVisibility()
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
@@ -288,8 +283,6 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         dockIdleColor = ContextCompat.getColor(requireContext(), R.color.bolt_search_dock)
         boltYellow = ContextCompat.getColor(requireContext(), R.color.bolt_search_yellow)
-        dockBackground = (binding.dock.background.mutate() as android.graphics.drawable.GradientDrawable)
-        binding.dock.background = dockBackground
         binding.search.filters = binding.search.filters + android.text.InputFilter { _, _, _, dest, start, end ->
             if (thunderCommitted) dest.subSequence(start, end) else null
         }
@@ -364,9 +357,8 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun openSearch(thunder: Boolean) {
-        val opening = !expanded
         expanded = true
-        updateSearchVisibility(animateBackdrop = opening)
+        updateSearchVisibility()
         setThunderMode(thunder)
         if (!thunder && flag == Constants.FLAG_LAUNCH_APP && !hasContactsPermission() && !askedForContacts) {
             askedForContacts = true
@@ -381,7 +373,7 @@ class AppDrawerFragment : BaseFragment() {
         else binding.search.showKeyboard()
     }
 
-    private fun updateSearchVisibility(animateBackdrop: Boolean = false) {
+    private fun updateSearchVisibility() {
         binding.search.hint = when {
             searchRename != null -> getString(R.string.bolt_new_app_name)
             !expanded -> getString(R.string.bolt_search_anything)
@@ -395,25 +387,8 @@ class AppDrawerFragment : BaseFragment() {
         if (!expanded) binding.search.clearFocus()
         binding.recyclerView.visibility = if (expanded) View.VISIBLE else View.INVISIBLE
         binding.recyclerView.updateRowMotion(expanded)
-        updateSearchBackdrop(animateBackdrop)
         updateDockButtons()
         updateSearchStatus()
-    }
-
-    private fun updateSearchBackdrop(animate: Boolean) {
-        val target = if (expanded) 255 else 0
-        backdropAnimator?.cancel()
-        backdropAnimator = null
-        if (!animate || !LauncherMotion.isEnabled(requireContext()) || searchBackdrop.alpha == target) {
-            searchBackdrop.alpha = target
-            return
-        }
-        backdropAnimator = ValueAnimator.ofInt(searchBackdrop.alpha, target).apply {
-            duration = LauncherMotion.SEARCH_DURATION
-            interpolator = LauncherMotion.settle
-            addUpdateListener { searchBackdrop.alpha = it.animatedValue as Int }
-            start()
-        }
     }
 
     private fun setThunderMode(enabled: Boolean, animate: Boolean = true) {
@@ -455,7 +430,7 @@ class AppDrawerFragment : BaseFragment() {
         boltProgress = progress
         val bolt = binding.dockBolt
         val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, boltYellow, progress)
-        dockBackground.setColor(dockColor)
+        binding.searchPanel.setDockAppearance(dockColor, progress)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
         binding.search.setThunderCursor(lightDock)
         binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
@@ -473,7 +448,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun onResultsChanged(query: String) {
         if (_binding == null || query != currentResultsQuery()) return
-        updateContactDecoration()
+        updateSearchSections()
         val bottomAnchored = thunderMode || query.isNotBlank()
         val directionChanged = layoutManager.reverseLayout != bottomAnchored
         layoutManager.reverseLayout = bottomAnchored
@@ -510,6 +485,8 @@ class AppDrawerFragment : BaseFragment() {
                 }
                 ContactLoadResult.PermissionDenied -> {
                     contactsAdapter.clearContacts()
+                    updateSearchSections()
+                    updateSearchStatus()
                     updateResultHighlight(currentResultsQuery())
                 }
                 is ContactLoadResult.Failure -> Unit
@@ -520,12 +497,12 @@ class AppDrawerFragment : BaseFragment() {
     private fun filterContacts(query: String) {
         if (!expanded || thunderMode || flag != Constants.FLAG_LAUNCH_APP || query.isBlank()) {
             contactsAdapter.clearResults()
-            updateContactDecoration()
+            updateSearchSections()
             updateDockButtons()
             return
         }
         contactsAdapter.filter(query, showAll = false) {
-            updateContactDecoration()
+            updateSearchSections()
             updateResultHighlight(query)
             positionResults()
             updateSearchStatus()
@@ -557,12 +534,11 @@ class AppDrawerFragment : BaseFragment() {
         layoutManager.scrollToPositionWithOffset(0, 0)
     }
 
-    private fun updateContactDecoration() {
-        val boundary = contactsAdapter.firstResult?.takeIf { adapter.itemCount > 0 }
-            ?.let { adapter.itemCount to it.uri }
-        if (boundary == decoratedContact) return
-        decoratedContact = boundary
-        binding.recyclerView.invalidateItemDecorations()
+    private fun updateSearchSections() {
+        val showSections = expanded && !thunderMode && flag == Constants.FLAG_LAUNCH_APP &&
+            currentResultsQuery().isNotBlank()
+        appsSection.show(showSections && adapter.itemCount > 0)
+        contactsSection.show(showSections && contactsAdapter.itemCount > 0)
     }
 
     private fun selectContact(contact: ContactSearchAdapter.Contact) {
@@ -598,15 +574,13 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun updateSearchStatus() {
         val query = currentResultsQuery()
-        val showEmpty = hasEmptySearchResults(query)
         val feedback = searchFeedback.takeIf { expanded }
         val offerWeb = offersWebFallback(query)
         binding.searchStatus.apply {
-            isVisible = feedback != null || showEmpty
+            isVisible = feedback != null || offerWeb
             text = when {
                 feedback != null -> getString(feedback)
                 offerWeb -> getString(R.string.bolt_search_web_for, query.trim())
-                showEmpty -> getString(R.string.bolt_no_matches)
                 else -> ""
             }
             setBackgroundResource(if (offerWeb) R.drawable.bolt_search_best_match else 0)
@@ -916,7 +890,7 @@ class AppDrawerFragment : BaseFragment() {
         if (insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true) {
             binding.search.hideKeyboard()
         } else {
-            resetHomeSearch(animateBackdrop = true)
+            resetHomeSearch()
         }
         return true
     }
@@ -926,7 +900,7 @@ class AppDrawerFragment : BaseFragment() {
         if (searchAppLaunch?.isRecent() != true) resetHomeSearch()
     }
 
-    fun resetHomeSearch(animateBackdrop: Boolean = false) {
+    fun resetHomeSearch() {
         if (_binding == null || !isHomePage) return
         searchAppLaunch = null
         restoreSearchKeyboard = false
@@ -942,7 +916,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.hideKeyboard()
         binding.search.text?.clear()
         setThunderMode(false, animate = false)
-        updateSearchVisibility(animateBackdrop)
+        updateSearchVisibility()
     }
 
     private fun showHomeSettings() {
@@ -1075,16 +1049,9 @@ class AppDrawerFragment : BaseFragment() {
         layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
         contactsAdapter = ContactSearchAdapter(tap = ::selectContact, hold = ::openContact)
-        binding.recyclerView.adapter = ConcatAdapter(adapter, contactsAdapter)
-        binding.recyclerView.addItemDecoration(object : RecyclerView.ItemDecoration() {
-            override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView,
-                                        state: RecyclerView.State) {
-                if (adapter.itemCount > 0 && parent.getChildAdapterPosition(view) == adapter.itemCount &&
-                    contactsAdapter.itemCount > 0) {
-                    outRect.bottom = (8 * resources.displayMetrics.density).toInt()
-                }
-            }
-        })
+        appsSection = SearchSectionAdapter(getString(R.string.bolt_apps_section))
+        contactsSection = SearchSectionAdapter(getString(R.string.bolt_contacts_section))
+        binding.recyclerView.adapter = ConcatAdapter(adapter, appsSection, contactsAdapter, contactsSection)
         binding.recyclerView.itemAnimator = null
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -1243,8 +1210,6 @@ class AppDrawerFragment : BaseFragment() {
         stopLoadingContacts()
         boltAnimator?.cancel()
         boltAnimator = null
-        backdropAnimator?.cancel()
-        backdropAnimator = null
         LauncherMotion.reset(binding.recyclerView)
         LauncherMotion.reset(binding.dock)
         LauncherMotion.reset(binding.contactShortcuts)

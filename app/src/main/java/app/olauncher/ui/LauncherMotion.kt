@@ -10,7 +10,6 @@ import app.olauncher.helper.isSystemAnimationsDisabled
 /** Short, interruptible transitions for launcher state changes. */
 internal object LauncherMotion {
     const val MODE_DURATION = 180L
-    const val SEARCH_DURATION = 220L
     private const val REVEAL_DURATION = 140L
     val settle = PathInterpolator(0.2f, 0f, 0f, 1f)
 
