@@ -17,7 +17,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
-import app.olauncher.ui.LauncherMotion
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -49,6 +48,7 @@ internal class ThunderGameView(
     private enum class Drag { HORIZONTAL, DOWN }
     private var drag: Drag? = null
     private var trackingTouch = false
+    private var tapCandidate = false
     private var anchorX = 0f
     private var anchorY = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -73,6 +73,8 @@ internal class ThunderGameView(
         if (soundEnabled) play(rotateSound)
         updateControls()
     }
+    private val dockResumeButton = button(R.string.thunder_game_resume, ::resumeGame)
+    private val dockExitButton = button(R.string.thunder_game_exit, exit)
     private val running get() = !paused && !game.gameOver
     private val tick = Runnable {
         if (running) {
@@ -85,7 +87,8 @@ internal class ThunderGameView(
         orientation = VERTICAL
         isFocusableInTouchMode = true
         clipChildren = false
-        setOnClickListener { rotatePiece() }
+        board.setOnClickListener { rotatePiece() }
+        board.setOnTouchListener { _, event -> handleBoardTouch(event) }
         setPadding(dp(16), dp(8), dp(16), dp(8))
 
         val field = LinearLayout(context)
@@ -97,12 +100,16 @@ internal class ThunderGameView(
             background = surface()
             setPadding(dp(5), dp(4), dp(5), dp(4))
             gravity = Gravity.CENTER_HORIZONTAL
-            setOnClickListener { rotatePiece() }
         }
         rail.addView(label(R.string.thunder_game_title).apply {
             setTextColor(accent)
             setTypeface(typeface, Typeface.BOLD)
         })
+        if (!settings.getBoolean("controls_hint_seen", false)) {
+            rail.addView(label(R.string.thunder_game_controls_hint).apply {
+                setPadding(0, dp(4), 0, dp(4))
+            })
+        }
         rail.addView(stats)
         rail.addView(label(R.string.thunder_game_next))
         rail.addView(preview, LayoutParams(LayoutParams.MATCH_PARENT, dp(56)))
@@ -123,6 +130,8 @@ internal class ThunderGameView(
                 textSize = 20f
                 contentDescription = context.getString(R.string.thunder_game_drop)
             }, LayoutParams(dp(52), LayoutParams.MATCH_PARENT))
+            addView(dockResumeButton, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+            addView(dockExitButton, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         }
         addView(dock, LayoutParams(LayoutParams.MATCH_PARENT, dp(52)))
         bindGame()
@@ -130,6 +139,9 @@ internal class ThunderGameView(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        if (!settings.getBoolean("controls_hint_seen", false)) {
+            settings.edit().putBoolean("controls_hint_seen", true).apply()
+        }
         updateMusic()
         scheduleTick()
     }
@@ -144,8 +156,14 @@ internal class ThunderGameView(
         super.onDetachedFromWindow()
     }
 
+    fun handleBack() {
+        if (game.gameOver) exit() else pauseGame()
+    }
+
     fun pauseGame() {
+        if (paused || game.gameOver) return
         paused = true
+        trackingTouch = false
         scheduleTick()
         saveBest()
         updateMusic()
@@ -176,10 +194,11 @@ internal class ThunderGameView(
     }
 
     private fun onLock() {
+        trackingTouch = false
         best = max(best, game.score)
         if (game.clearedLastMove > 0) {
             play(clearSound)
-            if (LauncherMotion.isEnabled(context)) board.strike(game.clearedRows)
+            board.strike(game.clearedRows, game.clearedFourRows)
         } else {
             play(lockSound)
         }
@@ -204,46 +223,41 @@ internal class ThunderGameView(
         scheduleTick()
     }
 
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+    private fun handleBoardTouch(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 trackingTouch = running
+                tapCandidate = running
                 drag = null
                 anchorX = event.x
                 anchorY = event.y
             }
-            MotionEvent.ACTION_POINTER_DOWN -> trackingTouch = false
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> trackingTouch = false
             MotionEvent.ACTION_MOVE -> {
                 if (trackingTouch && running) {
                     val dx = event.x - anchorX
                     val dy = event.y - anchorY
-                    if (drag == null) {
+                    if (drag == null && max(abs(dx), abs(dy)) > touchSlop) {
+                        tapCandidate = false
                         drag = when {
-                            abs(dx) > touchSlop && abs(dx) >= abs(dy) -> Drag.HORIZONTAL
-                            dy > touchSlop -> Drag.DOWN
+                            abs(dx) >= abs(dy) -> Drag.HORIZONTAL
+                            dy > 0 -> Drag.DOWN
                             else -> null
-                        }
-                        if (drag != null) {
-                            // A drag that starts on a button must not click it on release.
-                            val cancel = MotionEvent.obtain(event)
-                            cancel.action = MotionEvent.ACTION_CANCEL
-                            super.dispatchTouchEvent(cancel)
-                            cancel.recycle()
                         }
                     }
                     if (drag != null) moveWithFinger(dx, dy)
                 }
-                if (drag != null) return true
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                trackingTouch = false
-                if (drag != null) {
-                    drag = null
-                    return true
+            MotionEvent.ACTION_UP -> {
+                if (trackingTouch && running && tapCandidate &&
+                    max(abs(event.x - anchorX), abs(event.y - anchorY)) <= touchSlop
+                ) {
+                    board.performClick()
                 }
+                trackingTouch = false
             }
         }
-        return super.dispatchTouchEvent(event)
+        return true
     }
 
     private fun moveWithFinger(dx: Float, dy: Float) {
@@ -288,6 +302,11 @@ internal class ThunderGameView(
             paused -> R.string.thunder_game_resume
             else -> R.string.thunder_game_pause
         })
+        val showPauseActions = paused && !game.gameOver
+        dockResumeButton.visibility = if (showPauseActions) VISIBLE else GONE
+        dockExitButton.visibility = dockResumeButton.visibility
+        dockDropButton.visibility = if (showPauseActions) GONE else VISIBLE
+        dropButton.visibility = dockDropButton.visibility
         dockDropButton.isEnabled = running
         dropButton.isEnabled = running
         musicButton.setText(if (musicEnabled) R.string.thunder_game_music_on else R.string.thunder_game_music_off)
