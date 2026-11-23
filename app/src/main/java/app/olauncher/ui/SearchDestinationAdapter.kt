@@ -56,30 +56,56 @@ internal fun TextView.bindAliasBadge(target: InAppSearch.Target, description: In
     styleAliasBadge(target.color)
 }
 
-internal fun TextView.styleAliasBadge(color: Int, useSmokedSurface: Boolean = true) {
+internal fun TextView.styleAliasBadge(color: Int) {
     val density = resources.displayMetrics.density
-    if (Prefs(context).launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(
-                ColorUtils.blendARGB(color, Color.WHITE, 0.84f),
-                ColorUtils.blendARGB(color, Color.WHITE, 0.50f),
-            ),
-        ).apply {
-            cornerRadius = 5f * density
-            setStroke(density.roundToInt(), ColorUtils.blendARGB(color, 0xFF244C8A.toInt(), 0.55f))
+    val stroke = density.roundToInt().coerceAtLeast(1)
+    when (Prefs(context).launcherTheme) {
+        Prefs.LauncherTheme.DEFAULT -> {
+            background = InAppSearch.background(color, density)
+            setTextColor(InAppSearch.foreground(color))
         }
-        setTextColor(0xFF101D33.toInt())
-        return
-    }
-    val smokedSurface = context.getColorFromAttr(R.attr.boltSmokedControlColor)
-    if (useSmokedSurface && smokedSurface != 0) {
-        background = InAppSearch.background(smokedSurface, density).apply {
-            setStroke(density.roundToInt(), ColorUtils.blendARGB(color, Color.WHITE, 0.35f))
+        Prefs.LauncherTheme.SMOKED_GLASS -> {
+            val surface = context.getColorFromAttr(R.attr.boltSmokedControlColor)
+            background = InAppSearch.background(surface, density).apply {
+                setStroke(stroke, ColorUtils.blendARGB(color, Color.WHITE, 0.35f))
+            }
+            setTextColor(Color.WHITE)
         }
-        setTextColor(Color.WHITE)
-    } else {
-        background = InAppSearch.background(color, density)
-        setTextColor(InAppSearch.foreground(color))
+        Prefs.LauncherTheme.FROSTED_GLASS -> {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF364D68.toInt(), 0xFF1D314A.toInt()),
+            ).apply {
+                cornerRadius = 13f * density
+                setStroke(stroke, ColorUtils.blendARGB(color, 0xFFB7DFFF.toInt(), 0.55f))
+            }
+            setTextColor(Color.WHITE)
+        }
+        Prefs.LauncherTheme.WINDOWS_XP -> {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    ColorUtils.blendARGB(color, Color.WHITE, 0.84f),
+                    ColorUtils.blendARGB(color, Color.WHITE, 0.50f),
+                ),
+            ).apply {
+                cornerRadius = 5f * density
+                setStroke(stroke, ColorUtils.blendARGB(color, 0xFF244C8A.toInt(), 0.55f))
+            }
+            setTextColor(0xFF101D33.toInt())
+        }
+        Prefs.LauncherTheme.WII_U -> {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    ColorUtils.blendARGB(color, 0xFF004B69.toInt(), 0.78f),
+                    ColorUtils.blendARGB(color, 0xFF00344D.toInt(), 0.86f),
+                ),
+            ).apply {
+                cornerRadius = 9f * density
+                setStroke(stroke, ColorUtils.blendARGB(color, 0xFF75DDFF.toInt(), 0.58f))
+            }
+            setTextColor(Color.WHITE)
+        }
     }
 }

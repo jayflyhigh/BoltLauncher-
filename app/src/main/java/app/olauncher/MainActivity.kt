@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
             Prefs.LauncherTheme.FROSTED_GLASS -> theme.applyStyle(R.style.FrostedGlassOverlay, true)
             Prefs.LauncherTheme.SMOKED_GLASS -> theme.applyStyle(R.style.SmokedGlassOverlay, true)
             Prefs.LauncherTheme.WINDOWS_XP -> theme.applyStyle(R.style.WindowsXpOverlay, true)
+            Prefs.LauncherTheme.WII_U -> theme.applyStyle(R.style.WiiUOverlay, true)
         }
         if (prefs.boldFont) theme.applyStyle(R.style.BoldFontOverlay, true)
         if (isEinkDisplay() || isSystemAnimationsDisabled()) theme.applyStyle(R.style.NoAnimationOverlay, true)

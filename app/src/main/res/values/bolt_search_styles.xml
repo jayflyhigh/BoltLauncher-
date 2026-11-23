@@ -37,7 +37,12 @@
         <item name="boltRowBottomColor">#17233961</item>
         <item name="boltRowOutlineColor">#4BB5D3F3</item>
         <item name="boltSettingsCardBottomColor">@color/bolt_glass_settings_card_bottom</item>
-        <item name="boltDockColor">#CD26344B</item>
+        <item name="boltDockColor">#DB26344B</item>
+        <item name="boltSelectedRowColor">#DCEBFF</item>
+        <item name="boltSelectedRowTextColor">#152C4A</item>
+        <item name="boltSelectedRowSecondaryColor">#274762</item>
+        <item name="boltSelectedTypoHintColor">#173854</item>
+        <item name="boltSelectedRowOutlineColor">#A4CBFF</item>
         <item name="boltPanelColor">#D21A273C</item>
         <item name="boltPanelOutlineColor">#6D9AB9D9</item>
         <item name="boltRowColor">#54667D9E</item>
@@ -50,7 +55,7 @@
         <item name="boltSettingsSurfaceColor">@color/bolt_glass_settings_surface</item>
         <item name="boltSettingsCardColor">@color/bolt_glass_settings_card</item>
         <item name="boltSettingsCardOutlineColor">@color/bolt_glass_settings_outline</item>
-        <item name="boltHomeMenuTextColor">?attr/primaryColor</item>
+        <item name="boltHomeMenuTextColor">@color/bolt_glass_menu_text</item>
     </style>
 
     <style name="SmokedGlassOverlay">
@@ -62,14 +67,14 @@
         <item name="boltRowColor">#D033353A</item>
         <item name="boltRowBottomColor">#D027292E</item>
         <item name="boltRowOutlineColor">#366F7279</item>
-        <item name="boltSelectedRowColor">#DF454247</item>
+        <item name="boltSelectedRowColor">#E9474447</item>
         <item name="boltSelectedRowOutlineWidth">1dp</item>
         <item name="boltSelectedRowOutlineColor">#BDAA76</item>
         <item name="boltSelectedRowTextColor">#FFF8E8</item>
         <item name="boltSelectedRowSecondaryColor">#E3D8C3</item>
         <item name="boltSmokedControlColor">#AC36383D</item>
-        <item name="boltDialogTopColor">#EC323439</item>
-        <item name="boltDialogBottomColor">#EF24262B</item>
+        <item name="boltDialogTopColor">#FF303237</item>
+        <item name="boltDialogBottomColor">#FF202227</item>
         <item name="boltDialogOutlineColor">#726F7379</item>
         <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
         <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
@@ -77,22 +82,22 @@
     </style>
 
     <style name="WindowsXpOverlay">
-        <item name="boltDockTopColor">#79B8FF</item>
+        <item name="boltDockTopColor">#86C4FF</item>
         <item name="boltDockColor">#114A9D</item>
         <item name="boltPanelColor">#D0E4FC</item>
         <item name="boltPanelOutlineColor">#2861AC</item>
         <item name="boltPanelCornerRadius">8dp</item>
         <item name="boltRowColor">#FFFDF5</item>
         <item name="boltRowBottomColor">#F1EFDF</item>
-        <item name="boltRowOutlineColor">#B5CBE7</item>
-        <item name="boltSelectedRowColor">#2358A6</item>
+        <item name="boltRowOutlineColor">#94B6E1</item>
+        <item name="boltSelectedRowColor">#17488E</item>
         <item name="boltSelectedRowOutlineColor">#17447F</item>
         <item name="boltSelectedRowOutlineWidth">1dp</item>
         <item name="boltSelectedRowTextColor">#FFFFFF</item>
         <item name="boltSelectedRowSecondaryColor">#E5F0FF</item>
         <item name="boltDialogTopColor">@color/bolt_xp_dialog_top</item>
         <item name="boltDialogBottomColor">@color/bolt_xp_dialog_bottom</item>
-        <item name="boltDialogOutlineColor">#6E9CDC</item>
+        <item name="boltDialogOutlineColor">#7FA9E6</item>
         <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
         <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
         <item name="boltPopupOutlineColor">?attr/boltDialogOutlineColor</item>
@@ -101,13 +106,64 @@
         <item name="boltSettingsCardBottomColor">@color/bolt_xp_settings_card_bottom</item>
         <item name="boltSettingsCardOutlineColor">#517DB9</item>
         <item name="boltHomeMenuTextColor">@color/bolt_xp_menu_text</item>
-        <item name="boltResultTextColor">#172C46</item>
-        <item name="boltResultSecondaryColor">#405779</item>
-        <item name="boltResultActionColor">#172C46</item>
+        <item name="boltResultTextColor">#10243B</item>
+        <item name="boltResultSecondaryColor">#263D5D</item>
+        <item name="boltResultActionColor">#10243B</item>
         <item name="boltSelectedTypoHintColor">#FFFFFF</item>
-        <item name="boltSearchSectionColor">#204576</item>
+        <item name="boltSearchSectionColor">#173D70</item>
         <item name="boltThunderDockColor">#28622B</item>
         <item name="boltThunderCursorColor">#FFFFFF</item>
         <item name="boltThunderMatchTextColor">#143E7B</item>
+    </style>
+
+    <style name="WiiUOverlay">
+        <item name="android:textColorPrimary">#20384B</item>
+        <item name="android:textColorSecondary">#395B6D</item>
+        <item name="colorAccent">#006A89</item>
+        <item name="primaryColor">#20384B</item>
+        <item name="primaryColorTrans50">#99314D62</item>
+        <item name="primaryColorTrans80">#CC20384B</item>
+        <item name="primaryInverseColor">#FFFFFF</item>
+        <item name="primaryColorInverseTrans90">#E6FFFFFF</item>
+        <item name="primaryColorInverseTrans80">#CCFFFFFF</item>
+        <item name="primaryColorInverseTrans50">#80FFFFFF</item>
+        <item name="primaryShadeColor">#EDF8FC</item>
+        <item name="primaryShadeDarkColor">#DCECF3</item>
+        <item name="dialogShadeColor">#EAF6FC</item>
+
+        <item name="boltDockTopColor">#7645CEF3</item>
+        <item name="boltDockColor">#075778</item>
+        <item name="boltPanelColor">#DDF3FF</item>
+        <item name="boltPanelOutlineColor">#087EA7</item>
+        <item name="boltPanelCornerRadius">16dp</item>
+        <item name="boltRowColor">#FFFFFF</item>
+        <item name="boltRowBottomColor">#F0FAFF</item>
+        <item name="boltRowOutlineColor">#79B6CD</item>
+        <item name="boltSelectedRowColor">#B8EDFF</item>
+        <item name="boltSelectedRowOutlineColor">#006585</item>
+        <item name="boltSelectedRowOutlineWidth">2dp</item>
+        <item name="boltSelectedRowTextColor">#173748</item>
+        <item name="boltSelectedRowSecondaryColor">#284D61</item>
+        <item name="boltSelectedTypoHintColor">#234E64</item>
+        <item name="boltResultTextColor">#20384B</item>
+        <item name="boltResultSecondaryColor">#2E4E61</item>
+        <item name="boltResultActionColor">#234E64</item>
+        <item name="boltSearchSectionColor">#365D70</item>
+
+        <item name="boltDialogTopColor">#FCFEFF</item>
+        <item name="boltDialogBottomColor">#C8EAF8</item>
+        <item name="boltDialogOutlineColor">#137C9C</item>
+        <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
+        <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
+        <item name="boltPopupOutlineColor">?attr/boltDialogOutlineColor</item>
+        <item name="boltHomeMenuTextColor">#20384B</item>
+        <item name="boltSettingsSurfaceColor">#EAF6FC</item>
+        <item name="boltSettingsCardColor">#FFFFFF</item>
+        <item name="boltSettingsCardBottomColor">#EDF8FC</item>
+        <item name="boltSettingsCardOutlineColor">#A4C9DA</item>
+        <item name="boltThunderDockColor">#55D9FA</item>
+        <item name="boltThunderPulseColor">#006585</item>
+        <item name="boltSearchCursorColor">#006A89</item>
+        <item name="boltThunderMatchTextColor">#005B78</item>
     </style>
 </resources>

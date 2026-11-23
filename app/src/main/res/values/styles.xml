@@ -51,8 +51,8 @@
         <item name="boltHomeMenuTextColor">@color/bolt_search_label</item>
         <item name="boltGlassTopEdgeColor">#D3EDF7FF</item>
         <item name="boltSelectedRowColor">@color/bolt_search_selected</item>
-        <item name="boltSelectedRowOutlineWidth">0dp</item>
-        <item name="boltSelectedRowOutlineColor">#00000000</item>
+        <item name="boltSelectedRowOutlineWidth">1dp</item>
+        <item name="boltSelectedRowOutlineColor">#FFD971</item>
         <item name="boltSelectedRowTextColor">#000000</item>
         <item name="boltSelectedRowSecondaryColor">#322817</item>
         <item name="boltSmokedControlColor">#00000000</item>
@@ -66,10 +66,12 @@
         <item name="boltSelectedTypoHintColor">?attr/boltResultActionColor</item>
         <item name="boltResultActionColor">@color/bolt_search_action_label</item>
         <item name="boltSearchSectionColor">#AFA8BF</item>
+        <item name="boltThunderPulseColor">@color/bolt_search_yellow</item>
+        <item name="boltSearchCursorColor">@color/bolt_search_yellow</item>
         <item name="boltThunderDockColor">@color/bolt_search_yellow</item>
         <item name="boltThunderCursorColor">#000000</item>
         <item name="boltDockColor">@color/bolt_search_dock</item>
-        <item name="boltPanelColor">@color/bolt_search_dock</item>
+        <item name="boltPanelColor">#19191C</item>
         <item name="boltPanelOutlineColor">@color/bolt_search_outline</item>
         <item name="boltRowColor">@color/bolt_search_result</item>
         <item name="boltDialogTopColor">#292535</item>
@@ -149,7 +151,7 @@
     </style>
 
     <style name="OlPopupMenuText" parent="TextAppearance.AppCompat.Widget.PopupMenu.Large">
-        <item name="android:textColor">?attr/primaryColor</item>
+        <item name="android:textColor">?attr/boltHomeMenuTextColor</item>
         <item name="android:textSize">@dimen/text_small</item>
         <item name="android:textStyle">bold</item>
     </style>
@@ -157,6 +159,10 @@
     <!-- Alert dialogs: the window only; content comes from layout/dialog_base.xml -->
     <style name="OlAlertDialog" parent="ThemeOverlay.AppCompat.Dialog.Alert">
         <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:textColorPrimary">?attr/boltHomeMenuTextColor</item>
+        <item name="android:textColorSecondary">?attr/boltHomeMenuTextColor</item>
+        <item name="colorAccent">?attr/boltHomeMenuTextColor</item>
+        <item name="primaryColor">?attr/boltHomeMenuTextColor</item>
         <item name="android:backgroundDimAmount">0.5</item>
         <item name="android:windowAnimationStyle">@style/OlDialogAnimation</item>
     </style>

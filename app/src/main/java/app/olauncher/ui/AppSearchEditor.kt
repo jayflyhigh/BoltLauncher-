@@ -106,7 +106,7 @@ object AppSearchEditor {
             bottomMargin = (8*density).toInt()
         })
         fun updatePreview(color: Int) {
-            preview.styleAliasBadge(color, useSmokedSurface = false)
+            preview.styleAliasBadge(color)
         }
         val wheel = SearchColorWheel(context)
         panel.addView(wheel, LinearLayout.LayoutParams(-1, (220*density).toInt()))
