@@ -31,6 +31,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
+import androidx.core.os.BundleCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
@@ -48,6 +49,7 @@ import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.BuildConfig
 import app.olauncher.MainViewModel
 import app.olauncher.R
+import app.olauncher.ui.game.ThunderBlocks
 import app.olauncher.ui.game.ThunderGameView
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
@@ -119,6 +121,7 @@ class AppDrawerFragment : BaseFragment() {
     private val supportsDestinations get() = flag == Constants.FLAG_LAUNCH_APP && !thunderMode && searchRename == null
 
     private var thunderGame: ThunderGameView? = null
+    private var pendingThunderRun: ThunderBlocks.State? = null
     private var expanded = false
     private var thunderMode = false
     private var moveMode = false
@@ -177,6 +180,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private companion object {
+        const val THUNDER_RUN_KEY = "thunder_run"
         const val SEARCH_RETURN_WINDOW_MS = 5_000L
         const val THUNDER_LIFT_MS = 90L
         const val THUNDER_QUIET_MS = 220L
@@ -234,6 +238,13 @@ class AppDrawerFragment : BaseFragment() {
         initHomeSwipe()
         applyDockInsets()
         updateSearchVisibility()
+        if (isHomePage) {
+            val run = pendingThunderRun ?: savedInstanceState?.let {
+                BundleCompat.getSerializable(it, THUNDER_RUN_KEY, ThunderBlocks.State::class.java)
+            }
+            pendingThunderRun = null
+            if (run != null) openThunderGame(run)
+        }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
@@ -413,14 +424,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.dockBolt.setOnLongClickListener {
             if (!isHomePage || expanded || thunderGame != null) return@setOnLongClickListener false
-            binding.search.hideKeyboard()
-            val game = ThunderGameView(requireContext(), ::closeThunderGame)
-            thunderGame = game
-            binding.searchPanel.isVisible = false
-            binding.root.addView(game, android.widget.LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-            ))
-            game.requestFocus()
+            openThunderGame()
             true
         }
         binding.dockSearchDestinations.setOnClickListener {
@@ -1366,6 +1370,17 @@ class AppDrawerFragment : BaseFragment() {
         if (!launch()) searchActionReturn = null
     }
 
+    private fun openThunderGame(state: ThunderBlocks.State? = null) {
+        binding.search.hideKeyboard()
+        val game = ThunderGameView(requireContext(), state, ::closeThunderGame)
+        thunderGame = game
+        binding.searchPanel.isVisible = false
+        binding.root.addView(game, android.widget.LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        ))
+        game.requestFocus()
+    }
+
     private fun closeThunderGame() {
         val game = thunderGame ?: return
         thunderGame = null
@@ -1845,7 +1860,14 @@ class AppDrawerFragment : BaseFragment() {
         super.onStop()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val run = thunderGame?.snapshot() ?: pendingThunderRun
+        if (run != null) outState.putSerializable(THUNDER_RUN_KEY, run)
+    }
+
     override fun onDestroyView() {
+        pendingThunderRun = thunderGame?.snapshot()
         closeThunderGame()
         clearThunderEmpty()
         binding.root.viewTreeObserver.removeOnWindowFocusChangeListener(searchWindowFocusListener)

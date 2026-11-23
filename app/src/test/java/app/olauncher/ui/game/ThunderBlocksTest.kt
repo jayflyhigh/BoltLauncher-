@@ -1,8 +1,14 @@
 package app.olauncher.ui.game
 
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 import kotlin.random.Random
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,6 +44,142 @@ class ThunderBlocksTest {
         assertTrue(occupied.all { game.board[it] != 0 })
         assertEquals(next, game.active)
         assertTrue(game.score > 0)
+    }
+
+    @Test
+    fun `straight piece lifts three rows to rotate off the floor`() {
+        val game = straightPiece()
+        fallToGround(game)
+        val originalX = game.x
+
+        assertTrue(game.rotate())
+        assertEquals(originalX, game.x)
+        assertEquals(ThunderBlocks.ROWS - 4, game.y)
+        assertEquals(4, game.active.cells.distinctBy { it.y }.size)
+        assertEquals(ThunderBlocks.LOCK_DELAY, game.lockRemaining)
+    }
+
+    @Test
+    fun `blocked rotation leaves the piece and pending lock intact`() {
+        val game = straightPiece()
+        fallToGround(game)
+        val original = game.active
+        val originalX = game.x
+        val originalY = game.y
+        for (row in originalY - 3 until originalY) {
+            game.board.fill(1, row * ThunderBlocks.COLUMNS, (row + 1) * ThunderBlocks.COLUMNS)
+        }
+        assertFalse(game.elapseLockTime(100L))
+
+        assertFalse(game.rotate())
+        assertEquals(original, game.active)
+        assertEquals(originalX, game.x)
+        assertEquals(originalY, game.y)
+        assertEquals(250L, game.lockRemaining)
+    }
+
+    @Test
+    fun `wall kick prefers a sideways adjustment at the original height`() {
+        val game = straightPiece()
+        assertTrue(game.rotate())
+        assertTrue(game.move(ThunderBlocks.COLUMNS - 2 - game.x))
+        val originalY = game.y
+
+        assertTrue(game.rotate())
+        assertEquals(ThunderBlocks.COLUMNS - 4, game.x)
+        assertEquals(originalY, game.y)
+    }
+
+    @Test
+    fun `grounded piece locks once when its delay expires`() {
+        val game = straightPiece()
+        fallToGround(game)
+        val next = game.next
+        assertEquals(ThunderBlocks.LOCK_DELAY, game.lockRemaining)
+
+        assertFalse(game.elapseLockTime(349L))
+        assertFalse(game.step(softDrop = true))
+        assertTrue(game.board.all { it == 0 })
+        assertTrue(game.elapseLockTime(1L))
+        assertEquals(next, game.active)
+        assertEquals(4, game.board.count { it != 0 })
+        assertFalse(game.elapseLockTime(350L))
+        assertEquals(4, game.board.count { it != 0 })
+    }
+
+    @Test
+    fun `successful grounded moves and rotations share a limited reset budget`() {
+        val game = straightPiece()
+        fallToGround(game)
+        repeat(ThunderBlocks.MAX_LOCK_RESETS) { index ->
+            assertFalse(game.elapseLockTime(100L))
+            val adjusted = when (index) {
+                0 -> game.rotate()
+                else -> game.move(if (index % 2 == 0) -1 else 1)
+            }
+            assertTrue(adjusted)
+            assertEquals(350L, game.lockRemaining)
+        }
+
+        val restored = restore(game.snapshot(elapsed = 100L))
+        assertEquals(350L, game.lockRemaining)
+        assertTrue(restored.move(-1))
+        assertEquals(250L, restored.lockRemaining)
+        assertTrue(restored.elapseLockTime(250L))
+    }
+
+    @Test
+    fun `moving off a ledge lets gravity resume and retains spent lock time`() {
+        val game = straightPiece()
+        game.board[(ThunderBlocks.ROWS - 4) * ThunderBlocks.COLUMNS + game.x] = 1
+        fallToGround(game)
+        assertFalse(game.elapseLockTime(200L))
+
+        assertTrue(game.move(1))
+        assertNull(game.lockRemaining)
+        assertFalse(game.elapseLockTime(350L))
+        fallToGround(game)
+        assertEquals(150L, game.lockRemaining)
+    }
+
+    @Test
+    fun `hard drop bypasses the pending delay`() {
+        val game = straightPiece()
+        fallToGround(game)
+        val next = game.next
+        assertFalse(game.elapseLockTime(50L))
+
+        game.drop()
+        assertEquals(next, game.active)
+        assertEquals(4, game.board.count { it != 0 })
+        assertNull(game.lockRemaining)
+        assertFalse(game.elapseLockTime(300L))
+    }
+
+    @Test
+    fun `restored run preserves board rotation queue stats and remaining lock delay`() {
+        val game = straightPiece()
+        assertTrue(game.rotate())
+        assertTrue(game.move(1))
+        game.board[(ThunderBlocks.ROWS - 1) * ThunderBlocks.COLUMNS] = 2
+        fallToGround(game)
+        assertFalse(game.elapseLockTime(100L))
+        val state = game.snapshot().copy(score = 1400L, lines = 8)
+        val restored = restore(state)
+
+        assertArrayEquals(state.board, restored.board)
+        assertEquals(game.active, restored.active)
+        assertEquals(game.next, restored.next)
+        assertArrayEquals(state.bag, restored.snapshot().bag)
+        assertEquals(game.x, restored.x)
+        assertEquals(game.y, restored.y)
+        assertEquals(1400L, restored.score)
+        assertEquals(8, restored.lines)
+        assertEquals(2, restored.level)
+        assertEquals(250L, restored.lockRemaining)
+        assertFalse(restored.elapseLockTime(249L))
+        assertTrue(restored.elapseLockTime(1L))
+        assertEquals(game.next, restored.active)
     }
 
     @Test
@@ -83,9 +225,13 @@ class ThunderBlocksTest {
         assertTrue(game.clearedFourRows)
         assertTrue(game.board.all { it == 0 })
 
-        game.drop()
-        assertEquals(4, game.lines)
-        assertFalse(game.clearedFourRows)
+        val restored = restore(game.snapshot())
+        assertEquals(game.score, restored.score)
+        assertEquals(4, restored.lines)
+        assertEquals(0, restored.clearedRows)
+        restored.drop()
+        assertEquals(4, restored.lines)
+        assertFalse(restored.clearedFourRows)
     }
 
     @Test
@@ -99,5 +245,22 @@ class ThunderBlocksTest {
         val score = game.score
         game.drop()
         assertEquals(score, game.score)
+    }
+    private fun straightPiece(): ThunderBlocks {
+        val state = ThunderBlocks(Random(18)).snapshot().copy(activeColor = 1)
+        return ThunderBlocks(state = state)
+    }
+
+    private fun fallToGround(game: ThunderBlocks) {
+        while (game.step()) Unit
+    }
+
+    private fun restore(state: ThunderBlocks.State): ThunderBlocks {
+        val bytes = ByteArrayOutputStream()
+        ObjectOutputStream(bytes).use { it.writeObject(state) }
+        val restored = ObjectInputStream(ByteArrayInputStream(bytes.toByteArray())).use {
+            it.readObject() as ThunderBlocks.State
+        }
+        return ThunderBlocks(state = restored)
     }
 }
