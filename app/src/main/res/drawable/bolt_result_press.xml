@@ -2,7 +2,7 @@
     <item android:state_pressed="true">
         <shape>
             <solid android:color="#26FFFFFF" />
-            <corners android:radius="@dimen/bolt_search_corner_radius" />
+            <corners android:radius="?attr/boltResultCornerRadius" />
         </shape>
     </item>
     <item android:drawable="@android:color/transparent" />
