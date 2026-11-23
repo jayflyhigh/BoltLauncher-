@@ -224,9 +224,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
         binding.root.onBackBeforeIme = {
             cancelAutoLaunch()
-            exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection()
+            handleThunderBack() || exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection()
         }
-        binding.root.onTap = ::dismissSearchActionsOutside
+        binding.root.onTap = { x, y -> thunderGame == null && dismissSearchActionsOutside(x, y) }
         initObservers()
         initClickListeners()
         initHomeSwipe()
@@ -235,6 +235,7 @@ class AppDrawerFragment : BaseFragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
+                    if (handleThunderBack()) return
                     if (exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection() || collapseSearch()) return
                     if (!isHomePage) closeDrawer()
                 }
@@ -1343,11 +1344,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.requestFocus()
     }
 
+    private fun handleThunderBack(): Boolean {
+        val game = thunderGame ?: return false
+        game.handleBack()
+        return true
+    }
+
     fun collapseSearch(): Boolean {
-        if (thunderGame != null) {
-            closeThunderGame()
-            return true
-        }
+        if (handleThunderBack()) return true
         if (_binding == null || !expanded || !isHomePage) return false
         if (exitMoveMode()) return true
         cancelAutoLaunch()

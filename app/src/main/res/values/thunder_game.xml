@@ -6,7 +6,9 @@
     <string name="thunder_game_resume">Resume</string>
     <string name="thunder_game_restart">Restart</string>
     <string name="thunder_game_exit">Exit</string>
-    <string name="thunder_game_dock_drop">Tap to drop</string>
+    <string name="thunder_game_dock_drop">Drop</string>
+    <string name="thunder_game_controls_hint">Tap to rotate. Drag sideways to move. Swipe down to lower. Tap Drop or ⚡ to hard-drop.</string>
+    <string name="thunder_game_tetris">TETRIS!</string>
     <string name="thunder_game_drop">Drop piece</string>
     <string name="thunder_game_drop_icon">⚡↓</string>
     <string name="thunder_game_music_on">Music on</string>

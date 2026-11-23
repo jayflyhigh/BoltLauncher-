@@ -40,6 +40,7 @@ internal class ThunderBlocks(private val random: Random = Random.Default) {
     var clearedRows = 0
         private set
     val clearedLastMove get() = clearedRows.countOneBits()
+    val clearedFourRows get() = clearedLastMove == 4
 
     val level get() = lines / LINES_PER_LEVEL + 1
     val interval get() = (940L - (level - 1) * 29L).coerceAtLeast(85L)

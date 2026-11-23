@@ -53,12 +53,39 @@ class ThunderBlocksTest {
             }
             game.drop()
             assertEquals(1, game.clearedLastMove)
+            assertFalse(game.clearedFourRows)
             assertEquals(1 shl bottom, game.clearedRows)
             assertFalse(game.gameOver)
         }
         assertEquals(250, game.lines)
         assertEquals(32, game.level)
         assertEquals(85L, game.interval)
+    }
+
+    @Test
+    fun `four rows cleared by one piece qualify only for that lock`() {
+        val game = ThunderBlocks(Random(18))
+        while (game.active.cells.distinctBy { it.x }.size != 4) {
+            game.drop()
+            game.board.fill(0)
+        }
+        assertTrue(game.rotate())
+        val firstRow = ThunderBlocks.ROWS - 4
+        for (row in firstRow until ThunderBlocks.ROWS) {
+            for (column in 0 until ThunderBlocks.COLUMNS) {
+                if (column != game.x) game.board[row * ThunderBlocks.COLUMNS + column] = 1
+            }
+        }
+
+        game.drop()
+        assertEquals(4, game.lines)
+        assertEquals(0b1111 shl firstRow, game.clearedRows)
+        assertTrue(game.clearedFourRows)
+        assertTrue(game.board.all { it == 0 })
+
+        game.drop()
+        assertEquals(4, game.lines)
+        assertFalse(game.clearedFourRows)
     }
 
     @Test
