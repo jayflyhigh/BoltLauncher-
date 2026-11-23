@@ -1,0 +1,8 @@
+<resources>
+    <color name="bolt_xp_dialog_top">#2656A5</color>
+    <color name="bolt_xp_dialog_bottom">#152D57</color>
+    <color name="bolt_xp_settings_surface">#142C55</color>
+    <color name="bolt_xp_settings_card">#234982</color>
+    <color name="bolt_xp_settings_card_bottom">#1B3869</color>
+    <color name="bolt_xp_menu_text">#FFFFFF</color>
+</resources>

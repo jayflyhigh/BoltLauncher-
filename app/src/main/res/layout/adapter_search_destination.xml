@@ -16,7 +16,7 @@
         android:ellipsize="end"
         android:gravity="center_vertical"
         android:maxLines="1"
-        android:textColor="@android:color/white"
+        android:textColor="?attr/boltResultTextColor"
         android:textSize="16sp" />
 
     <TextView

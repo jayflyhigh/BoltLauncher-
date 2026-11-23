@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.WallpaperManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -557,7 +558,10 @@ fun isAccessServiceEnabled(context: Context): Boolean {
     }
     if (enabled == 1) {
         val enabledServicesString: String? = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-        return enabledServicesString?.contains(context.packageName + "/" + MyAccessibilityService::class.java.name) ?: false
+        val boltService = ComponentName(context, MyAccessibilityService::class.java)
+        return enabledServicesString?.split(':')?.any {
+            ComponentName.unflattenFromString(it) == boltService
+        } == true
     }
     return false
 }

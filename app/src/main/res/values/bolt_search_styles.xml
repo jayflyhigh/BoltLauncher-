@@ -75,4 +75,38 @@
         <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
         <item name="boltPopupOutlineColor">?attr/boltDialogOutlineColor</item>
     </style>
+
+    <style name="WindowsXpOverlay">
+        <item name="boltDockTopColor">#79B8FF</item>
+        <item name="boltDockColor">#114A9D</item>
+        <item name="boltPanelColor">#D0E4FC</item>
+        <item name="boltPanelOutlineColor">#2861AC</item>
+        <item name="boltPanelCornerRadius">8dp</item>
+        <item name="boltRowColor">#FFFDF5</item>
+        <item name="boltRowBottomColor">#F1EFDF</item>
+        <item name="boltRowOutlineColor">#B5CBE7</item>
+        <item name="boltSelectedRowColor">#2358A6</item>
+        <item name="boltSelectedRowOutlineColor">#17447F</item>
+        <item name="boltSelectedRowOutlineWidth">1dp</item>
+        <item name="boltSelectedRowTextColor">#FFFFFF</item>
+        <item name="boltSelectedRowSecondaryColor">#E5F0FF</item>
+        <item name="boltDialogTopColor">@color/bolt_xp_dialog_top</item>
+        <item name="boltDialogBottomColor">@color/bolt_xp_dialog_bottom</item>
+        <item name="boltDialogOutlineColor">#6E9CDC</item>
+        <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
+        <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
+        <item name="boltPopupOutlineColor">?attr/boltDialogOutlineColor</item>
+        <item name="boltSettingsSurfaceColor">@color/bolt_xp_settings_surface</item>
+        <item name="boltSettingsCardColor">@color/bolt_xp_settings_card</item>
+        <item name="boltSettingsCardBottomColor">@color/bolt_xp_settings_card_bottom</item>
+        <item name="boltSettingsCardOutlineColor">#517DB9</item>
+        <item name="boltHomeMenuTextColor">@color/bolt_xp_menu_text</item>
+        <item name="boltResultTextColor">#172C46</item>
+        <item name="boltResultSecondaryColor">#405779</item>
+        <item name="boltResultActionColor">#244B7C</item>
+        <item name="boltSearchSectionColor">#204576</item>
+        <item name="boltThunderDockColor">#28622B</item>
+        <item name="boltThunderCursorColor">#FFFFFF</item>
+        <item name="boltThunderMatchTextColor">#143E7B</item>
+    </style>
 </resources>

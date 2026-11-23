@@ -98,7 +98,7 @@
         \n\nIt\'s also the best way to support the developers of Olauncher. Check it out!</string>
     <string name="wallpaper_message">Olauncher offers beautiful new wallpapers daily. Give your homescreen a fresh new look every day, for free!
         \n\nWant to try it?</string>
-    <string name="accessibility_service_description">The accessibility permission is required to enable the gesture - double tap to lock . Any data acquired by Olauncher via this service will not leave your device.</string>
+    <string name="accessibility_service_description">Bolt Launcher uses this accessibility service to open the Android power menu and support double tap to lock. No data leaves your device.</string>
     <string name="support_olauncher_for_free">Support Olauncher for free by using our Amazon affiliate link.</string>
     <string name="support_olauncher_message">Every time you buy something using our link, we get a small commission. Please save the link and use it whenever you shop online.\nThank you!</string>
     <string name="open">Open link</string>
@@ -120,6 +120,7 @@
     \n\nThe service only sees taps inside Olauncher, and only uses them to lock your screen. It does not look at other apps or anything you type.
     \n\nNo data is collected, stored or shared. Nothing leaves your device.
     \n\nTap Accept, then turn on Olauncher in your device\'s Accessibility settings.</string>
+    <string name="bolt_accessibility_disclosure">Bolt Launcher uses Android’s accessibility service to open the system power menu and support the optional double tap to lock gesture. It processes taps inside Bolt Launcher for screen locking and opens the power menu when you select Power Menu. It does not look at other apps or anything you type.\n\nNo data is collected, stored or shared.\n\nTap Accept, then turn on Bolt Launcher in your device’s Accessibility settings.</string>
     <string name="accept">Accept</string>
     <string name="permission">Permission</string>
     <string name="double_tap_lock">Double tap to lock</string>

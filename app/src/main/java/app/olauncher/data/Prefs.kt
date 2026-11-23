@@ -196,6 +196,7 @@ class Prefs(context: Context) {
         DEFAULT("default"),
         FROSTED_GLASS("frosted_glass"),
         SMOKED_GLASS("smoked_glass"),
+        WINDOWS_XP("windows_xp"),
     }
 
     var launcherTheme: LauncherTheme
