@@ -34,7 +34,7 @@
         android:text="@string/bolt_typo_match"
         android:duplicateParentState="true"
         android:textColor="@color/bolt_typo_hint_text"
-        android:textSize="11sp"
+        android:textSize="12sp"
         android:visibility="invisible" />
 
     <TextView
@@ -46,7 +46,7 @@
         android:paddingStart="68dp"
         android:paddingEnd="24dp"
         android:textColor="@color/bolt_search_secondary"
-        android:textSize="12sp"
+        android:textSize="13sp"
         android:maxLines="1"
         android:ellipsize="end"
         android:visibility="gone" />
@@ -59,15 +59,16 @@
         android:layout_marginStart="10dp"
         android:layout_marginTop="1dp"
         android:gravity="center"
+        android:duplicateParentState="true"
         android:src="@drawable/ic_rounded"
-        app:tint="?attr/primaryColor" />
+        app:tint="@color/bolt_app_action_tint" />
 
     <LinearLayout
         android:id="@+id/appHideLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginVertical="1dp"
-        android:background="?attr/primaryShadeDarkColor"
+        android:background="@drawable/rounded_primary_gradient"
         android:clickable="true"
         android:focusable="true"
         android:gravity="end|center_vertical"
@@ -86,7 +87,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/delete"
-            android:textSize="12sp"
+            android:textSize="13sp"
+            android:textColor="?attr/boltHomeMenuTextColor"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_delete" />
 
         <TextView
@@ -101,7 +104,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/rename"
-            android:textSize="12sp"
+            android:textSize="13sp"
+            android:textColor="?attr/boltHomeMenuTextColor"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_rename" />
 
         <TextView
@@ -116,7 +121,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/hide"
-            android:textSize="12sp"
+            android:textSize="13sp"
+            android:textColor="?attr/boltHomeMenuTextColor"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_hide" />
 
         <TextView
@@ -131,7 +138,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/info"
-            android:textSize="12sp"
+            android:textSize="13sp"
+            android:textColor="?attr/boltHomeMenuTextColor"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_info" />
 
         <TextView
@@ -146,7 +155,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/close"
-            android:textSize="12sp"
+            android:textSize="13sp"
+            android:textColor="?attr/boltHomeMenuTextColor"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_close" />
 
     </LinearLayout>
@@ -158,6 +169,7 @@
         android:layout_marginStart="60dp"
         android:layout_marginEnd="4dp"
         android:gravity="center_vertical"
+        android:duplicateParentState="true"
         android:visibility="gone">
 
         <androidx.appcompat.widget.AppCompatImageButton
@@ -166,9 +178,9 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackground"
-            android:scaleType="center"
+            android:duplicateParentState="true"
+            android:scaleType="centerInside"
             android:contentDescription="@string/rename"
-            app:tint="@color/bolt_search_action_label"
             app:srcCompat="@drawable/ic_rename" />
 
         <androidx.appcompat.widget.AppCompatImageButton
@@ -177,9 +189,9 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackground"
-            android:scaleType="center"
+            android:duplicateParentState="true"
+            android:scaleType="centerInside"
             android:contentDescription="@string/bolt_play_store"
-            app:tint="@color/bolt_search_action_label"
             app:srcCompat="@drawable/bolt_play_store_icon" />
 
         <androidx.appcompat.widget.AppCompatImageButton
@@ -188,9 +200,9 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackground"
-            android:scaleType="center"
+            android:duplicateParentState="true"
+            android:scaleType="centerInside"
             android:contentDescription="@string/bolt_add_alias"
-            app:tint="@color/bolt_search_action_label"
             app:srcCompat="@drawable/bolt_add_alias_icon" />
 
         <androidx.appcompat.widget.AppCompatImageButton
@@ -199,9 +211,9 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackground"
-            android:scaleType="center"
+            android:duplicateParentState="true"
+            android:scaleType="centerInside"
             android:contentDescription="@string/bolt_app_info"
-            app:tint="@color/bolt_search_action_label"
             app:srcCompat="@drawable/ic_info" />
 
         <androidx.appcompat.widget.AppCompatImageButton
@@ -210,9 +222,9 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="?attr/selectableItemBackground"
-            android:scaleType="center"
+            android:duplicateParentState="true"
+            android:scaleType="centerInside"
             android:contentDescription="@string/delete"
-            app:tint="@color/bolt_search_action_uninstall"
             app:srcCompat="@drawable/ic_delete" />
 
     </LinearLayout>
@@ -221,6 +233,7 @@
         android:id="@+id/renameLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="@drawable/rounded_primary_gradient"
         android:clickable="true"
         android:focusable="true"
         android:gravity="end|center_vertical"
@@ -242,7 +255,8 @@
             android:maxLength="30"
             android:maxLines="1"
             android:paddingVertical="@dimen/app_padding_vertical"
-            android:textColorHint="?attr/primaryColorTrans50" />
+            android:textColor="?attr/boltHomeMenuTextColor"
+            android:textColorHint="?attr/boltHomeMenuTextColor" />
 
         <TextView
             android:id="@+id/tvSaveRename"
@@ -256,7 +270,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/rename"
+            android:textColor="?attr/boltHomeMenuTextColor"
             android:textSize="12sp"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_check" />
 
         <TextView
@@ -270,7 +286,9 @@
             android:maxLines="1"
             android:paddingHorizontal="8dp"
             android:text="@string/close"
+            android:textColor="?attr/boltHomeMenuTextColor"
             android:textSize="12sp"
+            app:drawableTint="?attr/boltHomeMenuTextColor"
             app:drawableTopCompat="@drawable/ic_close" />
     </LinearLayout>
 

@@ -34,7 +34,9 @@ class WindowBlur(private val window: Window) {
 
     /** Call after the window is shown so its theme attributes have been resolved. */
     fun fadeIn() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !supported) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !supported ||
+            window.attributes.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND == 0
+        ) return
         start()
     }
 

@@ -1,7 +1,9 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true">
         <shape>
-            <solid android:color="?attr/boltSelectedRowColor" />
+            <gradient android:angle="0"
+                android:startColor="?attr/boltSelectedRowColor"
+                android:endColor="?attr/boltSelectedRowEndColor" />
             <stroke android:width="?attr/boltSelectedRowOutlineWidth" android:color="?attr/boltSelectedRowOutlineColor" />
             <corners android:radius="@dimen/bolt_search_corner_radius" />
         </shape>

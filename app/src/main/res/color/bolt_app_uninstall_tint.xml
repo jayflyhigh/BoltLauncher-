@@ -1,0 +1,4 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:color="?attr/boltSelectedRowTextColor" />
+    <item android:color="@color/bolt_search_action_uninstall" />
+</selector>

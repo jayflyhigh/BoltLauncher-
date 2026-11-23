@@ -7,7 +7,9 @@ import android.text.TextWatcher
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
+import app.olauncher.R
 import app.olauncher.data.AppModel
+import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.InAppSearch
 import app.olauncher.helper.AppIconColor
 
@@ -16,17 +18,19 @@ object AppSearchEditor {
              app: AppModel.App? = null, onChanged: () -> Unit): AlertDialog {
         val packageName = initial?.packageName ?: requireNotNull(app).appPackage
         val appLabel = initial?.appLabel ?: requireNotNull(app).appLabel
-        val density = context.resources.displayMetrics.density
+        val builder = AlertDialog.Builder(context)
+        val dialogContext = builder.context
+        val density = dialogContext.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
-        val panel = LinearLayout(context).apply {
+        val panel = LinearLayout(dialogContext).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(4), dp(20), dp(12))
         }
         fun label(text: String) {
-            panel.addView(TextView(context).apply { this.text = text; setPadding(0, dp(14), 0, dp(6)) })
+            panel.addView(TextView(dialogContext).apply { this.text = text; setPadding(0, dp(14), 0, dp(6)) })
         }
         label("Alias code")
-        val alias = EditText(context).apply {
+        val alias = EditText(dialogContext).apply {
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setText(initial?.code.orEmpty())
@@ -34,7 +38,7 @@ object AppSearchEditor {
         panel.addView(alias)
         var color = initial?.color ?: AppIconColor.primary(context, app)
         label("Badge color")
-        val colorButton = Button(context).apply { isAllCaps = false }
+        val colorButton = Button(dialogContext).apply { isAllCaps = false }
         fun refreshColor() {
             colorButton.text = String.format("#%06X", color and 0xFFFFFF)
             colorButton.backgroundTintList = android.content.res.ColorStateList.valueOf(color)
@@ -46,7 +50,7 @@ object AppSearchEditor {
         colorButton.setOnClickListener {
             colorDialog = showColor(context, color, alias.text.toString()) { color = it; refreshColor() }
         }
-        val url = EditText(context).apply {
+        val url = EditText(dialogContext).apply {
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
             hint = "https://example.com/search?q={query}"
@@ -56,10 +60,15 @@ object AppSearchEditor {
             label("Search URL")
             panel.addView(url)
         }
-        val error = TextView(context).apply { setTextColor(Color.rgb(255, 110, 100)); visibility = View.GONE }
+        val error = TextView(dialogContext).apply {
+            val backgroundColor = dialogContext.getColorFromAttr(R.attr.boltDialogTopColor)
+            setTextColor(if (InAppSearch.foreground(backgroundColor) == Color.BLACK)
+                Color.rgb(140, 25, 22) else Color.rgb(255, 186, 181))
+            visibility = View.GONE
+        }
         panel.addView(error)
-        val builder = AlertDialog.Builder(context).setTitle(appLabel)
-            .setView(ScrollView(context).apply { addView(panel) })
+        builder.setTitle(appLabel)
+            .setView(ScrollView(dialogContext).apply { addView(panel) })
             .setPositiveButton(if (initial?.hidden == true) "Show" else "Save", null)
             .setNegativeButton(android.R.string.cancel, null)
         if (initial != null && !initial.hidden) {
@@ -88,9 +97,11 @@ object AppSearchEditor {
     }
 
     private fun showColor(context: Context, initial: Int, code: String, apply: (Int) -> Unit): AlertDialog {
-        val density = context.resources.displayMetrics.density
-        val panel = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding((20*density).toInt(), 0, (20*density).toInt(), 0) }
-        val preview = androidx.appcompat.widget.AppCompatTextView(context).apply {
+        val builder = AlertDialog.Builder(context)
+        val dialogContext = builder.context
+        val density = dialogContext.resources.displayMetrics.density
+        val panel = LinearLayout(dialogContext).apply { orientation = LinearLayout.VERTICAL; setPadding((20*density).toInt(), 0, (20*density).toInt(), 0) }
+        val preview = androidx.appcompat.widget.AppCompatTextView(dialogContext).apply {
             text = code.ifBlank { "Alias" }
             gravity = android.view.Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -108,12 +119,12 @@ object AppSearchEditor {
         fun updatePreview(color: Int) {
             preview.styleAliasBadge(color)
         }
-        val wheel = SearchColorWheel(context)
+        val wheel = SearchColorWheel(dialogContext)
         panel.addView(wheel, LinearLayout.LayoutParams(-1, (220*density).toInt()))
-        panel.addView(TextView(context).apply { text = "Brightness" })
-        val brightness = SeekBar(context).apply { max = 100 }
+        panel.addView(TextView(dialogContext).apply { text = "Brightness" })
+        val brightness = SeekBar(dialogContext).apply { max = 100 }
         panel.addView(brightness)
-        val hex = EditText(context).apply { setSingleLine(true); hint = "Hex color, e.g. #FF5722" }
+        val hex = EditText(dialogContext).apply { setSingleLine(true); hint = "Hex color, e.g. #FF5722" }
         panel.addView(hex)
         var selected = initial
         var updating = false
@@ -147,7 +158,7 @@ object AppSearchEditor {
             override fun afterTextChanged(s: Editable?) {}
         })
         display(initial)
-        val dialog = AlertDialog.Builder(context).setTitle("Code background color").setView(ScrollView(context).apply { addView(panel) })
+        val dialog = builder.setTitle("Code background color").setView(ScrollView(dialogContext).apply { addView(panel) })
             .setPositiveButton("Use color", null).setNegativeButton(android.R.string.cancel, null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {

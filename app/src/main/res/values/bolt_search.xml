@@ -57,6 +57,7 @@
     <string name="bolt_theme">Theme</string>
     <string name="bolt_theme_default">Default</string>
     <string name="bolt_frosted_glass">Frosted Glass</string>
+    <string name="bolt_liquid_glass">Liquid Glass</string>
     <string name="bolt_smoked_glass">Smoked Glass</string>
     <string name="bolt_windows_xp">Windows XP</string>
     <string name="bolt_wii_u">Wii U</string>

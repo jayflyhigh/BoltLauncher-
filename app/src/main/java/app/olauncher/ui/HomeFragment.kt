@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.TextView
+import app.olauncher.helper.InAppSearch
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatDelegate
@@ -70,6 +71,17 @@ class HomeFragment : BaseFragment(), View.OnClickListener, View.OnLongClickListe
         } ?: throw Exception("Invalid Activity")
 
         deviceManager = context?.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+
+        val wallpaperLabels = listOf(
+            binding.clock, binding.date, binding.tvScreenTime, binding.firstRunTips,
+            binding.setDefaultLauncher, binding.homeApp1, binding.homeApp2, binding.homeApp3,
+            binding.homeApp4, binding.homeApp5, binding.homeApp6, binding.homeApp7, binding.homeApp8,
+        )
+        val shadowRadius = 2.5f * resources.displayMetrics.density
+        wallpaperLabels.forEach { label ->
+            val shadow = InAppSearch.foreground(label.currentTextColor)
+            label.setShadowLayer(shadowRadius, 0f, 0f, shadow)
+        }
 
         initObservers()
         setHomeAlignment(prefs.homeAlignment)

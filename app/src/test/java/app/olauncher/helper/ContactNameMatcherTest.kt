@@ -17,6 +17,14 @@ class ContactNameMatcherTest {
     }
 
     @Test
+    fun `phone search matches across formatting`() {
+        val name = searchName("Jamie Morgan")
+        assertEquals(3, ContactNameMatcher("(555) 123-4567").rank(name, listOf("+15551234567")))
+        assertEquals(3, ContactNameMatcher("555123").rank(name, listOf("(555) 123-4567")))
+        assertNull(ContactNameMatcher("555234").rank(name, listOf("(555) 123-4567")))
+    }
+
+    @Test
     fun `matches surname first and distinguishes typo corrections`() {
         assertEquals(3, ContactNameMatcher("morgan jamie").rank(searchName("Jamie Morgan"), emptyList()))
         assertEquals(3, ContactNameMatcher("morgan jose").rank(searchName("José Morgan"), emptyList()))

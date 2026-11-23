@@ -33,6 +33,7 @@
             android:id="@+id/searchStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/rounded_primary_gradient"
             android:foreground="@drawable/bolt_search_press"
             android:accessibilityLiveRegion="polite"
             android:ellipsize="end"
@@ -51,8 +52,9 @@
             android:accessibilityLiveRegion="polite"
             android:gravity="center"
             android:paddingVertical="4dp"
+            android:background="@drawable/rounded_primary_gradient"
             android:text="@string/bolt_move_mode_hint"
-            android:textColor="@color/bolt_search_secondary"
+            android:textColor="?attr/boltHomeMenuTextColor"
             android:textSize="12sp"
             android:visibility="gone" />
 
@@ -88,8 +90,7 @@
                 android:padding="12dp"
                 android:scaleType="centerInside"
                 android:visibility="gone"
-                app:srcCompat="@drawable/dock_search"
-                app:tint="@color/bolt_search_label" />
+                app:srcCompat="@drawable/dock_search" />
 
             <TextView
                 android:id="@+id/dockActiveAlias"
@@ -108,8 +109,7 @@
                 android:background="@drawable/bolt_search_press"
                 android:contentDescription="@string/bolt_enable_thunder"
                 android:scaleType="center"
-                app:srcCompat="@drawable/bolt_search_lightning"
-                app:tint="@color/bolt_search_yellow" />
+                app:srcCompat="@drawable/bolt_search_lightning" />
             <View
                 android:id="@+id/dockWebDivider"
                 android:layout_width="@dimen/bolt_contact_action_divider_width"
@@ -146,8 +146,7 @@
                             android:contentDescription="@string/bolt_action_call"
                             android:scaleType="centerInside"
                             android:paddingHorizontal="9dp"
-                            app:srcCompat="@drawable/contact_call"
-                            app:tint="@color/bolt_search_label" />
+                            app:srcCompat="@drawable/contact_call" />
 
                         <androidx.appcompat.widget.AppCompatImageButton
                             android:id="@+id/contactMessage"
@@ -157,8 +156,7 @@
                             android:contentDescription="@string/bolt_action_message"
                             android:scaleType="centerInside"
                             android:paddingHorizontal="9dp"
-                            app:srcCompat="@drawable/contact_message"
-                            app:tint="@color/bolt_search_label" />
+                            app:srcCompat="@drawable/contact_message" />
 
                         <androidx.appcompat.widget.AppCompatImageButton
                             android:id="@+id/contactWhatsapp"
@@ -168,8 +166,7 @@
                             android:contentDescription="@string/bolt_action_whatsapp"
                             android:scaleType="centerInside"
                             android:paddingHorizontal="9dp"
-                            app:srcCompat="@drawable/contact_whatsapp"
-                            app:tint="@color/bolt_search_whatsapp" />
+                            app:srcCompat="@drawable/contact_whatsapp" />
                     </LinearLayout>
                 </FrameLayout>
 
@@ -182,8 +179,7 @@
                     android:scaleType="centerInside"
                     android:paddingHorizontal="9dp"
                     android:visibility="gone"
-                    app:srcCompat="@drawable/dock_web"
-                    app:tint="@color/bolt_search_label" />
+                    app:srcCompat="@drawable/dock_web" />
             </LinearLayout>
             <LinearLayout
                 android:id="@+id/renameControls"

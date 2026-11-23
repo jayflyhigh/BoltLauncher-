@@ -8,6 +8,9 @@ internal class ContactNameMatcher(private val query: String) {
     private val normalizedTerms = terms.map { it.normalizeForSearch() }
     private val initialsQuery = query.normalizeForSearch()
     private val allowInitials = initialsQuery.length >= 2 && terms.size == 1 && initialsQuery.all(Char::isLetter)
+    private val phoneQuery = query.takeIf { text ->
+        text.any(Char::isDigit) && text.all { it.isDigit() || it.isWhitespace() || it in "+-()." }
+    }?.filter(Char::isDigit)
     private val typoMatcher = SearchTypoMatcher(query)
     private val allowTypos = query.length >= 4 && query.none(Char::isDigit)
 
@@ -21,6 +24,9 @@ internal class ContactNameMatcher(private val query: String) {
         if (terms.all { term ->
                 name.raw.contains(term, ignoreCase = true) || numbers.any { it.contains(term) }
             }) return appSearchRank(name.raw, query)
+        if (phoneQuery != null && numbers.any { phoneQuery in it.filter(Char::isDigit) }) {
+            return appSearchRank(name.raw, query)
+        }
         if (normalizedTerms.all { it.isNotEmpty() && name.normalized.contains(it, ignoreCase = true) }) {
             return appSearchRank(name.normalized, initialsQuery)
         }
