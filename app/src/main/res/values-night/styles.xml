@@ -63,7 +63,7 @@
         <item name="boltThunderMatchTextColor">#FFFFFF</item>
         <item name="boltResultTextColor">@color/bolt_search_label</item>
         <item name="boltResultSecondaryColor">@color/bolt_search_secondary</item>
-        <item name="boltSelectedTypoHintColor">?attr/boltResultActionColor</item>
+        <item name="boltSelectedTypoHintColor">#000000</item>
         <item name="boltResultActionColor">@color/bolt_search_action_label</item>
         <item name="boltSearchSectionColor">#AFA8BF</item>
         <item name="boltThunderPulseColor">@color/bolt_search_yellow</item>

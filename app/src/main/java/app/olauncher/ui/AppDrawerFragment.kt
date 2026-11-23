@@ -186,7 +186,7 @@ class AppDrawerFragment : BaseFragment() {
     private var boltProgress = 0f
     private var dockIdleColor = 0
     private var windowsXpTheme = false
-    private var wiiUTheme = false
+    private var usesThemeTileIcons = false
     private var thunderDockColor = 0
 
     override fun onCreateView(
@@ -340,14 +340,17 @@ class AppDrawerFragment : BaseFragment() {
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
         windowsXpTheme = prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP
-        wiiUTheme = prefs.launcherTheme == Prefs.LauncherTheme.WII_U
-        if (wiiUTheme) {
-            binding.dockBolt.setWiiUIcon(R.drawable.bolt_search_lightning)
-            binding.dockSearchDestinations.setWiiUIcon(R.drawable.dock_search)
-            binding.dockWeb.setWiiUIcon(R.drawable.dock_web, compact = true)
-            binding.contactCall.setWiiUIcon(R.drawable.contact_call, compact = true)
-            binding.contactMessage.setWiiUIcon(R.drawable.contact_message, compact = true)
-            binding.contactWhatsapp.setWiiUIcon(R.drawable.contact_whatsapp, compact = true)
+        usesThemeTileIcons = when (prefs.launcherTheme) {
+            Prefs.LauncherTheme.WII_U, Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> true
+            else -> false
+        }
+        if (usesThemeTileIcons) {
+            binding.dockBolt.setThemeTileIcon(R.drawable.bolt_search_lightning)
+            binding.dockSearchDestinations.setThemeTileIcon(R.drawable.dock_search)
+            binding.dockWeb.setThemeTileIcon(R.drawable.dock_web, compact = true)
+            binding.contactCall.setThemeTileIcon(R.drawable.contact_call, compact = true)
+            binding.contactMessage.setThemeTileIcon(R.drawable.contact_message, compact = true)
+            binding.contactWhatsapp.setThemeTileIcon(R.drawable.contact_whatsapp, compact = true)
         } else if (windowsXpTheme) {
             binding.dockBolt.setXpIcon(R.drawable.xp_lightning)
             binding.dockSearchDestinations.setXpIcon(R.drawable.xp_search)
@@ -784,7 +787,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.renameConfirm.setTextColor(renameActionColor)
         binding.renameCancel.setTextColor(renameActionColor)
         binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
-        if (!windowsXpTheme && !wiiUTheme) {
+        if (!windowsXpTheme && !usesThemeTileIcons) {
             bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
         }
         updateBoltVisibility()
@@ -1396,11 +1399,11 @@ class AppDrawerFragment : BaseFragment() {
             menu.systemSettings.setXpIcon(R.drawable.xp_computer)
             menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
             menu.powerMenu.setXpIcon(R.drawable.xp_power)
-        } else if (wiiUTheme) {
-            menu.launcherSettings.setWiiUIcon(R.drawable.dock_settings)
-            menu.systemSettings.setWiiUIcon(R.drawable.bolt_system_settings_icon)
-            menu.launcherTheme.setWiiUIcon(R.drawable.bolt_frosted_glass_icon)
-            menu.powerMenu.setWiiUIcon(R.drawable.bolt_power_menu_icon)
+        } else if (usesThemeTileIcons) {
+            menu.launcherSettings.setThemeTileIcon(R.drawable.dock_settings)
+            menu.systemSettings.setThemeTileIcon(R.drawable.bolt_system_settings_icon)
+            menu.launcherTheme.setThemeTileIcon(R.drawable.bolt_frosted_glass_icon)
+            menu.powerMenu.setThemeTileIcon(R.drawable.bolt_power_menu_icon)
         }
         menu.launcherSettings.setOnClickListener {
             dialog.dismiss()
@@ -1454,6 +1457,7 @@ class AppDrawerFragment : BaseFragment() {
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
             Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
             Prefs.LauncherTheme.WII_U to R.string.bolt_wii_u,
+            Prefs.LauncherTheme.SEATTLE_SEAHAWKS to R.string.bolt_seattle_seahawks,
         ).map { (theme, label) -> theme to getString(label) }
             .sortedWith(compareBy(collator) { it.second })
         val current = prefs.launcherTheme

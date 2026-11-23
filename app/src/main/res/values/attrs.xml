@@ -49,4 +49,8 @@
     <attr name="boltThunderMatchTextColor" format="color" />
     <attr name="boltThunderPulseColor" format="color" />
     <attr name="boltSearchCursorColor" format="color" />
+    <attr name="boltIconTileTopColor" format="color" />
+    <attr name="boltIconTileBottomColor" format="color" />
+    <attr name="boltIconTileOutlineColor" format="color" />
+    <attr name="boltIconTileGlyphColor" format="color" />
 </resources>

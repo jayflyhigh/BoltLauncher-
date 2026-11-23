@@ -401,12 +401,12 @@ class AppDrawerAdapter(
                 binding.searchAddAlias.setXpIcon(R.drawable.xp_alias)
                 binding.searchAppInfo.setXpIcon(R.drawable.xp_info)
                 binding.searchUninstall.setXpIcon(R.drawable.xp_delete)
-            } else if (theme == Prefs.LauncherTheme.WII_U) {
-                binding.searchRename.setWiiUIcon(R.drawable.ic_rename)
-                binding.searchPlayStore.setWiiUIcon(R.drawable.bolt_play_store_icon)
-                binding.searchAddAlias.setWiiUIcon(R.drawable.bolt_add_alias_icon)
-                binding.searchAppInfo.setWiiUIcon(R.drawable.ic_info)
-                binding.searchUninstall.setWiiUIcon(R.drawable.ic_delete)
+            } else if (theme == Prefs.LauncherTheme.WII_U || theme == Prefs.LauncherTheme.SEATTLE_SEAHAWKS) {
+                binding.searchRename.setThemeTileIcon(R.drawable.ic_rename)
+                binding.searchPlayStore.setThemeTileIcon(R.drawable.bolt_play_store_icon)
+                binding.searchAddAlias.setThemeTileIcon(R.drawable.bolt_add_alias_icon)
+                binding.searchAppInfo.setThemeTileIcon(R.drawable.ic_info)
+                binding.searchUninstall.setThemeTileIcon(R.drawable.ic_delete)
             }
         }
         private var renameWatcher: TextWatcher? = null
