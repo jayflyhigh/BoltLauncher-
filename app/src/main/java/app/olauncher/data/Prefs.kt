@@ -198,6 +198,7 @@ class Prefs(context: Context) {
         SMOKED_GLASS("smoked_glass"),
         WINDOWS_XP("windows_xp"),
         WII_U("wii_u"),
+        SEATTLE_SEAHAWKS("seattle_seahawks"),
     }
 
     var launcherTheme: LauncherTheme

@@ -107,5 +107,18 @@ internal fun TextView.styleAliasBadge(color: Int) {
             }
             setTextColor(Color.WHITE)
         }
+        Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    ColorUtils.blendARGB(color, 0xFF2A455F.toInt(), 0.85f),
+                    0xFF0D2339.toInt(),
+                ),
+            ).apply {
+                cornerRadius = 6f * density
+                setStroke(stroke, ColorUtils.blendARGB(color, 0xFFA1DC45.toInt(), 0.55f))
+            }
+            setTextColor(Color.WHITE)
+        }
     }
 }

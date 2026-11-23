@@ -60,6 +60,7 @@
     <string name="bolt_smoked_glass">Smoked Glass</string>
     <string name="bolt_windows_xp">Windows XP</string>
     <string name="bolt_wii_u">Wii U</string>
+    <string name="bolt_seattle_seahawks">Seattle Seahawks</string>
     <string name="bolt_power_menu">Power Menu</string>
     <string name="bolt_power_menu_unavailable">Android’s power menu is unavailable.</string>
     <dimen name="bolt_result_row_margin">2dp</dimen>
