@@ -32,7 +32,8 @@
         android:layout_marginEnd="16dp"
         android:singleLine="true"
         android:text="@string/bolt_typo_match"
-        android:textColor="?attr/boltResultActionColor"
+        android:duplicateParentState="true"
+        android:textColor="@color/bolt_typo_hint_text"
         android:textSize="11sp"
         android:visibility="invisible" />
 

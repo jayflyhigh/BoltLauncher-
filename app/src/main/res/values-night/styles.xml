@@ -63,16 +63,14 @@
         <item name="boltThunderMatchTextColor">#FFFFFF</item>
         <item name="boltResultTextColor">@color/bolt_search_label</item>
         <item name="boltResultSecondaryColor">@color/bolt_search_secondary</item>
+        <item name="boltSelectedTypoHintColor">?attr/boltResultActionColor</item>
         <item name="boltResultActionColor">@color/bolt_search_action_label</item>
         <item name="boltSearchSectionColor">#AFA8BF</item>
-        <item name="boltSearchCursorColor">@color/bolt_search_yellow</item>
-        <item name="boltThunderPulseColor">@color/bolt_search_yellow</item>
         <item name="boltThunderDockColor">@color/bolt_search_yellow</item>
         <item name="boltThunderCursorColor">#000000</item>
         <item name="boltDockColor">@color/bolt_search_dock</item>
         <item name="boltPanelColor">@color/bolt_search_dock</item>
         <item name="boltPanelOutlineColor">@color/bolt_search_outline</item>
-        <item name="boltResultCornerRadius">@dimen/bolt_search_corner_radius</item>
         <item name="boltRowColor">@color/bolt_search_result</item>
         <item name="boltDialogTopColor">#292535</item>
         <item name="boltDialogBottomColor">#292535</item>

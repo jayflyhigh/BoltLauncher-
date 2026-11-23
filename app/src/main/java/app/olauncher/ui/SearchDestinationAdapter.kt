@@ -1,6 +1,7 @@
 package app.olauncher.ui
 
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.TextView
@@ -9,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.R
+import app.olauncher.data.Prefs
 import app.olauncher.databinding.AdapterSearchDestinationBinding
 import app.olauncher.helper.InAppSearch
 import app.olauncher.helper.getColorFromAttr
@@ -51,15 +53,33 @@ internal fun TextView.bindAliasBadge(target: InAppSearch.Target, description: In
     tag = target
     text = target.code
     contentDescription = context.getString(description, target.code)
+    styleAliasBadge(target.color)
+}
+
+internal fun TextView.styleAliasBadge(color: Int, useSmokedSurface: Boolean = true) {
     val density = resources.displayMetrics.density
+    if (Prefs(context).launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
+        background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                ColorUtils.blendARGB(color, Color.WHITE, 0.84f),
+                ColorUtils.blendARGB(color, Color.WHITE, 0.50f),
+            ),
+        ).apply {
+            cornerRadius = 5f * density
+            setStroke(density.roundToInt(), ColorUtils.blendARGB(color, 0xFF244C8A.toInt(), 0.55f))
+        }
+        setTextColor(0xFF101D33.toInt())
+        return
+    }
     val smokedSurface = context.getColorFromAttr(R.attr.boltSmokedControlColor)
-    if (smokedSurface != 0) {
+    if (useSmokedSurface && smokedSurface != 0) {
         background = InAppSearch.background(smokedSurface, density).apply {
-            setStroke(density.roundToInt(), ColorUtils.blendARGB(target.color, Color.WHITE, 0.35f))
+            setStroke(density.roundToInt(), ColorUtils.blendARGB(color, Color.WHITE, 0.35f))
         }
         setTextColor(Color.WHITE)
     } else {
-        background = InAppSearch.background(target.color, density)
-        setTextColor(InAppSearch.foreground(target.color))
+        background = InAppSearch.background(color, density)
+        setTextColor(InAppSearch.foreground(color))
     }
 }

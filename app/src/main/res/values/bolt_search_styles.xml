@@ -103,62 +103,11 @@
         <item name="boltHomeMenuTextColor">@color/bolt_xp_menu_text</item>
         <item name="boltResultTextColor">#172C46</item>
         <item name="boltResultSecondaryColor">#405779</item>
-        <item name="boltResultActionColor">#244B7C</item>
+        <item name="boltResultActionColor">#172C46</item>
+        <item name="boltSelectedTypoHintColor">#FFFFFF</item>
         <item name="boltSearchSectionColor">#204576</item>
         <item name="boltThunderDockColor">#28622B</item>
         <item name="boltThunderCursorColor">#FFFFFF</item>
         <item name="boltThunderMatchTextColor">#143E7B</item>
-    </style>
-
-    <style name="NeonConsoleOverlay">
-        <item name="android:textColorPrimary">#F5F5F5</item>
-        <item name="android:textColorSecondary">#C8C8C8</item>
-        <item name="colorAccent">@color/bolt_console_cyan</item>
-        <item name="primaryColor">#F5F5F5</item>
-        <item name="primaryColorTrans50">#A6F5F5F5</item>
-        <item name="primaryColorTrans80">#CCF5F5F5</item>
-        <item name="primaryInverseColor">#202020</item>
-        <item name="primaryColorInverseTrans90">#E6202020</item>
-        <item name="primaryColorInverseTrans80">#CC202020</item>
-        <item name="primaryColorInverseTrans50">#80202020</item>
-        <item name="primaryShadeColor">#383838</item>
-        <item name="primaryShadeDarkColor">#303030</item>
-        <item name="dialogShadeColor">#303030</item>
-
-        <item name="boltDockColor">#383838</item>
-        <item name="boltPanelCornerRadius">14dp</item>
-        <item name="boltResultCornerRadius">8dp</item>
-        <item name="boltPanelColor">#262626</item>
-        <item name="boltPanelOutlineColor">#515151</item>
-        <item name="boltRowColor">#333333</item>
-        <item name="boltRowBottomColor">?attr/boltRowColor</item>
-        <item name="boltRowOutlineColor">#454545</item>
-        <item name="boltSelectedRowColor">#414141</item>
-        <item name="boltSelectedRowOutlineColor">@color/bolt_console_cyan</item>
-        <item name="boltSelectedRowOutlineWidth">2dp</item>
-        <item name="boltSelectedRowTextColor">#FFFFFF</item>
-        <item name="boltSelectedRowSecondaryColor">#E0E0E0</item>
-        <item name="boltResultTextColor">#F5F5F5</item>
-        <item name="boltResultSecondaryColor">#C8C8C8</item>
-        <item name="boltResultActionColor">#EEEEEE</item>
-        <item name="boltSearchSectionColor">#D4D4D4</item>
-
-        <item name="boltDialogTopColor">#303030</item>
-        <item name="boltDialogBottomColor">?attr/boltDialogTopColor</item>
-        <item name="boltDialogOutlineColor">#555555</item>
-        <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
-        <item name="boltPopupBottomColor">?attr/boltDialogBottomColor</item>
-        <item name="boltPopupOutlineColor">?attr/boltDialogOutlineColor</item>
-        <item name="boltHomeMenuTextColor">#F5F5F5</item>
-        <item name="boltSettingsSurfaceColor">#262626</item>
-        <item name="boltSettingsCardColor">#383838</item>
-        <item name="boltSettingsCardBottomColor">?attr/boltSettingsCardColor</item>
-        <item name="boltSettingsCardOutlineColor">#515151</item>
-
-        <item name="boltSearchCursorColor">@color/bolt_console_cyan</item>
-        <item name="boltThunderDockColor">#242424</item>
-        <item name="boltThunderCursorColor">@color/bolt_console_cyan</item>
-        <item name="boltThunderPulseColor">@color/bolt_console_cyan</item>
-        <item name="boltThunderMatchTextColor">@color/bolt_console_cyan</item>
     </style>
 </resources>
