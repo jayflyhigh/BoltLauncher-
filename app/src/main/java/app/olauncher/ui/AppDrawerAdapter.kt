@@ -394,19 +394,12 @@ class AppDrawerAdapter(
 
         init {
             val context = binding.root.context
-            val launcherTheme = Prefs(context).launcherTheme
-            if (launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
+            if (Prefs(context).launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
                 binding.searchRename.setXpIcon(R.drawable.xp_rename)
                 binding.searchPlayStore.setXpIcon(R.drawable.xp_store)
                 binding.searchAddAlias.setXpIcon(R.drawable.xp_alias)
                 binding.searchAppInfo.setXpIcon(R.drawable.xp_info)
                 binding.searchUninstall.setXpIcon(R.drawable.xp_delete)
-            } else if (launcherTheme == Prefs.LauncherTheme.NEON_CONSOLE) {
-                binding.searchRename.setConsoleIcon(R.drawable.ic_rename)
-                binding.searchPlayStore.setConsoleIcon(R.drawable.bolt_play_store_icon)
-                binding.searchAddAlias.setConsoleIcon(R.drawable.bolt_add_alias_icon)
-                binding.searchAppInfo.setConsoleIcon(R.drawable.ic_info)
-                binding.searchUninstall.setConsoleIcon(R.drawable.ic_delete)
             }
         }
         private var renameWatcher: TextWatcher? = null

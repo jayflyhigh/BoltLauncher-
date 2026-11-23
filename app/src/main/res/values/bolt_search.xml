@@ -6,7 +6,6 @@
     <color name="bolt_search_result">#2B2B2B</color>
     <color name="bolt_search_outline">#414141</color>
     <color name="bolt_search_dock">#242424</color>
-    <color name="bolt_console_cyan">#43EBD1</color>
     <color name="bolt_search_label">#DEDEDE</color>
     <color name="bolt_search_secondary">#B7B7B7</color>
     <color name="bolt_search_uninstall">#F19A95</color>
@@ -60,7 +59,6 @@
     <string name="bolt_frosted_glass">Frosted Glass</string>
     <string name="bolt_smoked_glass">Smoked Glass</string>
     <string name="bolt_windows_xp">Windows XP</string>
-    <string name="bolt_neon_console">Nintendo Switch</string>
     <string name="bolt_power_menu">Power Menu</string>
     <string name="bolt_power_menu_unavailable">Android’s power menu is unavailable.</string>
     <dimen name="bolt_result_row_margin">2dp</dimen>

@@ -197,7 +197,6 @@ class Prefs(context: Context) {
         FROSTED_GLASS("frosted_glass"),
         SMOKED_GLASS("smoked_glass"),
         WINDOWS_XP("windows_xp"),
-        NEON_CONSOLE("neon_console"),
     }
 
     var launcherTheme: LauncherTheme
