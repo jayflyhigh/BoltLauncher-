@@ -23,7 +23,6 @@ import androidx.navigation.findNavController
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
 import app.olauncher.databinding.ActivityMainBinding
-import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.hasBeenDays
 import app.olauncher.helper.hasBeenHours
 import app.olauncher.helper.hasBeenMinutes
@@ -76,14 +75,8 @@ class MainActivity : AppCompatActivity() {
         if (isEinkDisplay()) prefs.appTheme = AppCompatDelegate.MODE_NIGHT_NO
         AppCompatDelegate.setDefaultNightMode(prefs.appTheme)
         super.onCreate(savedInstanceState)
-        when (prefs.launcherTheme) {
-            Prefs.LauncherTheme.DEFAULT -> Unit
-            Prefs.LauncherTheme.FROSTED_GLASS -> theme.applyStyle(R.style.FrostedGlassOverlay, true)
-            Prefs.LauncherTheme.SMOKED_GLASS -> theme.applyStyle(R.style.SmokedGlassOverlay, true)
-            Prefs.LauncherTheme.WINDOWS_XP -> theme.applyStyle(R.style.WindowsXpOverlay, true)
-            Prefs.LauncherTheme.WII_U -> theme.applyStyle(R.style.WiiUOverlay, true)
-            Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> theme.applyStyle(R.style.SeattleSeahawksOverlay, true)
-        }
+        val launcherOverlay = prefs.launcherTheme.overlay
+        if (launcherOverlay != 0) theme.applyStyle(launcherOverlay, true)
         if (prefs.boldFont) theme.applyStyle(R.style.BoldFontOverlay, true)
         if (isEinkDisplay() || isSystemAnimationsDisabled()) theme.applyStyle(R.style.NoAnimationOverlay, true)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -386,9 +379,12 @@ class MainActivity : AppCompatActivity() {
         timerJob?.cancel()
         timerJob = lifecycleScope.launch {
             delay(200)
-            val themeMismatch =
-                (prefs.appTheme == AppCompatDelegate.MODE_NIGHT_YES && getColorFromAttr(R.attr.primaryColor) != getColor(R.color.white))
-                        || (prefs.appTheme == AppCompatDelegate.MODE_NIGHT_NO && getColorFromAttr(R.attr.primaryColor) != getColor(R.color.black))
+            val appliedMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+            val themeMismatch = when (prefs.appTheme) {
+                AppCompatDelegate.MODE_NIGHT_YES -> appliedMode != Configuration.UI_MODE_NIGHT_YES
+                AppCompatDelegate.MODE_NIGHT_NO -> appliedMode != Configuration.UI_MODE_NIGHT_NO
+                else -> false
+            }
             // If recreating doesn't fix the theme (e.g. an OEM ROM overriding it), don't recreate in an endless loop (#734)
             if (themeMismatch && prefs.launcherRestartTimestamp.hasBeenMinutes(1))
                 restartLauncherOrCheckTheme(true)

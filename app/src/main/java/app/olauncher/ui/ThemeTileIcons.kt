@@ -1,8 +1,6 @@
 package app.olauncher.ui
 
 import android.content.Context
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
@@ -10,24 +8,23 @@ import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.AppCompatButton
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.core.graphics.drawable.DrawableCompat
 import app.olauncher.R
+import app.olauncher.data.Prefs
 import app.olauncher.helper.getColorFromAttr
 import kotlin.math.roundToInt
 
 internal fun AppCompatImageButton.setThemeTileIcon(@DrawableRes icon: Int, compact: Boolean = false) {
     val tile = context.themeTileIcon(icon, if (compact) 24 else 32) ?: return
-    imageTintList = null
-    if (!compact) {
-        val padding = (4f * resources.displayMetrics.density).roundToInt()
-        setPadding(padding, padding, padding, padding)
-    }
+    val density = resources.displayMetrics.density
+    val padding = ((if (compact) 8f else 4f) * density).roundToInt()
+    setPadding(padding, 0, padding, 0)
+    scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
     setImageDrawable(tile)
 }
 
 internal fun AppCompatButton.setThemeTileIcon(@DrawableRes icon: Int) {
     val tile = context.themeTileIcon(icon) ?: return
-    compoundDrawableTintList = null
-    supportCompoundDrawablesTintList = null
     setCompoundDrawablesRelativeWithIntrinsicBounds(tile, null, null, null)
 }
 
@@ -36,15 +33,18 @@ private fun Context.themeTileIcon(@DrawableRes icon: Int, sizeDp: Int = 32): Dra
     val density = resources.displayMetrics.density
     val size = (sizeDp * density).roundToInt()
     val inset = (sizeDp / 8f * density).roundToInt()
-    val tile = GradientDrawable(
+    val glassFrame = if (Prefs(this).launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS) {
+        AppCompatResources.getDrawable(this, R.drawable.liquid_glass_icon_frame)?.mutate() as? GradientDrawable
+    } else null
+    val tile = (glassFrame ?: GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
         intArrayOf(getColorFromAttr(R.attr.boltIconTileTopColor), getColorFromAttr(R.attr.boltIconTileBottomColor)),
     ).apply {
         cornerRadius = 9f * density
-        setSize(size, size)
         setStroke(density.roundToInt().coerceAtLeast(1), getColorFromAttr(R.attr.boltIconTileOutlineColor))
-    }
-    glyph.colorFilter = PorterDuffColorFilter(getColorFromAttr(R.attr.boltIconTileGlyphColor), PorterDuff.Mode.SRC_IN)
+    }).apply { setSize(size, size) }
+    // Glyph tint stays on the vector when AppCompat clears the image's color filter.
+    DrawableCompat.setTint(glyph, getColorFromAttr(R.attr.boltIconTileGlyphColor))
     return LayerDrawable(arrayOf(tile, glyph)).apply {
         setLayerInset(1, inset, inset, inset, inset)
         setLayerSize(1, size - 2 * inset, size - 2 * inset)

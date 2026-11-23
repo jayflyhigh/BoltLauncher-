@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.view.Gravity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
+import androidx.annotation.StyleRes
+import app.olauncher.R
 
 class Prefs(context: Context) {
     private val PREFS_FILENAME = "app.olauncher"
@@ -192,13 +194,14 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(SWIPE_RIGHT_ENABLED, true)
         set(value) = prefs.edit { putBoolean(SWIPE_RIGHT_ENABLED, value).apply() }
 
-    enum class LauncherTheme(val key: String) {
+    enum class LauncherTheme(val key: String, @StyleRes val overlay: Int = 0) {
         DEFAULT("default"),
-        FROSTED_GLASS("frosted_glass"),
-        SMOKED_GLASS("smoked_glass"),
-        WINDOWS_XP("windows_xp"),
-        WII_U("wii_u"),
-        SEATTLE_SEAHAWKS("seattle_seahawks"),
+        FROSTED_GLASS("frosted_glass", R.style.FrostedGlassOverlay),
+        LIQUID_GLASS("liquid_glass", R.style.LiquidGlassOverlay),
+        SMOKED_GLASS("smoked_glass", R.style.SmokedGlassOverlay),
+        WINDOWS_XP("windows_xp", R.style.WindowsXpOverlay),
+        WII_U("wii_u", R.style.WiiUOverlay),
+        SEATTLE_SEAHAWKS("seattle_seahawks", R.style.SeattleSeahawksOverlay),
     }
 
     var launcherTheme: LauncherTheme

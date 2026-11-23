@@ -50,12 +50,15 @@
         <item name="boltSettingsCardOutlineColor">?attr/primaryColorTrans50</item>
         <item name="boltHomeMenuTextColor">@color/bolt_search_label</item>
         <item name="boltGlassTopEdgeColor">#D3EDF7FF</item>
+        <item name="boltSelectedRowEndColor">?attr/boltSelectedRowColor</item>
         <item name="boltSelectedRowColor">@color/bolt_search_selected</item>
         <item name="boltSelectedRowOutlineWidth">1dp</item>
         <item name="boltSelectedRowOutlineColor">#FFD971</item>
         <item name="boltSelectedRowTextColor">#000000</item>
         <item name="boltSelectedRowSecondaryColor">#322817</item>
         <item name="boltSmokedControlColor">#00000000</item>
+        <item name="boltPanelEndColor">#00000000</item>
+        <item name="boltDialogDimsBackdrop">true</item>
         <item name="boltGlassReflectionColor">#00000000</item>
         <item name="boltRowBottomColor">@color/bolt_search_result</item>
         <item name="boltRowOutlineColor">#00000000</item>
@@ -158,6 +161,7 @@
         <item name="android:textColorSecondary">?attr/boltHomeMenuTextColor</item>
         <item name="colorAccent">?attr/boltHomeMenuTextColor</item>
         <item name="primaryColor">?attr/boltHomeMenuTextColor</item>
+        <item name="android:backgroundDimEnabled">?attr/boltDialogDimsBackdrop</item>
         <item name="android:backgroundDimAmount">0.5</item>
         <item name="android:windowAnimationStyle">@style/OlDialogAnimation</item>
     </style>

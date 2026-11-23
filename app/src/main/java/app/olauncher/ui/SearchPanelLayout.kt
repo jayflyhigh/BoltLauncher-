@@ -26,6 +26,10 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private lateinit var dock: View
 
     private val surface = context.getColorFromAttr(R.attr.boltPanelColor)
+    private val surfaceEnd = context.getColorFromAttr(R.attr.boltPanelEndColor)
+    private var panelGradient: LinearGradient? = null
+    private var glassDockTint: LinearGradient? = null
+    private var glassRim: LinearGradient? = null
     private val outline = context.getColorFromAttr(R.attr.boltPanelOutlineColor)
     private val radius = context.obtainStyledAttributes(intArrayOf(R.attr.boltPanelCornerRadius)).let {
         try {
@@ -55,7 +59,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         LinearGradient(0f, 0f, 0f, 52f * stroke,
             context.getColorFromAttr(R.attr.boltGlassTopEdgeColor), outline, Shader.TileMode.CLAMP)
     } else null
-    private val glassGrain = if (glassSheen != null) {
+    private val glassGrain = if (glassSheen != null && surfaceEnd == 0) {
         val size = 64
         val random = kotlin.random.Random(0)
         val pixels = IntArray(size * size) {
@@ -129,6 +133,20 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         return view.measuredHeight
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (surfaceEnd != 0 && w > 0 && w != oldw) {
+            val width = w.toFloat()
+            panelGradient = LinearGradient(0f, 0f, width, 0f, surface, surfaceEnd, Shader.TileMode.CLAMP)
+            glassDockTint = LinearGradient(0f, 0f, width, 0f, 0x004E9DEE, 0x6050BCD8, Shader.TileMode.CLAMP)
+            glassRim = LinearGradient(
+                0f, 0f, width, 36f * stroke,
+                intArrayOf(0xE1E0F3FF.toInt(), 0x5681B7EE, 0xD0A4F4FF.toInt()),
+                null, Shader.TileMode.CLAMP,
+            )
+        }
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val dockTop = height - dock.measuredHeight
         dock.layout(0, dockTop, width, height)
@@ -197,12 +215,21 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val save = canvas.save()
         canvas.clipPath(shape)
         if (panelTop < dockTop) {
-            paint.color = surface
+            paint.color = if (panelGradient == null) surface else Color.WHITE
+            paint.shader = panelGradient
             canvas.drawRect(0f, panelTop, width.toFloat(), dockTop, paint)
+            paint.shader = null
             drawGlassSheen(canvas, panelTop, dockTop, 200)
         }
         paint.color = dockColor
         canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
+        glassDockTint?.let { tint ->
+            paint.color = Color.WHITE
+            paint.alpha = dividerAlpha
+            paint.shader = tint
+            canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
+            paint.shader = null
+        }
         dockHighlight?.let { highlight ->
             val highlightSave = canvas.save()
             canvas.translate(0f, dockTop)
@@ -232,7 +259,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             val edgeSave = canvas.save()
             canvas.translate(0f, panelTop + stroke / 2f)
             paint.color = Color.WHITE
-            paint.shader = glassEdge
+            paint.shader = glassRim ?: glassEdge
             canvas.drawRoundRect(edgeBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
             paint.shader = null
             canvas.restoreToCount(edgeSave)
@@ -248,8 +275,10 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         paint.shader = sheen
         paint.alpha = opacity
         canvas.drawRect(0f, 0f, width.toFloat(), bottom - top, paint)
-        paint.shader = glassGrain
-        canvas.drawRect(0f, 0f, width.toFloat(), bottom - top, paint)
+        glassGrain?.let { grain ->
+            paint.shader = grain
+            canvas.drawRect(0f, 0f, width.toFloat(), bottom - top, paint)
+        }
         paint.shader = null
         canvas.restoreToCount(save)
     }

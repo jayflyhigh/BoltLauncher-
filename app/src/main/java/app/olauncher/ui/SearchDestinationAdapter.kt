@@ -81,6 +81,20 @@ internal fun TextView.styleAliasBadge(color: Int) {
             }
             setTextColor(Color.WHITE)
         }
+        Prefs.LauncherTheme.LIQUID_GLASS -> {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(
+                    context.getColorFromAttr(R.attr.boltSelectedRowColor),
+                    context.getColorFromAttr(R.attr.boltDockColor),
+                ),
+            ).apply {
+                cornerRadius = 10f * density
+                val rim = context.getColorFromAttr(R.attr.boltSelectedRowOutlineColor)
+                setStroke(stroke, ColorUtils.blendARGB(rim, color, 0.35f))
+            }
+            setTextColor(context.getColorFromAttr(R.attr.boltSelectedRowTextColor))
+        }
         Prefs.LauncherTheme.WINDOWS_XP -> {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,

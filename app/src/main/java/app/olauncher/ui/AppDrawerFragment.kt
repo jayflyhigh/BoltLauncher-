@@ -187,7 +187,9 @@ class AppDrawerFragment : BaseFragment() {
     private var dockIdleColor = 0
     private var windowsXpTheme = false
     private var usesThemeTileIcons = false
+    private var liquidGlass = false
     private var thunderDockColor = 0
+    private var dockUsesDarkText: Boolean? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -338,14 +340,23 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initSearch() {
+        dockUsesDarkText = null
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
         windowsXpTheme = prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP
+        liquidGlass = prefs.launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS
         usesThemeTileIcons = when (prefs.launcherTheme) {
             Prefs.LauncherTheme.WII_U, Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> true
             else -> false
         }
-        if (usesThemeTileIcons) {
+        if (liquidGlass) {
+            binding.dockBolt.setThemeTileIcon(R.drawable.liquid_glass_bolt)
+            binding.dockSearchDestinations.setThemeTileIcon(R.drawable.liquid_glass_search)
+            binding.dockWeb.setThemeTileIcon(R.drawable.liquid_glass_web, compact = true)
+            binding.contactCall.setThemeTileIcon(R.drawable.liquid_glass_call, compact = true)
+            binding.contactMessage.setThemeTileIcon(R.drawable.liquid_glass_message, compact = true)
+            binding.contactWhatsapp.setThemeTileIcon(R.drawable.liquid_glass_whatsapp, compact = true)
+        } else if (usesThemeTileIcons) {
             binding.dockBolt.setThemeTileIcon(R.drawable.bolt_search_lightning)
             binding.dockSearchDestinations.setThemeTileIcon(R.drawable.dock_search)
             binding.dockWeb.setThemeTileIcon(R.drawable.dock_web, compact = true)
@@ -359,6 +370,17 @@ class AppDrawerFragment : BaseFragment() {
             binding.contactCall.setXpIcon(R.drawable.xp_phone, compact = true)
             binding.contactMessage.setXpIcon(R.drawable.xp_message, compact = true)
             binding.contactWhatsapp.setXpIcon(R.drawable.xp_whatsapp, compact = true)
+        } else {
+            val tint = ColorStateList.valueOf(ContextCompat.getColor(requireContext(), R.color.bolt_search_label))
+            with(binding) {
+                dockSearchDestinations.imageTintList = tint
+                dockWeb.imageTintList = tint
+                contactCall.imageTintList = tint
+                contactMessage.imageTintList = tint
+                contactWhatsapp.imageTintList = ColorStateList.valueOf(
+                    ContextCompat.getColor(requireContext(), R.color.bolt_search_whatsapp),
+                )
+            }
         }
         binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
             if (thunderCommitted) {
@@ -783,13 +805,16 @@ class AppDrawerFragment : BaseFragment() {
         val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, thunderDockColor, progress)
         binding.searchPanel.setDockAppearance(dockColor, progress)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
-        binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
-        val renameActionColor = if (lightDock) 0xFF303030.toInt() else Color.WHITE
-        binding.renameConfirm.setTextColor(renameActionColor)
-        binding.renameCancel.setTextColor(renameActionColor)
-        binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
-        if (!windowsXpTheme && !usesThemeTileIcons) {
-            bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
+        if (dockUsesDarkText != lightDock) {
+            dockUsesDarkText = lightDock
+            binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
+            val renameActionColor = if (lightDock) 0xFF303030.toInt() else Color.WHITE
+            binding.renameConfirm.setTextColor(renameActionColor)
+            binding.renameCancel.setTextColor(renameActionColor)
+            binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
+            if (!windowsXpTheme && !usesThemeTileIcons && !liquidGlass) {
+                bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
+            }
         }
         updateBoltVisibility()
         if (flag != Constants.FLAG_LAUNCH_APP) return
@@ -974,13 +999,16 @@ class AppDrawerFragment : BaseFragment() {
                 else -> ""
             }
             if (text != status) text = status
-            val color = if (statusIsResult) context.getColorFromAttr(R.attr.boltResultSecondaryColor)
-                else ContextCompat.getColor(context, R.color.bolt_search_secondary)
+            val color = context.getColorFromAttr(
+                if (statusIsResult) R.attr.boltResultSecondaryColor else R.attr.boltHomeMenuTextColor,
+            )
             if (currentTextColor != color) setTextColor(color)
             isVisible = feedback != null || offerWeb || thunderEmpty
             if (panel.statusIsResult != statusIsResult) {
                 panel.statusIsResult = statusIsResult
-                setBackgroundResource(if (statusIsResult) R.drawable.bolt_search_best_match else 0)
+                setBackgroundResource(
+                    if (statusIsResult) R.drawable.bolt_search_best_match else R.drawable.rounded_primary_gradient,
+                )
                 minimumHeight = if (statusIsResult) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
             }
             if (isClickable != offerWeb) isClickable = offerWeb
@@ -1075,7 +1103,7 @@ class AppDrawerFragment : BaseFragment() {
         val hasNumber = showShortcuts && contact?.numbers?.isNotEmpty() == true
         listOf(binding.contactCall, binding.contactMessage, binding.contactWhatsapp).forEach {
             it.isEnabled = hasNumber
-            if (showShortcuts) it.alpha = if (hasNumber) 1f else 0.4f
+            if (showShortcuts) it.alpha = if (hasNumber) 1f else 0.64f
         }
         updateBoltVisibility()
         val web = binding.dockWeb
@@ -1088,8 +1116,10 @@ class AppDrawerFragment : BaseFragment() {
         val actions = binding.dockActions
         actions.isVisible = showWeb
         web.isVisible = showWeb
-        actions.setBackgroundResource(if (slot.isVisible) R.drawable.bolt_contact_action_group else 0)
-        actions.setPadding(0, 0, 0, 0)
+        if ((actions.background != null) != slot.isVisible) {
+            actions.setBackgroundResource(if (slot.isVisible) R.drawable.bolt_contact_action_group else 0)
+            actions.setPadding(0, 0, 0, 0)
+        }
         val actionsWidth = when {
             showWeb -> web.layoutParams.width + if (slot.isVisible) shortcutWidth else 0
             searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2
@@ -1398,7 +1428,23 @@ class AppDrawerFragment : BaseFragment() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val menu = DialogHomeSettingsBinding.inflate(LayoutInflater.from(builder.context))
         val dialog = builder.setView(menu.root).create()
-        if (prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
+        if (liquidGlass) {
+            menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.liquid_glass_settings, 0, R.drawable.liquid_glass_chevron, 0,
+            )
+            menu.systemSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.liquid_glass_device, 0, R.drawable.liquid_glass_chevron, 0,
+            )
+            menu.launcherTheme.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.liquid_glass_theme, 0, R.drawable.liquid_glass_chevron, 0,
+            )
+            menu.powerMenu.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.liquid_glass_power, 0, R.drawable.liquid_glass_chevron, 0,
+            )
+            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.powerMenu).forEach {
+                it.setBackgroundResource(R.drawable.bolt_result_press)
+            }
+        } else if (prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
             menu.launcherSettings.setXpIcon(R.drawable.xp_settings)
             menu.systemSettings.setXpIcon(R.drawable.xp_computer)
             menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
@@ -1408,6 +1454,11 @@ class AppDrawerFragment : BaseFragment() {
             menu.systemSettings.setThemeTileIcon(R.drawable.bolt_system_settings_icon)
             menu.launcherTheme.setThemeTileIcon(R.drawable.bolt_frosted_glass_icon)
             menu.powerMenu.setThemeTileIcon(R.drawable.bolt_power_menu_icon)
+        } else {
+            val tint = ColorStateList.valueOf(builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor))
+            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.powerMenu).forEach {
+                it.supportCompoundDrawablesTintList = tint
+            }
         }
         menu.launcherSettings.setOnClickListener {
             dialog.dismiss()
@@ -1458,15 +1509,19 @@ class AppDrawerFragment : BaseFragment() {
         val options = listOf(
             Prefs.LauncherTheme.DEFAULT to R.string.bolt_theme_default,
             Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
+            Prefs.LauncherTheme.LIQUID_GLASS to R.string.bolt_liquid_glass,
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
             Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
             Prefs.LauncherTheme.WII_U to R.string.bolt_wii_u,
             Prefs.LauncherTheme.SEATTLE_SEAHAWKS to R.string.bolt_seattle_seahawks,
         ).map { (theme, label) -> theme to getString(label) }
-            .sortedWith(compareBy(collator) { it.second })
+            .sortedWith(compareBy<Pair<Prefs.LauncherTheme, String>> { it.first != Prefs.LauncherTheme.DEFAULT }
+                .thenBy(collator) { it.second })
         val current = prefs.launcherTheme
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val textColor = builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
+        val density = resources.displayMetrics.density
+        val previews = options.map { (theme, _) -> ThemePreviewDrawable(builder.context, theme) }
         val labels = object : android.widget.ArrayAdapter<String>(
             builder.context,
             android.R.layout.simple_list_item_single_choice,
@@ -1474,8 +1529,11 @@ class AppDrawerFragment : BaseFragment() {
         ) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 return (super.getView(position, convertView, parent) as android.widget.CheckedTextView).apply {
+                    minimumHeight = (58 * density).toInt()
+                    compoundDrawablePadding = (12 * density).toInt()
                     setTextColor(textColor)
                     checkMarkTintList = ColorStateList.valueOf(textColor)
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, previews[position], null)
                 }
             }
         }
@@ -1525,7 +1583,8 @@ class AppDrawerFragment : BaseFragment() {
             flag,
             prefs.appLabelAlignment,
             appClickListener = { appModel ->
-                if (searchRename == null && !thunderCommitted) launchResult(appModel)
+                val staleResult = expanded && adapter.committedQuery != currentResultsQuery()
+                if (searchRename == null && !thunderCommitted && !staleResult) launchResult(appModel)
             },
             appInfoListener = { app ->
                 launchExternalAppAction { openAppInfo(requireContext(), app.user, app.appPackage) }

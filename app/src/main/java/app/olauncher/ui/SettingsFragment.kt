@@ -214,10 +214,10 @@ class SettingsFragment : BaseFragment(), View.OnClickListener, View.OnLongClickL
             prefs.firstSettingsOpen = false
         }
         viewModel.isOlauncherDefault.observe(viewLifecycleOwner) {
-            if (it) {
-                binding.setLauncher.text = getString(R.string.change_default_launcher)
-                prefs.toShowHintCounter += 1
-            }
+            binding.setLauncher.setText(
+                if (it) R.string.change_default_launcher else R.string.set_as_default_launcher,
+            )
+            if (it) prefs.toShowHintCounter += 1
         }
         viewModel.homeAppAlignment.observe(viewLifecycleOwner) {
             populateAlignment()

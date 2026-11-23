@@ -193,9 +193,11 @@ class ContactSearchAdapter(
 
     inner class Holder(private val binding: AdapterAppDrawerBinding) : RecyclerView.ViewHolder(binding.root) {
         var photoJob: Job? = null
+        private val liquidGlass = app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
+            app.olauncher.data.Prefs.LauncherTheme.LIQUID_GLASS
         private val initial = TextView(binding.root.context).apply {
             gravity = android.view.Gravity.CENTER
-            setTextColor(Color.BLACK)
+            setTextColor(if (liquidGlass) Color.WHITE else Color.BLACK)
             textSize = 20f
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
@@ -264,7 +266,13 @@ class ContactSearchAdapter(
             binding.renameLayout.visibility = View.GONE
             val radius = (36f * 18f / 52f) * binding.root.resources.displayMetrics.density
             binding.appIcon.apply {
-                background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = radius }
+                if (liquidGlass) {
+                    setBackgroundResource(R.drawable.liquid_glass_icon_frame)
+                    val inset = (3 * resources.displayMetrics.density).toInt()
+                    setPadding(inset, inset, inset, inset)
+                } else {
+                    background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = radius }
+                }
                 clipToOutline = true
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 setImageDrawable(null)

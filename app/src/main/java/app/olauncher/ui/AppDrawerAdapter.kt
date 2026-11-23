@@ -24,6 +24,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Filter
 import android.widget.Filterable
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
@@ -90,7 +91,13 @@ class AppDrawerAdapter(
 
     private val iconScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val iconCache = LruCache<IconKey, Drawable.ConstantState>(128)
-    private data class IconKey(val packageName: String, val user: UserHandle, val density: Int)
+    private data class IconKey(
+        val packageName: String,
+        val user: UserHandle,
+        val density: Int,
+        val activityClass: String?,
+        val shortcutId: String?,
+    )
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         if (holder is ViewHolder) holder.cancelIconLoad()
@@ -395,18 +402,40 @@ class AppDrawerAdapter(
         init {
             val context = binding.root.context
             val theme = Prefs(context).launcherTheme
-            if (theme == Prefs.LauncherTheme.WINDOWS_XP) {
-                binding.searchRename.setXpIcon(R.drawable.xp_rename)
-                binding.searchPlayStore.setXpIcon(R.drawable.xp_store)
-                binding.searchAddAlias.setXpIcon(R.drawable.xp_alias)
-                binding.searchAppInfo.setXpIcon(R.drawable.xp_info)
-                binding.searchUninstall.setXpIcon(R.drawable.xp_delete)
-            } else if (theme == Prefs.LauncherTheme.WII_U || theme == Prefs.LauncherTheme.SEATTLE_SEAHAWKS) {
-                binding.searchRename.setThemeTileIcon(R.drawable.ic_rename)
-                binding.searchPlayStore.setThemeTileIcon(R.drawable.bolt_play_store_icon)
-                binding.searchAddAlias.setThemeTileIcon(R.drawable.bolt_add_alias_icon)
-                binding.searchAppInfo.setThemeTileIcon(R.drawable.ic_info)
-                binding.searchUninstall.setThemeTileIcon(R.drawable.ic_delete)
+            if (theme == Prefs.LauncherTheme.LIQUID_GLASS) {
+                binding.appIcon.apply {
+                    setBackgroundResource(R.drawable.liquid_glass_icon_frame)
+                    val inset = (3 * resources.displayMetrics.density).toInt()
+                    setPadding(inset, inset, inset, inset)
+                }
+            }
+            with(binding) {
+                when (theme) {
+                    Prefs.LauncherTheme.WINDOWS_XP -> {
+                        searchRename.setXpIcon(R.drawable.xp_rename)
+                        searchPlayStore.setXpIcon(R.drawable.xp_store)
+                        searchAddAlias.setXpIcon(R.drawable.xp_alias)
+                        searchAppInfo.setXpIcon(R.drawable.xp_info)
+                        searchUninstall.setXpIcon(R.drawable.xp_delete)
+                    }
+                    Prefs.LauncherTheme.LIQUID_GLASS, Prefs.LauncherTheme.WII_U,
+                    Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> {
+                        searchRename.setThemeTileIcon(R.drawable.ic_rename)
+                        searchPlayStore.setThemeTileIcon(R.drawable.bolt_play_store_icon)
+                        searchAddAlias.setThemeTileIcon(R.drawable.bolt_add_alias_icon)
+                        searchAppInfo.setThemeTileIcon(R.drawable.ic_info)
+                        searchUninstall.setThemeTileIcon(R.drawable.ic_delete)
+                    }
+                    else -> {
+                        val tint = AppCompatResources.getColorStateList(context, R.color.bolt_app_action_tint)
+                        for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
+                            button.imageTintList = tint
+                        }
+                        searchUninstall.imageTintList = AppCompatResources.getColorStateList(
+                            context, R.color.bolt_app_uninstall_tint,
+                        )
+                    }
+                }
             }
         }
         private var renameWatcher: TextWatcher? = null
@@ -547,7 +576,13 @@ class AppDrawerAdapter(
             cancelIconLoad()
             appIcon.isVisible = appModel.appPackage.isNotEmpty()
             if (appModel.appPackage.isNotEmpty()) {
-                val key = IconKey(appModel.appPackage, appModel.user, root.resources.displayMetrics.densityDpi)
+                val key = IconKey(
+                    appModel.appPackage,
+                    appModel.user,
+                    root.resources.displayMetrics.densityDpi,
+                    (appModel as? AppModel.App)?.activityClassName,
+                    (appModel as? AppModel.PinnedShortcut)?.shortcutId,
+                )
                 val cached = iconCache.get(key)
                 appIcon.setImageDrawable(cached?.newDrawable(root.resources)
                     ?: root.context.packageManager.defaultActivityIcon)
@@ -559,9 +594,28 @@ class AppDrawerAdapter(
                         val icon = withContext(Dispatchers.IO) {
                             try {
                                 val launcher = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-                                launcher.getActivityList(key.packageName, key.user)
-                                    .firstOrNull()?.getBadgedIcon(key.density)
-                                    ?.let { normalizeSearchIcon(it, resources, appIconSlotSize) }
+                                val shortcutIcon = key.shortcutId?.let { shortcutId ->
+                                    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.N_MR1 ||
+                                        !launcher.hasShortcutHostPermission()
+                                    ) return@let null
+                                    val query = LauncherApps.ShortcutQuery()
+                                        .setPackage(key.packageName)
+                                        .setShortcutIds(listOf(shortcutId))
+                                        .setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+                                    try {
+                                        launcher.getShortcuts(query, key.user)?.firstOrNull()?.let {
+                                            launcher.getShortcutBadgedIconDrawable(it, key.density)
+                                        }
+                                    } catch (_: SecurityException) {
+                                        null
+                                    }
+                                }
+                                val icon = shortcutIcon ?: launcher.getActivityList(key.packageName, key.user).let { activities ->
+                                    val activity = activities.firstOrNull { it.componentName.className == key.activityClass }
+                                        ?: activities.firstOrNull()
+                                    activity?.getBadgedIcon(key.density)
+                                }
+                                icon?.let { normalizeSearchIcon(it, resources, appIconSlotSize) }
                             } catch (_: Exception) { null }
                         }
                         ensureActive()
@@ -578,12 +632,6 @@ class AppDrawerAdapter(
             root.setOnClickListener { clickListener(appModel) }
             val showAppActions = View.OnLongClickListener {
                 if (appModel.appPackage.isNotEmpty() && !showSearchActions(appModel)) {
-                    appDelete.alpha = when (
-                        appModel is AppModel.PinnedShortcut || !root.context.isSystemApp(appModel.appPackage, appModel.user)
-                    ) {
-                        true -> 1.0f
-                        false -> 0.5f
-                    }
                     appDelete.text = if (appModel is AppModel.PinnedShortcut)
                         root.context.getString(R.string.remove)
                     else
@@ -593,10 +641,6 @@ class AppDrawerAdapter(
                     else
                         root.context.getString(R.string.adapter_hide)
                     appTitle.visibility = View.INVISIBLE
-                    appHide.alpha = when (appModel is AppModel.PinnedShortcut) {
-                        true -> 0.5f
-                        false -> 1.0f
-                    }
                     if (!appHideLayout.isVisible) {
                         appHideLayout.visibility = View.VISIBLE
                         LauncherMotion.reveal(appHideLayout)

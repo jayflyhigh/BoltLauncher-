@@ -28,6 +28,9 @@
     <attr name="boltSettingsCardColor" format="color" />
     <attr name="boltSettingsCardOutlineColor" format="color" />
     <attr name="boltHomeMenuTextColor" format="color" />
+    <attr name="boltSelectedRowEndColor" format="color" />
+    <attr name="boltPanelEndColor" format="color" />
+    <attr name="boltDialogDimsBackdrop" format="boolean" />
     <attr name="boltGlassReflectionColor" format="color" />
     <attr name="boltRowBottomColor" format="color" />
     <attr name="boltRowOutlineColor" format="color" />

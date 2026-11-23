@@ -11,18 +11,15 @@ import kotlin.math.roundToInt
 
 internal fun AppCompatImageButton.setXpIcon(@DrawableRes icon: Int, compact: Boolean = false) {
     val drawable = context.largeXpIcon(icon, if (compact) 24 else 32) ?: return
-    imageTintList = null
     val paddingDp = if (compact) 7 else 4
     val padding = (paddingDp * resources.displayMetrics.density).roundToInt()
     setPadding(padding, padding, padding, padding)
+    scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
     setImageDrawable(drawable)
 }
 
 internal fun AppCompatButton.setXpIcon(@DrawableRes icon: Int) {
     val drawable = context.largeXpIcon(icon) ?: return
-    // The menu row can carry a tint from either TextView or AppCompat.
-    compoundDrawableTintList = null
-    supportCompoundDrawablesTintList = null
     setCompoundDrawablesRelativeWithIntrinsicBounds(drawable, null, null, null)
 }
 
