@@ -2,8 +2,9 @@
     <color name="bolt_glass_settings_surface">#E01C2032</color>
     <color name="bolt_glass_settings_card">#76454C68</color>
     <color name="bolt_glass_settings_outline">#8FB7C5EB</color>
-    <color name="bolt_glass_dialog_top">#D35B718F</color>
-    <color name="bolt_glass_dialog_bottom">#D8243148</color>
+    <color name="bolt_glass_dialog_top">#405671</color>
+    <color name="bolt_glass_dialog_bottom">#243148</color>
     <color name="bolt_glass_dialog_outline">#91C8D2F5</color>
     <color name="bolt_glass_settings_card_bottom">#2B212B43</color>
+    <color name="bolt_glass_menu_text">#FFFFFF</color>
 </resources>

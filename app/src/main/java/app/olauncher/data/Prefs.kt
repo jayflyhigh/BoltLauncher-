@@ -197,6 +197,7 @@ class Prefs(context: Context) {
         FROSTED_GLASS("frosted_glass"),
         SMOKED_GLASS("smoked_glass"),
         WINDOWS_XP("windows_xp"),
+        WII_U("wii_u"),
     }
 
     var launcherTheme: LauncherTheme

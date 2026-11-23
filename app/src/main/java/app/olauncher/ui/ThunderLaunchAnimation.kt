@@ -8,7 +8,7 @@ import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.view.View
-import androidx.core.content.ContextCompat
+import app.olauncher.helper.getColorFromAttr
 import app.olauncher.R
 import kotlin.math.roundToInt
 
@@ -21,7 +21,7 @@ internal class ThunderLaunchAnimation(
     private val lift = 4f * density
     private val originalAlpha = source.alpha
     private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = ContextCompat.getColor(source.context, R.color.bolt_search_yellow)
+        color = source.context.getColorFromAttr(R.attr.boltThunderPulseColor)
         style = Paint.Style.STROKE
         strokeWidth = 1.5f * density
     }

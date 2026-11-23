@@ -186,6 +186,7 @@ class AppDrawerFragment : BaseFragment() {
     private var boltProgress = 0f
     private var dockIdleColor = 0
     private var windowsXpTheme = false
+    private var wiiUTheme = false
     private var thunderDockColor = 0
 
     override fun onCreateView(
@@ -339,13 +340,21 @@ class AppDrawerFragment : BaseFragment() {
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
         windowsXpTheme = prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP
-        if (windowsXpTheme) {
+        wiiUTheme = prefs.launcherTheme == Prefs.LauncherTheme.WII_U
+        if (wiiUTheme) {
+            binding.dockBolt.setWiiUIcon(R.drawable.bolt_search_lightning)
+            binding.dockSearchDestinations.setWiiUIcon(R.drawable.dock_search)
+            binding.dockWeb.setWiiUIcon(R.drawable.dock_web, compact = true)
+            binding.contactCall.setWiiUIcon(R.drawable.contact_call, compact = true)
+            binding.contactMessage.setWiiUIcon(R.drawable.contact_message, compact = true)
+            binding.contactWhatsapp.setWiiUIcon(R.drawable.contact_whatsapp, compact = true)
+        } else if (windowsXpTheme) {
             binding.dockBolt.setXpIcon(R.drawable.xp_lightning)
             binding.dockSearchDestinations.setXpIcon(R.drawable.xp_search)
-            binding.dockWeb.setXpIcon(R.drawable.xp_web)
-            binding.contactCall.setXpIcon(R.drawable.xp_phone)
-            binding.contactMessage.setXpIcon(R.drawable.xp_message)
-            binding.contactWhatsapp.setXpIcon(R.drawable.xp_whatsapp)
+            binding.dockWeb.setXpIcon(R.drawable.xp_web, compact = true)
+            binding.contactCall.setXpIcon(R.drawable.xp_phone, compact = true)
+            binding.contactMessage.setXpIcon(R.drawable.xp_message, compact = true)
+            binding.contactWhatsapp.setXpIcon(R.drawable.xp_whatsapp, compact = true)
         }
         binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
             if (thunderCommitted) {
@@ -775,7 +784,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.renameConfirm.setTextColor(renameActionColor)
         binding.renameCancel.setTextColor(renameActionColor)
         binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
-        if (!windowsXpTheme) {
+        if (!windowsXpTheme && !wiiUTheme) {
             bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
         }
         updateBoltVisibility()
@@ -1387,6 +1396,11 @@ class AppDrawerFragment : BaseFragment() {
             menu.systemSettings.setXpIcon(R.drawable.xp_computer)
             menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
             menu.powerMenu.setXpIcon(R.drawable.xp_power)
+        } else if (wiiUTheme) {
+            menu.launcherSettings.setWiiUIcon(R.drawable.dock_settings)
+            menu.systemSettings.setWiiUIcon(R.drawable.bolt_system_settings_icon)
+            menu.launcherTheme.setWiiUIcon(R.drawable.bolt_frosted_glass_icon)
+            menu.powerMenu.setWiiUIcon(R.drawable.bolt_power_menu_icon)
         }
         menu.launcherSettings.setOnClickListener {
             dialog.dismiss()
@@ -1439,13 +1453,27 @@ class AppDrawerFragment : BaseFragment() {
             Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
             Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
+            Prefs.LauncherTheme.WII_U to R.string.bolt_wii_u,
         ).map { (theme, label) -> theme to getString(label) }
             .sortedWith(compareBy(collator) { it.second })
         val current = prefs.launcherTheme
-        androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle(R.string.bolt_theme)
+        val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+        val textColor = builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
+        val labels = object : android.widget.ArrayAdapter<String>(
+            builder.context,
+            android.R.layout.simple_list_item_single_choice,
+            options.map { it.second },
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                return (super.getView(position, convertView, parent) as android.widget.CheckedTextView).apply {
+                    setTextColor(textColor)
+                    checkMarkTintList = ColorStateList.valueOf(textColor)
+                }
+            }
+        }
+        builder.setTitle(R.string.bolt_theme)
             .setSingleChoiceItems(
-                options.map { it.second }.toTypedArray(),
+                labels,
                 options.indexOfFirst { it.first == current },
             ) { picker, position ->
                 picker.dismiss()
