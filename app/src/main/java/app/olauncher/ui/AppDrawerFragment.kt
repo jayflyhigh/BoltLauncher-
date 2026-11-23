@@ -185,6 +185,7 @@ class AppDrawerFragment : BaseFragment() {
     private var boltProgress = 0f
     private var dockIdleColor = 0
     private var windowsXpTheme = false
+    private var neonConsoleTheme = false
     private var thunderDockColor = 0
 
     override fun onCreateView(
@@ -338,6 +339,15 @@ class AppDrawerFragment : BaseFragment() {
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
         windowsXpTheme = prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP
+        neonConsoleTheme = prefs.launcherTheme == Prefs.LauncherTheme.NEON_CONSOLE
+        if (neonConsoleTheme) {
+            binding.dockBolt.setConsoleIcon(R.drawable.bolt_search_lightning, accent = true)
+            binding.dockSearchDestinations.setConsoleIcon(R.drawable.dock_search)
+            binding.dockWeb.setConsoleIcon(R.drawable.dock_web)
+            binding.contactCall.setConsoleIcon(R.drawable.contact_call)
+            binding.contactMessage.setConsoleIcon(R.drawable.contact_message)
+            binding.contactWhatsapp.setConsoleIcon(R.drawable.contact_whatsapp)
+        }
         if (windowsXpTheme) {
             binding.dockBolt.setXpIcon(R.drawable.xp_lightning)
             binding.dockSearchDestinations.setXpIcon(R.drawable.xp_search)
@@ -774,7 +784,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.renameConfirm.setTextColor(renameActionColor)
         binding.renameCancel.setTextColor(renameActionColor)
         binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
-        if (!windowsXpTheme) {
+        if (!windowsXpTheme && !neonConsoleTheme) {
             bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
         }
         updateBoltVisibility()
@@ -1386,6 +1396,11 @@ class AppDrawerFragment : BaseFragment() {
             menu.systemSettings.setXpIcon(R.drawable.xp_computer)
             menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
             menu.powerMenu.setXpIcon(R.drawable.xp_power)
+        } else if (neonConsoleTheme) {
+            menu.launcherSettings.setConsoleMenuIcon(R.drawable.dock_settings)
+            menu.systemSettings.setConsoleMenuIcon(R.drawable.console_sliders)
+            menu.launcherTheme.setConsoleMenuIcon(R.drawable.console_themes)
+            menu.powerMenu.setConsoleMenuIcon(R.drawable.bolt_power_menu_icon)
         }
         menu.launcherSettings.setOnClickListener {
             dialog.dismiss()
@@ -1437,6 +1452,7 @@ class AppDrawerFragment : BaseFragment() {
             Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
             Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
+            Prefs.LauncherTheme.NEON_CONSOLE to R.string.bolt_neon_console,
         )
         val current = prefs.launcherTheme
         androidx.appcompat.app.AlertDialog.Builder(requireContext())

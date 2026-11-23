@@ -46,4 +46,7 @@
     <attr name="boltThunderDockColor" format="color" />
     <attr name="boltThunderCursorColor" format="color" />
     <attr name="boltThunderMatchTextColor" format="color" />
+    <attr name="boltSearchCursorColor" format="color" />
+    <attr name="boltThunderPulseColor" format="color" />
+    <attr name="boltResultCornerRadius" format="dimension" />
 </resources>
