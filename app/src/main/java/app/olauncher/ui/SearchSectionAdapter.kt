@@ -1,8 +1,9 @@
 package app.olauncher.ui
 
-import android.graphics.Color
 import android.view.ViewGroup
 import android.widget.TextView
+import app.olauncher.R
+import app.olauncher.helper.getColorFromAttr
 import androidx.recyclerview.widget.RecyclerView
 
 /** A non-interactive category label; omitted when its section has no results. */
@@ -19,7 +20,7 @@ class SearchSectionAdapter(private val title: String) : RecyclerView.Adapter<Sea
         return Holder(TextView(parent.context).apply {
             layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setPadding((20 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (8 * density).toInt())
-            setTextColor(Color.rgb(175, 168, 191))
+            setTextColor(context.getColorFromAttr(R.attr.boltSearchSectionColor))
             textSize = 12f
             letterSpacing = 0.06f
             typeface = android.graphics.Typeface.DEFAULT_BOLD

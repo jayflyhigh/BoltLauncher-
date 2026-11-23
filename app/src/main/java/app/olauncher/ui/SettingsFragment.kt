@@ -16,6 +16,7 @@ import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.bundleOf
 import androidx.lifecycle.ViewModelProvider
@@ -307,7 +308,7 @@ class SettingsFragment : BaseFragment(), View.OnClickListener, View.OnLongClickL
             requireContext().createDialog(
                 title = R.string.accessibility_permission,
                 action = R.string.accept,
-                message = R.string.accessibility_disclosure,
+                message = R.string.bolt_accessibility_disclosure,
                 neutral = R.string.not_now,
                 onAction = { openAccessibilityService() },
             ) { container ->
@@ -389,11 +390,14 @@ class SettingsFragment : BaseFragment(), View.OnClickListener, View.OnLongClickL
             prefs.lockModeOn = isAdmin
     }
 
+    private val lockAccessibilitySettings =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (isAccessServiceEnabled(requireContext())) prefs.lockModeOn = true
+            populateLockSettings()
+        }
+
     private fun openAccessibilityService() {
-        // prefs.lockModeOn = true
-        populateLockSettings()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        lockAccessibilitySettings.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     private fun toggleLockMode() {

@@ -2,7 +2,6 @@ package app.olauncher.ui
 
 import android.content.Context
 import android.graphics.Typeface
-import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
@@ -245,10 +244,10 @@ class ContactSearchAdapter(
             androidx.core.view.ViewCompat.setStateDescription(binding.root,
                 state?.let(binding.root.resources::getString))
             binding.appTitle.setTextColor(if (highlighted) selectedText else
-                ContextCompat.getColor(binding.root.context, R.color.bolt_search_label))
+                binding.root.context.getColorFromAttr(R.attr.boltResultTextColor))
             binding.updateTypoHint(showTypoHints && contact.uri in typoMatches)
             binding.contactNumber.setTextColor(if (highlighted) selectedNumber else
-                ContextCompat.getColor(binding.root.context, R.color.bolt_search_secondary))
+                binding.root.context.getColorFromAttr(R.attr.boltResultSecondaryColor))
         }
 
         fun bind(contact: Contact) {

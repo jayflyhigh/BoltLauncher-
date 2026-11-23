@@ -2,7 +2,6 @@ package app.olauncher.ui
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.net.Uri
 import android.os.UserManager
 import android.content.pm.LauncherApps
@@ -30,6 +29,7 @@ import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.R
+import app.olauncher.data.Prefs
 import app.olauncher.helper.getColorFromAttr
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
@@ -388,8 +388,20 @@ class AppDrawerAdapter(
         }
 
         private val selectedText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
-        private val normalText = androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.bolt_search_label)
+        private val normalText = binding.root.context.getColorFromAttr(R.attr.boltResultTextColor)
+        private val thunderMatchText = binding.root.context.getColorFromAttr(R.attr.boltThunderMatchTextColor)
         private var iconJob: Job? = null
+
+        init {
+            val context = binding.root.context
+            if (Prefs(context).launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
+                binding.searchRename.setXpIcon(R.drawable.xp_rename)
+                binding.searchPlayStore.setXpIcon(R.drawable.xp_store)
+                binding.searchAddAlias.setXpIcon(R.drawable.xp_alias)
+                binding.searchAppInfo.setXpIcon(R.drawable.xp_info)
+                binding.searchUninstall.setXpIcon(R.drawable.xp_delete)
+            }
+        }
         private var renameWatcher: TextWatcher? = null
 
         private var boundApp: AppModel? = null
@@ -445,7 +457,7 @@ class AppDrawerAdapter(
             if (thunderMode && !enterHighlighted && query.isNotBlank()) {
                 appTitle.text = android.text.SpannableString(title).apply {
                     thunderMatchRanges(appModel.appLabel, query).forEach { range ->
-                        setSpan(android.text.style.ForegroundColorSpan(Color.WHITE), range.first, range.last + 1,
+                        setSpan(android.text.style.ForegroundColorSpan(thunderMatchText), range.first, range.last + 1,
                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                         setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), range.first, range.last + 1,
                             android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

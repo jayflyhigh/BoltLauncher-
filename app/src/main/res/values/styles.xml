@@ -60,6 +60,13 @@
         <item name="boltRowBottomColor">@color/bolt_search_result</item>
         <item name="boltRowOutlineColor">#00000000</item>
         <item name="boltSettingsCardBottomColor">?attr/primaryShadeDarkColor</item>
+        <item name="boltThunderMatchTextColor">#FFFFFF</item>
+        <item name="boltResultTextColor">@color/bolt_search_label</item>
+        <item name="boltResultSecondaryColor">@color/bolt_search_secondary</item>
+        <item name="boltResultActionColor">@color/bolt_search_action_label</item>
+        <item name="boltSearchSectionColor">#AFA8BF</item>
+        <item name="boltThunderDockColor">@color/bolt_search_yellow</item>
+        <item name="boltThunderCursorColor">#000000</item>
         <item name="boltDockColor">@color/bolt_search_dock</item>
         <item name="boltPanelColor">@color/bolt_search_dock</item>
         <item name="boltPanelOutlineColor">@color/bolt_search_outline</item>

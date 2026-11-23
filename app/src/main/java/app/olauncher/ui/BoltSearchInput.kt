@@ -7,12 +7,14 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import androidx.appcompat.widget.AppCompatEditText
+import app.olauncher.R
+import app.olauncher.helper.getColorFromAttr
 
 class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     AppCompatEditText(context, attrs) {
     private var thunderCursor = false
     private var blinkStart = 0L
-    private val cursorPaint = android.graphics.Paint().apply { color = android.graphics.Color.BLACK }
+    private val cursorPaint = android.graphics.Paint().apply { color = context.getColorFromAttr(R.attr.boltThunderCursorColor) }
 
     var onImeCommit: (() -> Unit)? = null
     var onEmptyBackspace: (() -> Boolean)? = null

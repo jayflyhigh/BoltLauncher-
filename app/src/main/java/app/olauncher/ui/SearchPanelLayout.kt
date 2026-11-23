@@ -27,7 +27,15 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
 
     private val surface = context.getColorFromAttr(R.attr.boltPanelColor)
     private val outline = context.getColorFromAttr(R.attr.boltPanelOutlineColor)
-    private val radius = resources.getDimension(R.dimen.bolt_search_corner_radius)
+    private val radius = context.obtainStyledAttributes(intArrayOf(R.attr.boltPanelCornerRadius)).let {
+        try {
+            it.getDimension(0, resources.getDimension(R.dimen.bolt_search_corner_radius))
+        } finally {
+            it.recycle()
+        }
+    }
+    private val dockTopColor = context.getColorFromAttr(R.attr.boltDockTopColor)
+    private var dockHighlight: LinearGradient? = null
     private val dockGap = resources.getDimensionPixelSize(R.dimen.bolt_result_dock_gap)
     private val rowInset = resources.getDimensionPixelSize(R.dimen.bolt_search_results_inset)
     private val stroke = resources.displayMetrics.density
@@ -124,6 +132,12 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val dockTop = height - dock.measuredHeight
         dock.layout(0, dockTop, width, height)
+        if (changed && dockTopColor != 0 && dock.measuredHeight > 0) {
+            dockHighlight = LinearGradient(
+                0f, 0f, 0f, dock.measuredHeight * 0.45f,
+                dockTopColor, dockTopColor and 0x00FFFFFF, Shader.TileMode.CLAMP,
+            )
+        }
         var edge = dockTop
         if (statusInPanel) {
             val inset = (width - status.measuredWidth) / 2
@@ -189,6 +203,15 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         }
         paint.color = dockColor
         canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
+        dockHighlight?.let { highlight ->
+            val highlightSave = canvas.save()
+            canvas.translate(0f, dockTop)
+            paint.shader = highlight
+            paint.alpha = dividerAlpha
+            canvas.drawRect(0f, 0f, width.toFloat(), height - dockTop, paint)
+            paint.shader = null
+            canvas.restoreToCount(highlightSave)
+        }
         drawGlassSheen(canvas, dockTop, height.toFloat(), dividerAlpha)
         // In Thunder mode the transition from charcoal to yellow already separates the bar.
         if (dividerAlpha > 0 && (resultsHeight > 0 || statusInPanel)) {

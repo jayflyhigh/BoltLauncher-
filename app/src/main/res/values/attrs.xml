@@ -12,6 +12,8 @@
     <attr name="dialogShadeColor" format="color" />
     <attr name="primaryShadeDarkColor" format="color" />
     <attr name="mainFontFamily" format="string" />
+    <attr name="boltDockTopColor" format="color" />
+    <attr name="boltPanelCornerRadius" format="dimension" />
     <attr name="boltDockColor" format="color" />
     <attr name="boltPanelColor" format="color" />
     <attr name="boltPanelOutlineColor" format="color" />
@@ -37,4 +39,11 @@
     <attr name="boltSelectedRowTextColor" format="color" />
     <attr name="boltSelectedRowSecondaryColor" format="color" />
     <attr name="boltSmokedControlColor" format="color" />
+    <attr name="boltResultTextColor" format="color" />
+    <attr name="boltResultSecondaryColor" format="color" />
+    <attr name="boltResultActionColor" format="color" />
+    <attr name="boltSearchSectionColor" format="color" />
+    <attr name="boltThunderDockColor" format="color" />
+    <attr name="boltThunderCursorColor" format="color" />
+    <attr name="boltThunderMatchTextColor" format="color" />
 </resources>

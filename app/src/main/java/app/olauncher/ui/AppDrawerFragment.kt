@@ -19,6 +19,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -54,9 +55,11 @@ import app.olauncher.databinding.DialogHomeSettingsBinding
 import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.ContactLoadResult
 import app.olauncher.helper.InAppSearch
+import app.olauncher.helper.MyAccessibilityService
 import app.olauncher.helper.deletePinnedShortcut
 import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.hideKeyboard
+import app.olauncher.helper.isAccessServiceEnabled
 import app.olauncher.helper.isEinkDisplay
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.openAppInfo
@@ -181,7 +184,8 @@ class AppDrawerFragment : BaseFragment() {
     private var boltAnimator: ValueAnimator? = null
     private var boltProgress = 0f
     private var dockIdleColor = 0
-    private var boltYellow = 0
+    private var windowsXpTheme = false
+    private var thunderDockColor = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -332,7 +336,16 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun initSearch() {
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
-        boltYellow = ContextCompat.getColor(requireContext(), R.color.bolt_search_yellow)
+        thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
+        windowsXpTheme = prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP
+        if (windowsXpTheme) {
+            binding.dockBolt.setXpIcon(R.drawable.xp_lightning)
+            binding.dockSearchDestinations.setXpIcon(R.drawable.xp_search)
+            binding.dockWeb.setXpIcon(R.drawable.xp_web)
+            binding.contactCall.setXpIcon(R.drawable.xp_phone)
+            binding.contactMessage.setXpIcon(R.drawable.xp_message)
+            binding.contactWhatsapp.setXpIcon(R.drawable.xp_whatsapp)
+        }
         binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
             if (thunderCommitted) {
                 dest.subSequence(from, to)
@@ -753,7 +766,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun positionBolt(progress: Float) {
         boltProgress = progress
         val bolt = binding.dockBolt
-        val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, boltYellow, progress)
+        val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, thunderDockColor, progress)
         binding.searchPanel.setDockAppearance(dockColor, progress)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
         binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
@@ -761,7 +774,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.renameConfirm.setTextColor(renameActionColor)
         binding.renameCancel.setTextColor(renameActionColor)
         binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
-        bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else boltYellow)
+        if (!windowsXpTheme) {
+            bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
+        }
         updateBoltVisibility()
         if (flag != Constants.FLAG_LAUNCH_APP) return
         val travel = (binding.dock.width - bolt.width).coerceAtLeast(0)
@@ -945,6 +960,9 @@ class AppDrawerFragment : BaseFragment() {
                 else -> ""
             }
             if (text != status) text = status
+            val color = if (statusIsResult) context.getColorFromAttr(R.attr.boltResultSecondaryColor)
+                else ContextCompat.getColor(context, R.color.bolt_search_secondary)
+            if (currentTextColor != color) setTextColor(color)
             isVisible = feedback != null || offerWeb || thunderEmpty
             if (panel.statusIsResult != statusIsResult) {
                 panel.statusIsResult = statusIsResult
@@ -1363,6 +1381,12 @@ class AppDrawerFragment : BaseFragment() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val menu = DialogHomeSettingsBinding.inflate(LayoutInflater.from(builder.context))
         val dialog = builder.setView(menu.root).create()
+        if (prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
+            menu.launcherSettings.setXpIcon(R.drawable.xp_settings)
+            menu.systemSettings.setXpIcon(R.drawable.xp_computer)
+            menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
+            menu.powerMenu.setXpIcon(R.drawable.xp_power)
+        }
         menu.launcherSettings.setOnClickListener {
             dialog.dismiss()
             findNavController().navigate(R.id.action_mainFragment_to_settingsFragment)
@@ -1379,7 +1403,32 @@ class AppDrawerFragment : BaseFragment() {
             dialog.dismiss()
             showThemePicker()
         }
+        menu.powerMenu.setOnClickListener {
+            dialog.dismiss()
+            openPowerMenu()
+        }
         dialog.show()
+    }
+
+    private fun openPowerMenu() {
+        val context = requireContext()
+        if (isAccessServiceEnabled(context)) {
+            MyAccessibilityService.requestPowerMenu(context)
+            return
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle(R.string.bolt_power_menu)
+            .setMessage(R.string.bolt_accessibility_disclosure)
+            .setNegativeButton(R.string.not_now, null)
+            .setPositiveButton(R.string.accept) { _, _ ->
+                try {
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                } catch (_: ActivityNotFoundException) {
+                    context.showToast(getString(R.string.bolt_power_menu_unavailable))
+                }
+            }
+            .show()
     }
 
     private fun showThemePicker() {
@@ -1387,6 +1436,7 @@ class AppDrawerFragment : BaseFragment() {
             Prefs.LauncherTheme.DEFAULT to R.string.bolt_theme_default,
             Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
+            Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
         )
         val current = prefs.launcherTheme
         androidx.appcompat.app.AlertDialog.Builder(requireContext())

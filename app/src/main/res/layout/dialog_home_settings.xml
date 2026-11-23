@@ -31,4 +31,10 @@
         android:drawableStart="@drawable/bolt_frosted_glass_icon"
         android:text="@string/bolt_theme" />
 
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/powerMenu"
+        style="@style/BoltHomeMenuRow"
+        android:drawableStart="@drawable/bolt_power_menu_icon"
+        android:text="@string/bolt_power_menu" />
+
 </LinearLayout>
