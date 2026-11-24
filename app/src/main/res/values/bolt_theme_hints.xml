@@ -46,8 +46,17 @@
     <string name="bolt_hint_hawks_rename">Call a new name</string>
     <string name="bolt_scan_wallpaper">Scan Wallpaper</string>
     <string name="bolt_scan_current_wallpaper">Scan current home wallpaper</string>
-    <string name="bolt_scan_wallpaper_image">Choose the wallpaper image</string>
-    <string name="bolt_wallpaper_colors_unavailable">No wallpaper colors found.</string>
+    <string name="bolt_scan_wallpaper_image">Choose wallpaper image</string>
+    <string name="bolt_wallpaper_colors_unavailable">Couldn’t read the home wallpaper colors. Try scanning again or choose the wallpaper image.</string>
     <string name="bolt_wallpaper_colors_applied">Wallpaper colors applied</string>
+    <string name="bolt_wallpaper_rescan_needed">Home wallpaper colors need a rescan. Bolt is keeping your last colors.</string>
+    <string name="bolt_wallpaper_image_unreadable">Couldn’t sample this image. Choose another JPG or PNG, or adjust the crop to include visible colors.</string>
+    <string name="bolt_wallpaper_picker_unavailable">No image picker is available. Enable a Files or Photos app and try again.</string>
+    <string name="bolt_wallpaper_crop_title">Preview wallpaper crop</string>
+    <string name="bolt_wallpaper_crop_description">Adjust the zoom and position to match your home wallpaper. Applying this crop only changes Bolt’s colors.</string>
+    <string name="bolt_wallpaper_crop_zoom">Zoom</string>
+    <string name="bolt_wallpaper_crop_horizontal">Horizontal position</string>
+    <string name="bolt_wallpaper_crop_vertical">Vertical position</string>
+    <string name="bolt_wallpaper_crop_apply">Apply colors</string>
     <string name="bolt_reset_wallpaper_colors">Reset Default colors</string>
 </resources>
