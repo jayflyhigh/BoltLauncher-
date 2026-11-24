@@ -210,6 +210,9 @@ class ContactSearchAdapter(
                 app.olauncher.data.Prefs.LauncherTheme.COZY_QUEST) {
                 binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
             }
+            WallpaperThemeColors.from(binding.root.context)?.let {
+                binding.root.background = it.rowBackground(binding.root.context)
+            }
             LauncherMotion.configureResultPress(binding.root)
             val density = binding.root.resources.displayMetrics.density
             binding.root.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT

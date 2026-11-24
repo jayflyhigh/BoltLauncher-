@@ -32,6 +32,13 @@
         android:text="@string/bolt_theme" />
 
     <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/scanWallpaper"
+        style="@style/BoltHomeMenuRow"
+        android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
+        android:text="@string/bolt_scan_wallpaper"
+        android:visibility="gone" />
+
+    <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/powerMenu"
         style="@style/BoltHomeMenuRow"
         android:drawableStart="@drawable/bolt_power_menu_icon"

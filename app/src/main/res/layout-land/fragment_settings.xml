@@ -24,6 +24,7 @@
             android:paddingVertical="56dp">
 
             <LinearLayout
+                android:id="@+id/homeSettingsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
@@ -88,6 +89,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/appearanceSettingsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_margin="12dp"
@@ -207,6 +209,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/featureSettingsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_margin="12dp"
@@ -379,6 +382,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/aboutSettingsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"

@@ -223,6 +223,29 @@ class Prefs(context: Context) {
         }
         set(value) = prefs.edit { putString("LAUNCHER_THEME", value.key) }
 
+    internal val wallpaperPalette: WallpaperPalette?
+        get() {
+            wallpaperSeed?.let { return WallpaperPalette.forColor(it) }
+            val saved = prefs.getString("WALLPAPER_PALETTE", null)
+            return WallpaperPalette.entries.firstOrNull { it.name == saved }
+        }
+
+    internal val wallpaperSeed: Int?
+        get() = prefs.getInt("WALLPAPER_COLOR", 0).takeUnless { it == 0 }
+
+    internal var wallpaperSample: WallpaperPalette.Sample?
+        get() = wallpaperSeed?.let { WallpaperPalette.Sample(it, prefs.getInt("WALLPAPER_ACCENT", it)) }
+        set(value) = prefs.edit {
+            if (value == null) {
+                remove("WALLPAPER_COLOR")
+                remove("WALLPAPER_ACCENT")
+                remove("WALLPAPER_PALETTE")
+            } else {
+                putInt("WALLPAPER_COLOR", value.base)
+                putInt("WALLPAPER_ACCENT", value.accent)
+            }
+        }
+
     var appTheme: Int
         get() = prefs.getInt(APP_THEME, AppCompatDelegate.MODE_NIGHT_YES)
         set(value) = prefs.edit { putInt(APP_THEME, value).apply() }

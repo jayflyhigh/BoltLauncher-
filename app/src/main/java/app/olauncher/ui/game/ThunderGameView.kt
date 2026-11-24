@@ -21,6 +21,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import app.olauncher.R
+import androidx.core.graphics.ColorUtils
+import app.olauncher.ui.WallpaperThemeColors
 import app.olauncher.helper.getColorFromAttr
 import kotlin.math.abs
 import kotlin.math.max
@@ -38,9 +40,13 @@ internal class ThunderGameView(
     private var soundEnabled = settings.getBoolean("sound", true)
     private val board = ThunderBoardView(context)
     private val preview = ThunderBoardView(context, preview = true)
-    private val stats = label()
     private val density = resources.displayMetrics.density
-    private val accent = context.getColor(R.color.bolt_search_yellow)
+    private val wallpaperColors = WallpaperThemeColors.from(context)
+    private val surfaceColor = wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)
+    private val opaqueSurface = surfaceColor or Color.BLACK
+    private val textColor = readableColor(context.getColorFromAttr(R.attr.boltResultTextColor))
+    private val accent = readableColor(wallpaperColors?.accent ?: context.getColorFromAttr(R.attr.boltSearchCursorColor))
+    private val stats = label()
     private val audioAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_GAME)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -515,16 +521,23 @@ internal class ThunderGameView(
         if (best > settings.getLong("best", 0L)) settings.edit().putLong("best", best).apply()
     }
 
+    private fun readableColor(preferred: Int): Int =
+        when {
+            ColorUtils.calculateContrast(preferred, opaqueSurface) >= 4.5 -> preferred
+            ColorUtils.calculateLuminance(opaqueSurface) > 0.179 -> Color.BLACK
+            else -> Color.WHITE
+        }
+
     private fun surface() = GradientDrawable().apply {
         cornerRadius = dp(16).toFloat()
-        setColor(context.getColorFromAttr(R.attr.boltDockColor))
-        setStroke(dp(1), context.getColorFromAttr(R.attr.boltPanelOutlineColor))
+        setColor(surfaceColor)
+        setStroke(dp(1), wallpaperColors?.outline ?: context.getColorFromAttr(R.attr.boltPanelOutlineColor))
     }
 
     private fun label(textId: Int = 0) = TextView(context).apply {
         textSize = 13f
         gravity = Gravity.CENTER
-        setTextColor(Color.WHITE)
+        setTextColor(textColor)
         if (textId != 0) setText(textId)
     }
 
@@ -536,7 +549,7 @@ internal class ThunderGameView(
         minHeight = dp(44)
         minWidth = 0
         setPadding(dp(4), 0, dp(4), 0)
-        setTextColor(Color.WHITE)
+        setTextColor(textColor)
         setBackgroundResource(R.drawable.bolt_search_press)
         setOnClickListener { action() }
     }

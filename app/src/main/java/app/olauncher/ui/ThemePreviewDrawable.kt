@@ -31,19 +31,25 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
     private val density = context.resources.displayMetrics.density
     private val theme = context.resources.newTheme().apply {
         applyStyle(R.style.AppTheme, true)
-        if (candidate.overlay != 0) applyStyle(candidate.overlay, true)
+        val overlay = if (candidate == Prefs.LauncherTheme.DEFAULT) {
+            Prefs(context).wallpaperPalette?.overlay ?: 0
+        } else candidate.overlay
+        if (overlay != 0) applyStyle(overlay, true)
     }
-    private val panel = color(R.attr.boltPanelColor)
+    private val wallpaperColors = if (candidate == Prefs.LauncherTheme.DEFAULT) {
+        Prefs(context).wallpaperSample?.let(::WallpaperThemeColors)
+    } else null
+    private val panel = wallpaperColors?.panel ?: color(R.attr.boltPanelColor)
     private val panelEnd = color(R.attr.boltPanelEndColor)
-    private val rim = color(R.attr.boltPanelOutlineColor)
-    private val row = color(R.attr.boltSelectedRowColor)
-    private val rowEnd = color(R.attr.boltSelectedRowEndColor)
-    private val rowRim = color(R.attr.boltSelectedRowOutlineColor)
+    private val rim = wallpaperColors?.outline ?: color(R.attr.boltPanelOutlineColor)
+    private val row = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowColor)
+    private val rowEnd = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowEndColor)
+    private val rowRim = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowOutlineColor)
     private val rowText = color(R.attr.boltSelectedRowTextColor)
-    private val dock = color(R.attr.boltDockColor)
+    private val dock = wallpaperColors?.dock ?: color(R.attr.boltDockColor)
     private val dockTop = color(R.attr.boltDockTopColor)
-    private val cursor = color(R.attr.boltSearchCursorColor)
-    private val accent = color(R.attr.boltThunderDockColor)
+    private val cursor = wallpaperColors?.accent ?: color(R.attr.boltSearchCursorColor)
+    private val accent = wallpaperColors?.accent ?: color(R.attr.boltThunderDockColor)
     private val panelFill = gradient(panel, panelEnd, 0f, 0f, 64f, 0f)
     private val rowFill = gradient(row, rowEnd, 5f, 0f, 59f, 0f)
     private val dockFill = gradient(

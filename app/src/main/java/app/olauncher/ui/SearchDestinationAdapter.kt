@@ -39,6 +39,9 @@ internal class SearchDestinationAdapter(
 
     class Holder(val binding: AdapterSearchDestinationBinding) : RecyclerView.ViewHolder(binding.root) {
         init {
+            WallpaperThemeColors.from(binding.root.context)?.let {
+                binding.root.background = it.rowBackground(binding.root.context)
+            }
             if (Prefs(binding.root.context).launcherTheme == Prefs.LauncherTheme.E_INK) {
                 binding.destinationBadge.isDuplicateParentStateEnabled = true
                 binding.destinationBadge.layoutParams.height =

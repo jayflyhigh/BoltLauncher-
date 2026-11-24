@@ -40,8 +40,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ConcatAdapter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -54,6 +56,7 @@ import app.olauncher.ui.game.ThunderGameView
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
+import app.olauncher.data.WallpaperPalette
 import app.olauncher.databinding.DialogHomeSettingsBinding
 import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.ContactLoadResult
@@ -93,6 +96,12 @@ class AppDrawerFragment : BaseFragment() {
             contactsLoad = null
             loadContactsIfAllowed()
         }
+    }
+    private var wallpaperScan: Job? = null
+    private val pickWallpaperImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null || _binding == null) return@registerForActivityResult
+        val context = requireContext().applicationContext
+        scanWallpaper { WallpaperPalette.scanImage(context, uri) }
     }
     private val requestContacts = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (_binding != null && expanded && !thunderMode) {
@@ -197,6 +206,9 @@ class AppDrawerFragment : BaseFragment() {
     private var dockIdleColor = 0
     private var paperNotebook = false
     private var eInk = false
+    private lateinit var searchHints: SearchHints
+    private var wallpaperColors: WallpaperThemeColors? = null
+    private var wallpaperColorsActive = false
     private var cozyQuest = false
     private var dockGraphite = Color.BLACK
     private var windowsXpTheme = false
@@ -362,8 +374,16 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun initSearch() {
         dockUsesDarkText = null
-        dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
-        thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
+        searchHints = SearchHints.forTheme(prefs.launcherTheme)
+        wallpaperColorsActive = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT && prefs.wallpaperPalette != null
+        wallpaperColors = WallpaperThemeColors.from(requireContext())
+        dockIdleColor = wallpaperColors?.dock ?: requireContext().getColorFromAttr(R.attr.boltDockColor)
+        thunderDockColor = wallpaperColors?.accent ?: requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
+        wallpaperColors?.let { colors ->
+            binding.dockWebDivider.setBackgroundColor(colors.outline)
+            binding.searchStatus.background = colors.rowBackground(requireContext())
+            binding.moveModeHint.background = colors.rowBackground(requireContext())
+        }
         cozyQuest = prefs.launcherTheme == Prefs.LauncherTheme.COZY_QUEST
         eInk = prefs.launcherTheme == Prefs.LauncherTheme.E_INK
         paperNotebook = prefs.launcherTheme == Prefs.LauncherTheme.PAPER_NOTEBOOK
@@ -400,8 +420,11 @@ class AppDrawerFragment : BaseFragment() {
             binding.contactMessage.setXpIcon(R.drawable.xp_message, compact = true)
             binding.contactWhatsapp.setXpIcon(R.drawable.xp_whatsapp, compact = true)
         } else {
-            val tint = ColorStateList.valueOf(if (paperNotebook || eInk) dockGraphite
-                else ContextCompat.getColor(requireContext(), R.color.bolt_search_label))
+            val tint = ColorStateList.valueOf(when {
+                wallpaperColorsActive -> thunderDockColor
+                paperNotebook || eInk -> dockGraphite
+                else -> ContextCompat.getColor(requireContext(), R.color.bolt_search_label)
+            })
             with(binding) {
                 dockSearchDestinations.imageTintList = tint
                 dockWeb.imageTintList = tint
@@ -494,7 +517,7 @@ class AppDrawerFragment : BaseFragment() {
             androidx.appcompat.app.AlertDialog.Builder(requireContext())
                 .setTitle(R.string.bolt_hidden_destinations)
                 .setItems(hidden.map { it.appLabel }.toTypedArray()) { _, index -> editAlias(hidden[index]) }
-                .show()
+                .show().applyWallpaperBackground()
             true
         }
         binding.dockActiveAlias.setOnClickListener { clearActiveAlias() }
@@ -621,7 +644,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun refreshDestinations() {
-        if (cozyQuest) updateSearchHint()
+        updateSearchHint()
         val show = supportsDestinations && expanded && !thunderMode &&
             (destinationsOnly || currentResultsQuery().isNotBlank())
         val targets = if (show) {
@@ -799,16 +822,15 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun updateSearchHint() {
-        val hint = when {
-            searchRename != null -> getString(if (cozyQuest) R.string.bolt_cozy_rename_hint else R.string.bolt_new_app_name)
-            !expanded -> getString(if (cozyQuest) R.string.bolt_cozy_home_hint else R.string.bolt_search_anything)
-            flag == Constants.FLAG_HIDDEN_APPS -> getString(R.string.hidden_apps)
-            flag != Constants.FLAG_LAUNCH_APP -> getString(R.string.bolt_select_app)
-            cozyQuest && thunderMode -> getString(R.string.bolt_cozy_thunder_hint)
-            cozyQuest && destinationsOnly -> getString(R.string.bolt_cozy_destination_hint)
-            cozyQuest -> getString(R.string.bolt_cozy_search_hint)
-            else -> null
-        }
+        val hint = getString(when {
+            searchRename != null -> searchHints.rename
+            !expanded -> searchHints.home
+            flag == Constants.FLAG_HIDDEN_APPS -> R.string.hidden_apps
+            flag != Constants.FLAG_LAUNCH_APP -> R.string.bolt_select_app
+            thunderMode -> searchHints.thunder
+            destinationsOnly -> searchHints.destination
+            else -> searchHints.regular
+        })
         if (!android.text.TextUtils.equals(binding.search.hint, hint)) binding.search.hint = hint
     }
 
@@ -1118,7 +1140,9 @@ class AppDrawerFragment : BaseFragment() {
             if (panel.statusIsResult != statusIsResult) {
                 panel.statusIsResult = statusIsResult
                 isSelected = statusIsResult
-                setBackgroundResource(
+                val colors = wallpaperColors
+                if (colors != null) background = colors.rowBackground(context)
+                else setBackgroundResource(
                     if (statusIsResult) R.drawable.bolt_search_best_match else R.drawable.rounded_primary_gradient,
                 )
                 minimumHeight = if (statusIsResult) resources.getDimensionPixelSize(R.dimen.bolt_search_result_height) else 0
@@ -1243,7 +1267,11 @@ class AppDrawerFragment : BaseFragment() {
         val groupBackground = if (paperNotebook) R.drawable.bolt_notebook_contact_actions
             else R.drawable.bolt_contact_action_group
         if (!eInk && !cozyQuest && (actions.background != null) != slot.isVisible) {
-            actions.setBackgroundResource(if (!slot.isVisible) 0 else groupBackground)
+            val colors = wallpaperColors
+            if (slot.isVisible && colors != null) {
+                val radius = resources.getDimension(R.dimen.bolt_search_corner_radius)
+                actions.background = colors.surface(colors.row, radius)
+            } else actions.setBackgroundResource(if (!slot.isVisible) 0 else groupBackground)
             actions.setPadding(0, 0, 0, 0)
         }
         val boltWidth = resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
@@ -1306,7 +1334,7 @@ class AppDrawerFragment : BaseFragment() {
                     launch(contact.numbers[index])
                 }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .show().applyWallpaperBackground()
         }
     }
 
@@ -1603,9 +1631,11 @@ class AppDrawerFragment : BaseFragment() {
             menu.launcherTheme.setThemeTileIcon(R.drawable.bolt_frosted_glass_icon)
             menu.powerMenu.setThemeTileIcon(R.drawable.bolt_power_menu_icon)
         } else {
-            val tint = ColorStateList.valueOf(builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor))
-            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.powerMenu).forEach {
-                it.supportCompoundDrawablesTintList = tint
+            val tintAttr = if (wallpaperColorsActive) R.attr.boltResultActionColor else R.attr.boltHomeMenuTextColor
+            val tint = ColorStateList.valueOf(builder.context.getColorFromAttr(tintAttr))
+            val iconTint = wallpaperColors?.let { ColorStateList.valueOf(it.accent) } ?: tint
+            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.scanWallpaper, menu.powerMenu).forEach {
+                it.supportCompoundDrawablesTintList = iconTint
             }
         }
         menu.launcherSettings.setOnClickListener {
@@ -1624,11 +1654,51 @@ class AppDrawerFragment : BaseFragment() {
             dialog.dismiss()
             showThemePicker()
         }
+        menu.scanWallpaper.isVisible = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT
+        menu.scanWallpaper.setOnClickListener {
+            dialog.dismiss()
+            val context = requireContext().applicationContext
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.bolt_scan_wallpaper)
+                .setItems(buildList {
+                    add(getString(R.string.bolt_scan_current_wallpaper))
+                    add(getString(R.string.bolt_scan_wallpaper_image))
+                    if (prefs.wallpaperPalette != null) add(getString(R.string.bolt_reset_wallpaper_colors))
+                }.toTypedArray()) { _, index ->
+                    when (index) {
+                        0 -> scanWallpaper { WallpaperPalette.scan(context) }
+                        1 -> pickWallpaperImage.launch("image/*")
+                        2 -> {
+                            wallpaperScan?.cancel()
+                            prefs.wallpaperSample = null
+                            requireActivity().recreate()
+                        }
+                    }
+                }
+                .show().applyWallpaperBackground()
+        }
         menu.powerMenu.setOnClickListener {
             dialog.dismiss()
             openPowerMenu()
         }
         dialog.show()
+        dialog.applyWallpaperBackground()
+    }
+
+    private fun scanWallpaper(readColor: () -> WallpaperPalette.Sample?) {
+        wallpaperScan?.cancel()
+        wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
+            val color = withContext(Dispatchers.IO) { readColor() }
+            if (prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT) return@launch
+            if (color == null) {
+                requireContext().showToast(getString(R.string.bolt_wallpaper_colors_unavailable))
+                return@launch
+            }
+            val changed = prefs.wallpaperSample != color
+            prefs.wallpaperSample = color
+            requireContext().showToast(getString(R.string.bolt_wallpaper_colors_applied))
+            if (changed) requireActivity().recreate()
+        }
     }
 
     private fun openPowerMenu() {
@@ -1649,7 +1719,7 @@ class AppDrawerFragment : BaseFragment() {
                     context.showToast(getString(R.string.bolt_power_menu_unavailable))
                 }
             }
-            .show()
+            .show().applyWallpaperBackground()
     }
 
     private fun showThemePicker() {
@@ -1700,7 +1770,7 @@ class AppDrawerFragment : BaseFragment() {
                     requireActivity().recreate()
                 }
             }
-            .show()
+            .show().applyWallpaperBackground()
     }
 
     private fun launchResult(

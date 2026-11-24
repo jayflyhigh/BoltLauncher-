@@ -23,7 +23,8 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     }
     private var steadyThunderCaret = false
     private val thunderCursorColor = context.getColorFromAttr(R.attr.boltThunderCursorColor)
-    private val regularCursorColor = context.getColorFromAttr(R.attr.boltSearchCursorColor)
+    private val regularCursorColor = WallpaperThemeColors.from(context)?.accent
+        ?: context.getColorFromAttr(R.attr.boltSearchCursorColor)
     private val cursorWidth = 2f * resources.displayMetrics.density
     private var blinkStart = 0L
     private val cursorPaint = android.graphics.Paint().apply { color = regularCursorColor }
