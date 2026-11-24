@@ -418,13 +418,14 @@ class AppDrawerFragment : BaseFragment() {
                     contactMessage to R.drawable.bolt_cozy_message,
                     contactWhatsapp to R.drawable.bolt_cozy_whatsapp,
                     dockWeb to R.drawable.bolt_cozy_web,
+                    dockSearchDestinations to R.drawable.bolt_cozy_search,
                 )) {
+                    val inset = (3 * resources.displayMetrics.density).toInt()
+                    button.setPaddingRelative(inset, 0, inset, 0)
                     button.imageTintList = null
                     button.setImageResource(icon)
                 }
-                dockSearchDestinations.imageTintList = ColorStateList.valueOf(
-                    requireContext().getColorFromAttr(R.attr.boltSearchCursorColor),
-                )
+                search.typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
                 dockWebDivider.setBackgroundColor(requireContext().getColorFromAttr(R.attr.boltPanelOutlineColor))
             }
         } else if (eInk) {
@@ -612,6 +613,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun refreshDestinations() {
+        if (cozyQuest) updateSearchHint()
         val show = supportsDestinations && expanded && !thunderMode &&
             (destinationsOnly || currentResultsQuery().isNotBlank())
         val targets = if (show) {
@@ -785,14 +787,22 @@ class AppDrawerFragment : BaseFragment() {
         else binding.search.showKeyboard()
     }
 
-    private fun updateSearchVisibility() {
-        binding.search.hint = when {
-            searchRename != null -> getString(R.string.bolt_new_app_name)
-            !expanded -> getString(R.string.bolt_search_anything)
+    private fun updateSearchHint() {
+        val hint = when {
+            searchRename != null -> getString(if (cozyQuest) R.string.bolt_cozy_rename_hint else R.string.bolt_new_app_name)
+            !expanded -> getString(if (cozyQuest) R.string.bolt_cozy_home_hint else R.string.bolt_search_anything)
             flag == Constants.FLAG_HIDDEN_APPS -> getString(R.string.hidden_apps)
             flag != Constants.FLAG_LAUNCH_APP -> getString(R.string.bolt_select_app)
+            cozyQuest && thunderMode -> getString(R.string.bolt_cozy_thunder_hint)
+            cozyQuest && destinationsOnly -> getString(R.string.bolt_cozy_destination_hint)
+            cozyQuest -> getString(R.string.bolt_cozy_search_hint)
             else -> null
         }
+        if (!android.text.TextUtils.equals(binding.search.hint, hint)) binding.search.hint = hint
+    }
+
+    private fun updateSearchVisibility() {
+        updateSearchHint()
         binding.search.isFocusableInTouchMode = expanded
         binding.search.isFocusable = expanded
         binding.search.isLongClickable = expanded
@@ -1530,7 +1540,16 @@ class AppDrawerFragment : BaseFragment() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val menu = DialogHomeSettingsBinding.inflate(LayoutInflater.from(builder.context))
         val dialog = builder.setView(menu.root).create()
-        if (liquidGlass) {
+        if (cozyQuest) {
+            menu.launcherSettings.text = getString(R.string.bolt_cozy_launcher_settings)
+            menu.systemSettings.text = getString(R.string.bolt_cozy_system_settings)
+            menu.launcherTheme.text = getString(R.string.bolt_cozy_theme_menu)
+            menu.powerMenu.text = getString(R.string.bolt_cozy_power_menu)
+            menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_settings, 0, 0, 0)
+            menu.systemSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_phone, 0, 0, 0)
+            menu.launcherTheme.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_themes, 0, 0, 0)
+            menu.powerMenu.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_power, 0, 0, 0)
+        } else if (liquidGlass) {
             menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(
                 R.drawable.liquid_glass_settings, 0, R.drawable.liquid_glass_chevron, 0,
             )
@@ -1782,8 +1801,9 @@ class AppDrawerFragment : BaseFragment() {
         }
         contactsAdapter = ContactSearchAdapter(tap = ::selectContact, hold = ::openContact)
         appsSection = SearchSectionAdapter(getString(R.string.bolt_apps_section))
-        contactsSection = SearchSectionAdapter(getString(R.string.bolt_contacts_section))
-        destinationSection = SearchSectionAdapter(getString(R.string.bolt_search_section))
+        val cozySections = prefs.launcherTheme == Prefs.LauncherTheme.COZY_QUEST
+        contactsSection = SearchSectionAdapter(getString(if (cozySections) R.string.bolt_cozy_contacts_section else R.string.bolt_contacts_section))
+        destinationSection = SearchSectionAdapter(getString(if (cozySections) R.string.bolt_cozy_destinations_section else R.string.bolt_search_section))
         destinationAdapter = SearchDestinationAdapter(::selectDestination, { activateAlias(it) }, { editAlias(it) })
         normalResults = ConcatAdapter(adapter, appsSection, contactsAdapter, contactsSection)
         searchResults = ConcatAdapter(normalResults, destinationAdapter, destinationSection)

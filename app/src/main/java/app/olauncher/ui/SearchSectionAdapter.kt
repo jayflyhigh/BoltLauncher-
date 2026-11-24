@@ -33,9 +33,11 @@ class SearchSectionAdapter(private val title: String) : RecyclerView.Adapter<Sea
             setTextColor(context.getColorFromAttr(R.attr.boltSearchSectionColor))
             textSize = 13f
             letterSpacing = 0.04f
-            typeface = if (theme == Prefs.LauncherTheme.E_INK) {
-                Typeface.create("serif", Typeface.BOLD)
-            } else Typeface.DEFAULT_BOLD
+            typeface = when (theme) {
+                Prefs.LauncherTheme.COZY_QUEST -> Typeface.create("casual", Typeface.BOLD)
+                Prefs.LauncherTheme.E_INK -> Typeface.create("serif", Typeface.BOLD)
+                else -> Typeface.DEFAULT_BOLD
+            }
             androidx.core.view.ViewCompat.setAccessibilityHeading(this, true)
         })
     }
