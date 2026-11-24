@@ -194,11 +194,12 @@ class ContactSearchAdapter(
         var photoJob: Job? = null
         private val liquidGlass = app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
             app.olauncher.data.Prefs.LauncherTheme.LIQUID_GLASS
+        private val wallpaperColors = WallpaperThemeColors.from(binding.root.context)
         private val avatarText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
         private val avatarFill = if (app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
             app.olauncher.data.Prefs.LauncherTheme.PAPER_NOTEBOOK) {
             androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.bolt_notebook_rule)
-        } else binding.root.context.getColorFromAttr(R.attr.boltSelectedRowColor)
+        } else wallpaperColors?.accent ?: binding.root.context.getColorFromAttr(R.attr.boltSelectedRowColor)
         private val initial = TextView(binding.root.context).apply {
             gravity = android.view.Gravity.CENTER
             setTextColor(avatarText)
@@ -210,7 +211,7 @@ class ContactSearchAdapter(
                 app.olauncher.data.Prefs.LauncherTheme.COZY_QUEST) {
                 binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
             }
-            WallpaperThemeColors.from(binding.root.context)?.let {
+            wallpaperColors?.let {
                 binding.root.background = it.rowBackground(binding.root.context)
             }
             LauncherMotion.configureResultPress(binding.root)

@@ -480,7 +480,7 @@ class AppDrawerAdapter(
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint
                         }
-                        searchUninstall.imageTintList = if (eInk) tint else
+                        searchUninstall.imageTintList = if (eInk || wallpaperColors != null) tint else
                             AppCompatResources.getColorStateList(context, R.color.bolt_app_uninstall_tint)
                     }
                 }
@@ -505,6 +505,7 @@ class AppDrawerAdapter(
             return ThunderLaunchAnimation(source, icon,
                 android.graphics.RectF(x, y, x + source.width, y + source.height),
                 binding.appTitle.takeIf { paperNotebook && it.isShown },
+                wallpaperColors?.accent ?: source.context.getColorFromAttr(R.attr.boltThunderPulseColor),
             )
         }
 

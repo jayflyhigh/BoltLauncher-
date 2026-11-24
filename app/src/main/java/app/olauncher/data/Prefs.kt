@@ -233,18 +233,32 @@ class Prefs(context: Context) {
     internal val wallpaperSeed: Int?
         get() = prefs.getInt("WALLPAPER_COLOR", 0).takeUnless { it == 0 }
 
-    internal var wallpaperSample: WallpaperPalette.Sample?
+    internal val wallpaperSample: WallpaperPalette.Sample?
         get() = wallpaperSeed?.let { WallpaperPalette.Sample(it, prefs.getInt("WALLPAPER_ACCENT", it)) }
-        set(value) = prefs.edit {
-            if (value == null) {
+
+    // Older samples have no recorded source. Keep them fixed until the user chooses a source.
+    internal val followsHomeWallpaper: Boolean
+        get() = prefs.getBoolean("WALLPAPER_FOLLOWS_HOME", false)
+
+    internal var wallpaperNeedsRescan: Boolean
+        get() = prefs.getBoolean("WALLPAPER_NEEDS_RESCAN", false)
+        set(value) = prefs.edit { putBoolean("WALLPAPER_NEEDS_RESCAN", value) }
+
+    internal fun saveWallpaperSample(sample: WallpaperPalette.Sample?, followHome: Boolean = false) {
+        prefs.edit {
+            remove("WALLPAPER_PALETTE")
+            remove("WALLPAPER_NEEDS_RESCAN")
+            if (sample == null) {
                 remove("WALLPAPER_COLOR")
                 remove("WALLPAPER_ACCENT")
-                remove("WALLPAPER_PALETTE")
+                remove("WALLPAPER_FOLLOWS_HOME")
             } else {
-                putInt("WALLPAPER_COLOR", value.base)
-                putInt("WALLPAPER_ACCENT", value.accent)
+                putInt("WALLPAPER_COLOR", sample.base)
+                putInt("WALLPAPER_ACCENT", sample.accent)
+                putBoolean("WALLPAPER_FOLLOWS_HOME", followHome)
             }
         }
+    }
 
     var appTheme: Int
         get() = prefs.getInt(APP_THEME, AppCompatDelegate.MODE_NIGHT_YES)

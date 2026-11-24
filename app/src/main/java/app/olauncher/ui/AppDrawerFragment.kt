@@ -2,6 +2,7 @@ package app.olauncher.ui
 
 import android.Manifest
 import android.animation.ValueAnimator
+import android.app.WallpaperManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,6 +30,8 @@ import android.view.ViewGroup
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.core.os.BundleCompat
@@ -98,10 +101,18 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
     private var wallpaperScan: Job? = null
+    private var wallpaperCropDialog: AlertDialog? = null
+    private var choosingWallpaperImage = false
+    private var scanningHomeExplicitly = false
+    private var removeWallpaperListener: (() -> Unit)? = null
     private val pickWallpaperImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null || _binding == null) return@registerForActivityResult
-        val context = requireContext().applicationContext
-        scanWallpaper { WallpaperPalette.scanImage(context, uri) }
+        if (_binding == null) return@registerForActivityResult
+        if (uri == null) {
+            finishChoosingWallpaper()
+        } else if (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT) {
+            choosingWallpaperImage = true
+            previewWallpaperImage(uri)
+        }
     }
     private val requestContacts = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (_binding != null && expanded && !thunderMode) {
@@ -430,7 +441,7 @@ class AppDrawerFragment : BaseFragment() {
                 dockWeb.imageTintList = tint
                 contactCall.imageTintList = tint
                 contactMessage.imageTintList = tint
-                contactWhatsapp.imageTintList = ColorStateList.valueOf(
+                contactWhatsapp.imageTintList = if (wallpaperColorsActive) tint else ColorStateList.valueOf(
                     ContextCompat.getColor(requireContext(), when {
                         eInk -> R.color.bolt_eink_whatsapp
                         paperNotebook -> R.color.bolt_notebook_whatsapp
@@ -939,6 +950,11 @@ class AppDrawerFragment : BaseFragment() {
             binding.renameConfirm.setTextColor(renameActionColor)
             binding.renameCancel.setTextColor(renameActionColor)
             binding.search.setHintTextColor(if (lightDock) 0xFF28230F.toInt() else 0xFFD2D2D2.toInt())
+            if (wallpaperColorsActive) {
+                val tint = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
+                binding.dockWeb.imageTintList = tint
+                binding.dockSearchDestinations.imageTintList = tint
+            }
             if (!windowsXpTheme && !usesThemeTileIcons && !liquidGlass) {
                 bolt.imageTintList = ColorStateList.valueOf(if (lightDock) Color.BLACK else thunderDockColor)
             }
@@ -1657,25 +1673,7 @@ class AppDrawerFragment : BaseFragment() {
         menu.scanWallpaper.isVisible = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT
         menu.scanWallpaper.setOnClickListener {
             dialog.dismiss()
-            val context = requireContext().applicationContext
-            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle(R.string.bolt_scan_wallpaper)
-                .setItems(buildList {
-                    add(getString(R.string.bolt_scan_current_wallpaper))
-                    add(getString(R.string.bolt_scan_wallpaper_image))
-                    if (prefs.wallpaperPalette != null) add(getString(R.string.bolt_reset_wallpaper_colors))
-                }.toTypedArray()) { _, index ->
-                    when (index) {
-                        0 -> scanWallpaper { WallpaperPalette.scan(context) }
-                        1 -> pickWallpaperImage.launch("image/*")
-                        2 -> {
-                            wallpaperScan?.cancel()
-                            prefs.wallpaperSample = null
-                            requireActivity().recreate()
-                        }
-                    }
-                }
-                .show().applyWallpaperBackground()
+            showWallpaperScanOptions()
         }
         menu.powerMenu.setOnClickListener {
             dialog.dismiss()
@@ -1685,19 +1683,146 @@ class AppDrawerFragment : BaseFragment() {
         dialog.applyWallpaperBackground()
     }
 
-    private fun scanWallpaper(readColor: () -> WallpaperPalette.Sample?) {
+    private fun showWallpaperScanOptions() {
+        val options = buildList<Pair<Int, () -> Unit>> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                add(R.string.bolt_scan_current_wallpaper to { scanHomeWallpaper(explicit = true) })
+            }
+            add(R.string.bolt_scan_wallpaper_image to ::chooseWallpaperImage)
+            if (prefs.wallpaperPalette != null) {
+                add(R.string.bolt_reset_wallpaper_colors to {
+                    wallpaperScan?.cancel()
+                    scanningHomeExplicitly = false
+                    stopWatchingWallpaper()
+                    prefs.saveWallpaperSample(null)
+                    requireActivity().recreate()
+                })
+            }
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(if (prefs.wallpaperNeedsRescan) R.string.bolt_wallpaper_rescan_needed
+                else R.string.bolt_scan_wallpaper)
+            .setItems(options.map { getString(it.first) }.toTypedArray()) { _, index ->
+                options[index].second()
+            }
+            .show().applyWallpaperBackground()
+    }
+
+    private fun chooseWallpaperImage() {
         wallpaperScan?.cancel()
+        scanningHomeExplicitly = false
+        choosingWallpaperImage = true
+        try {
+            pickWallpaperImage.launch("image/*")
+        } catch (_: ActivityNotFoundException) {
+            finishChoosingWallpaper()
+            requireContext().showToast(getString(R.string.bolt_wallpaper_picker_unavailable))
+        }
+    }
+
+    private fun previewWallpaperImage(uri: Uri) {
+        wallpaperScan?.cancel()
+        val context = requireContext().applicationContext
         wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
-            val color = withContext(Dispatchers.IO) { readColor() }
-            if (prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT) return@launch
-            if (color == null) {
-                requireContext().showToast(getString(R.string.bolt_wallpaper_colors_unavailable))
+            val bitmap = withContext(Dispatchers.IO) { WallpaperPalette.decodeImage(context, uri) }
+            if (bitmap == null) {
+                choosingWallpaperImage = false
+                requireContext().showToast(getString(R.string.bolt_wallpaper_image_unreadable))
                 return@launch
             }
-            val changed = prefs.wallpaperSample != color
-            prefs.wallpaperSample = color
-            requireContext().showToast(getString(R.string.bolt_wallpaper_colors_applied))
-            if (changed) requireActivity().recreate()
+            val dialog = createWallpaperCropDialog(requireActivity(), bitmap) { crop ->
+                wallpaperCropDialog = null
+                wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
+                    val sample = withContext(Dispatchers.Default) {
+                        WallpaperPalette.scanImage(bitmap, crop)
+                    }
+                    choosingWallpaperImage = false
+                    if (sample == null) {
+                        requireContext().showToast(getString(R.string.bolt_wallpaper_image_unreadable))
+                    } else if (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT) {
+                        applyWallpaperSample(sample, followHome = false, announce = true)
+                    }
+                }
+            }
+            wallpaperCropDialog = dialog
+            dialog.setOnDismissListener {
+                if (wallpaperCropDialog === dialog) {
+                    wallpaperCropDialog = null
+                    finishChoosingWallpaper()
+                }
+            }
+            dialog.show()
+            dialog.applyWallpaperBackground()
+        }
+    }
+
+    private fun finishChoosingWallpaper() {
+        choosingWallpaperImage = false
+        if (isResumed) refreshHomeWallpaper()
+    }
+
+    private fun refreshHomeWallpaper() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1 || choosingWallpaperImage ||
+            prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT || !prefs.followsHomeWallpaper
+        ) return
+        watchHomeWallpaper()
+        scanHomeWallpaper(explicit = scanningHomeExplicitly)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun watchHomeWallpaper() {
+        if (removeWallpaperListener != null) return
+        val manager = WallpaperManager.getInstance(requireContext())
+        val listener = WallpaperManager.OnColorsChangedListener { _, flags ->
+            if (flags and WallpaperManager.FLAG_SYSTEM != 0 && isResumed && _binding != null) {
+                refreshHomeWallpaper()
+            }
+        }
+        manager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
+        removeWallpaperListener = { manager.removeOnColorsChangedListener(listener) }
+    }
+
+    private fun stopWatchingWallpaper() {
+        removeWallpaperListener?.invoke()
+        removeWallpaperListener = null
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun scanHomeWallpaper(explicit: Boolean) {
+        wallpaperScan?.cancel()
+        scanningHomeExplicitly = explicit
+        if (explicit) choosingWallpaperImage = false
+        val context = requireContext().applicationContext
+        wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
+            val sample = withContext(Dispatchers.IO) { WallpaperPalette.scan(context) }
+            scanningHomeExplicitly = false
+            if (prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT) return@launch
+            if (sample == null) {
+                val needsRescan = prefs.followsHomeWallpaper
+                val alreadyMarked = prefs.wallpaperNeedsRescan
+                if (needsRescan && !alreadyMarked) prefs.wallpaperNeedsRescan = true
+                if (explicit || !alreadyMarked) requireContext().showToast(getString(
+                    if (needsRescan) R.string.bolt_wallpaper_rescan_needed else R.string.bolt_wallpaper_colors_unavailable,
+                ))
+                return@launch
+            }
+            applyWallpaperSample(sample, followHome = true, announce = explicit)
+        }
+    }
+
+    private fun applyWallpaperSample(sample: WallpaperPalette.Sample, followHome: Boolean, announce: Boolean) {
+        val changed = prefs.wallpaperSample != sample
+        val sourceChanged = followHome != prefs.followsHomeWallpaper
+        if (changed || sourceChanged || prefs.wallpaperNeedsRescan) {
+            prefs.saveWallpaperSample(sample, followHome)
+        }
+        if (announce) requireContext().showToast(getString(R.string.bolt_wallpaper_colors_applied))
+        if (changed) {
+            requireActivity().recreate()
+        } else if (sourceChanged && followHome && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && isResumed) {
+            refreshHomeWallpaper()
+        } else if (!followHome) {
+            stopWatchingWallpaper()
         }
     }
 
@@ -2024,6 +2149,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onResume() {
         super.onResume()
+        refreshHomeWallpaper()
         inAppSearch.reload()
         activeAlias?.let { active ->
             activeAlias = inAppSearch.targets.firstOrNull { it.packageName == active.packageName && !it.hidden }
@@ -2058,6 +2184,8 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onPause() {
+        stopWatchingWallpaper()
+        if (!choosingWallpaperImage && !scanningHomeExplicitly) wallpaperScan?.cancel()
         thunderGame?.pauseGame()
         restoreSearchKeyboard = false
         dismissSearchEdit()
@@ -2079,6 +2207,13 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onDestroyView() {
+        wallpaperScan?.cancel()
+        stopWatchingWallpaper()
+        val cropDialog = wallpaperCropDialog
+        wallpaperCropDialog = null
+        cropDialog?.dismiss()
+        choosingWallpaperImage = false
+        scanningHomeExplicitly = false
         pendingThunderRun = thunderGame?.snapshot()
         closeThunderGame()
         clearThunderEmpty()

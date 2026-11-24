@@ -1,6 +1,7 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import androidx.core.graphics.ColorUtils
@@ -13,17 +14,40 @@ import androidx.appcompat.app.AlertDialog
 internal class WallpaperThemeColors(sample: WallpaperPalette.Sample) {
     private val hsl = FloatArray(3).also { ColorUtils.colorToHSL(sample.base, it) }
 
-    private fun tone(lightness: Float, saturation: Float = hsl[1]): Int =
-        ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, lightness))
+    private val brightness = ColorUtils.calculateLuminance(sample.base).toFloat()
+    private val saturation = hsl[1].coerceAtMost(chromaLimit(sample.base, 0.64f))
 
-    val panel = tone(0.12f, hsl[1].coerceAtMost(0.55f))
-    val dock = tone(0.17f, hsl[1].coerceAtMost(0.55f))
-    val row = tone(0.20f, hsl[1].coerceAtMost(0.50f))
-    val outline = tone(0.42f, hsl[1].coerceAtMost(0.55f))
+    private fun tone(lightness: Float) = ColorUtils.HSLToColor(floatArrayOf(hsl[0], saturation, lightness))
+
+    private val rowLightness = run {
+        var lightness = 0.165f + 0.22f * brightness
+        // Fit the brightest surface under the contrast limit so the three tones stay distinct.
+        while (ColorUtils.calculateLuminance(tone(lightness)) > 0.09) lightness -= 0.01f
+        lightness
+    }
+
+    val panel = tone(rowLightness - 0.075f)
+    val dock = tone(rowLightness - 0.03f)
+    val row = tone(rowLightness)
+    val outline = ColorUtils.blendARGB(panel, Color.WHITE, 0.34f)
     val accent = FloatArray(3).let {
         ColorUtils.colorToHSL(sample.accent, it)
-        it[2] = it[2].coerceIn(0.75f, 0.88f)
-        ColorUtils.HSLToColor(it)
+        it[1] = it[1].coerceAtMost(chromaLimit(sample.accent, 1f))
+        it[2] = it[2].coerceIn(0.66f, 0.88f)
+        var color = ColorUtils.HSLToColor(it)
+        while (ColorUtils.calculateLuminance(color) < 0.58) {
+            it[2] += 0.01f
+            color = ColorUtils.HSLToColor(it)
+        }
+        color
+    }
+
+    private fun chromaLimit(color: Int, limit: Float): Float {
+        val red = Color.red(color)
+        val green = Color.green(color)
+        val blue = Color.blue(color)
+        val chroma = maxOf(red, green, blue) - minOf(red, green, blue)
+        return (chroma / 64f).coerceAtMost(limit)
     }
 
     fun rowBackground(context: Context) = StateListDrawable().apply {

@@ -8,8 +8,6 @@ import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.view.View
-import app.olauncher.helper.getColorFromAttr
-import app.olauncher.R
 import kotlin.math.roundToInt
 
 internal class ThunderLaunchAnimation(
@@ -17,12 +15,13 @@ internal class ThunderLaunchAnimation(
     private val icon: Drawable,
     private val iconBounds: RectF,
     private val markerTitle: SearchResultTitle?,
+    pulseColor: Int,
 ) : Drawable() {
     private val density = source.resources.displayMetrics.density
     private val lift = 4f * density
     private val originalAlpha = source.alpha
     private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = source.context.getColorFromAttr(R.attr.boltThunderPulseColor)
+        color = pulseColor
         style = Paint.Style.STROKE
         strokeWidth = 1.5f * density
     }
