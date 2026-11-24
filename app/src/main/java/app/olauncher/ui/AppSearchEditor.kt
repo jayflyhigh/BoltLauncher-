@@ -93,6 +93,7 @@ object AppSearchEditor {
         dialog.setOnDismissListener { colorDialog?.dismiss() }
         dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         dialog.show()
+        dialog.applyWallpaperBackground()
         return dialog
     }
 
@@ -167,6 +168,8 @@ object AppSearchEditor {
                 } else { apply(selected); dialog.dismiss() }
             }
         }
-        dialog.show(); return dialog
+        dialog.show()
+        dialog.applyWallpaperBackground()
+        return dialog
     }
 }

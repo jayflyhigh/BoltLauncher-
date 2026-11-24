@@ -25,12 +25,13 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private lateinit var moveModeHint: View
     private lateinit var dock: View
 
-    private val surface = context.getColorFromAttr(R.attr.boltPanelColor)
+    private val wallpaperColors = WallpaperThemeColors.from(context)
+    private val surface = wallpaperColors?.panel ?: context.getColorFromAttr(R.attr.boltPanelColor)
     private val surfaceEnd = context.getColorFromAttr(R.attr.boltPanelEndColor)
     private var panelGradient: LinearGradient? = null
     private var glassDockTint: LinearGradient? = null
     private var glassRim: LinearGradient? = null
-    private val outline = context.getColorFromAttr(R.attr.boltPanelOutlineColor)
+    private val outline = wallpaperColors?.outline ?: context.getColorFromAttr(R.attr.boltPanelOutlineColor)
     private val radius = context.obtainStyledAttributes(intArrayOf(R.attr.boltPanelCornerRadius)).let {
         try {
             it.getDimension(0, resources.getDimension(R.dimen.bolt_search_corner_radius))
@@ -90,7 +91,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             requestLayout()
         }
 
-    private var dockColor = context.getColorFromAttr(R.attr.boltDockColor)
+    private var dockColor = wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)
     private var dividerAlpha = 255
 
     fun setDockAppearance(color: Int, thunderProgress: Float) {

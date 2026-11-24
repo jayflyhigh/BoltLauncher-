@@ -75,7 +75,9 @@ class MainActivity : AppCompatActivity() {
         if (isEinkDisplay()) prefs.appTheme = AppCompatDelegate.MODE_NIGHT_NO
         AppCompatDelegate.setDefaultNightMode(prefs.appTheme)
         super.onCreate(savedInstanceState)
-        val launcherOverlay = prefs.launcherTheme.overlay
+        val launcherOverlay = if (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT) {
+            prefs.wallpaperPalette?.overlay ?: 0
+        } else prefs.launcherTheme.overlay
         if (launcherOverlay != 0) theme.applyStyle(launcherOverlay, true)
         if (prefs.boldFont) theme.applyStyle(R.style.BoldFontOverlay, true)
         if (isEinkDisplay() || isSystemAnimationsDisabled()) theme.applyStyle(R.style.NoAnimationOverlay, true)

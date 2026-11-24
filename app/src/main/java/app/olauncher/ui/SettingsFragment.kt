@@ -69,6 +69,14 @@ class SettingsFragment : BaseFragment(), View.OnClickListener, View.OnLongClickL
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         prefs = Prefs(requireContext())
+        WallpaperThemeColors.from(requireContext())?.let { colors ->
+            val density = resources.displayMetrics.density
+            binding.root.setBackgroundColor(colors.panel)
+            listOfNotNull(binding.homeSettingsCard, binding.appearanceSettingsCard,
+                binding.featureSettingsCard, binding.aboutSettingsCard).forEach { card ->
+                card.background = colors.surface(colors.dock, 16f * density, density.toInt().coerceAtLeast(1))
+            }
+        }
         viewModel = activity?.run {
             ViewModelProvider(this)[MainViewModel::class.java]
         } ?: throw Exception("Invalid Activity")

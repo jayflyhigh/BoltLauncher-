@@ -11,6 +11,7 @@ import android.os.SystemClock
 import android.view.View
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
+import app.olauncher.ui.WallpaperThemeColors
 import app.olauncher.ui.LauncherMotion
 import kotlin.math.min
 
@@ -40,12 +41,13 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
     private val strikePath = Path()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bounds = RectF()
-    private val dock = context.getColorFromAttr(R.attr.boltDockColor).let {
+    private val wallpaperColors = WallpaperThemeColors.from(context)
+    private val dock = (wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)).let {
         (it and 0x00FFFFFF) or (Color.alpha(it).coerceAtMost(225) shl 24)
     }
-    private val edge = context.getColorFromAttr(R.attr.boltPanelOutlineColor)
+    private val edge = wallpaperColors?.outline ?: context.getColorFromAttr(R.attr.boltPanelOutlineColor)
     private val reflection = context.getColorFromAttr(R.attr.boltGlassReflectionColor)
-    private val accent = context.getColor(R.color.bolt_search_yellow)
+    private val accent = wallpaperColors?.accent ?: context.getColor(R.color.bolt_search_yellow)
     private val palette = intArrayOf(
         accent, 0xFF81D7ED.toInt(), 0xFFAA9EF1.toInt(), 0xFFF19D76.toInt(),
         0xFF8CD4AF.toInt(), 0xFFEEA6C0.toInt(), 0xFFADBCEA.toInt(), 0xFFC6D786.toInt(),

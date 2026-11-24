@@ -30,7 +30,7 @@ class SearchSectionAdapter(private val title: String) : RecyclerView.Adapter<Sea
                 compoundDrawablePadding = (6 * density).toInt()
             }
             setPadding((20 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (8 * density).toInt())
-            setTextColor(context.getColorFromAttr(R.attr.boltSearchSectionColor))
+            setTextColor(WallpaperThemeColors.from(context)?.accent ?: context.getColorFromAttr(R.attr.boltSearchSectionColor))
             textSize = 13f
             letterSpacing = 0.04f
             typeface = when (theme) {

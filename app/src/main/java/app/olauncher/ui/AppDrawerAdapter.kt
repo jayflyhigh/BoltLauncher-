@@ -398,7 +398,12 @@ class AppDrawerAdapter(
 
     private class ViewHolder(private val binding: AdapterAppDrawerBinding) :
         RecyclerView.ViewHolder(binding.root) {
+        private val wallpaperColors = WallpaperThemeColors.from(binding.root.context)
+
         init {
+            wallpaperColors?.let {
+                binding.root.background = it.rowBackground(binding.root.context)
+            }
             LauncherMotion.configureResultPress(binding.root)
             binding.appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
@@ -466,7 +471,12 @@ class AppDrawerAdapter(
                     }
                     else -> {
                         searchPlayStore.setImageResource(R.drawable.bolt_google_play_icon)
-                        val tint = AppCompatResources.getColorStateList(context, R.color.bolt_app_action_tint)
+                        val tint = wallpaperColors?.let {
+                            android.content.res.ColorStateList(
+                                arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+                                intArrayOf(selectedText, it.accent),
+                            )
+                        } ?: AppCompatResources.getColorStateList(context, R.color.bolt_app_action_tint)
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint
                         }
