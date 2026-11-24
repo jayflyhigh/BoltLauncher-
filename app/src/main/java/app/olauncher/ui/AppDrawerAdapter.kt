@@ -398,13 +398,20 @@ class AppDrawerAdapter(
             binding.appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
 
-        private val paperNotebook = Prefs(binding.root.context).launcherTheme == Prefs.LauncherTheme.PAPER_NOTEBOOK
+        private val theme = Prefs(binding.root.context).launcherTheme
+        private val paperNotebook = theme == Prefs.LauncherTheme.PAPER_NOTEBOOK
+        private val eInk = theme == Prefs.LauncherTheme.E_INK
+        private val allowsTwoLineNames = paperNotebook || eInk
 
         init {
-            if (paperNotebook) {
+            if (allowsTwoLineNames) {
                 binding.root.minimumHeight = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
                 binding.root.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
                 binding.appTitle.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                if (eInk) {
+                    (binding.appTitle.layoutParams as android.widget.FrameLayout.LayoutParams).gravity =
+                        android.view.Gravity.CENTER_VERTICAL
+                }
             }
         }
 
@@ -415,7 +422,6 @@ class AppDrawerAdapter(
 
         init {
             val context = binding.root.context
-            val theme = Prefs(context).launcherTheme
             if (theme == Prefs.LauncherTheme.LIQUID_GLASS) {
                 binding.appIcon.apply {
                     setBackgroundResource(R.drawable.liquid_glass_icon_frame)
@@ -427,7 +433,6 @@ class AppDrawerAdapter(
 
         private fun configureActionIcons() {
             val context = binding.root.context
-            val theme = Prefs(context).launcherTheme
             with(binding) {
                 when (theme) {
                     Prefs.LauncherTheme.WINDOWS_XP -> {
@@ -451,9 +456,8 @@ class AppDrawerAdapter(
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint
                         }
-                        searchUninstall.imageTintList = AppCompatResources.getColorStateList(
-                            context, R.color.bolt_app_uninstall_tint,
-                        )
+                        searchUninstall.imageTintList = if (eInk) tint else
+                            AppCompatResources.getColorStateList(context, R.color.bolt_app_uninstall_tint)
                     }
                 }
             }
@@ -590,7 +594,7 @@ class AppDrawerAdapter(
             root.setTag(R.id.bolt_result_identity, identity)
             (root.parent as? DockResultsView)?.rememberRow(root, identity)
             bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
-            appTitle.maxLines = if (paperNotebook) 2 else 1
+            appTitle.maxLines = if (allowsTwoLineNames) 2 else 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
             appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
             appTitle.ellipsize = android.text.TextUtils.TruncateAt.END

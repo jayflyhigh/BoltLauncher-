@@ -1,0 +1,59 @@
+<resources>
+    <dimen name="bolt_eink_chip_height">28dp</dimen>
+    <string name="bolt_eink" translatable="false">E-Ink</string>
+    <color name="bolt_eink_ivory">#F3EFE4</color>
+    <color name="bolt_eink_ink">#20201D</color>
+    <color name="bolt_eink_rule">#C9C2B4</color>
+    <color name="bolt_eink_secondary">#5E594F</color>
+    <color name="bolt_eink_chip">#3B3934</color>
+    <color name="bolt_eink_whatsapp">#157443</color>
+
+    <style name="EInkOverlay">
+        <item name="android:textColorPrimary">@color/bolt_eink_ink</item>
+        <item name="colorAccent">@color/bolt_eink_ink</item>
+        <item name="primaryColor">@color/bolt_eink_ink</item>
+        <item name="boltHomeMenuTextColor">@color/bolt_eink_ink</item>
+        <item name="boltSelectedRowTextColor">@android:color/white</item>
+        <item name="boltSelectedTypoHintColor">@android:color/white</item>
+        <item name="boltResultTextColor">@color/bolt_eink_ink</item>
+        <item name="boltResultActionColor">@color/bolt_eink_ink</item>
+        <item name="boltSearchCursorColor">@color/bolt_eink_ink</item>
+        <item name="boltPanelOutlineColor">@color/bolt_eink_rule</item>
+        <item name="boltThunderMatchTextColor">@color/bolt_eink_ink</item>
+        <item name="android:textColorSecondary">@color/bolt_eink_secondary</item>
+        <item name="boltResultSecondaryColor">@color/bolt_eink_secondary</item>
+        <item name="boltSelectedRowSecondaryColor">@color/bolt_eink_ivory</item>
+        <item name="boltSearchSectionColor">@color/bolt_eink_secondary</item>
+        <item name="primaryColorTrans50">@color/bolt_eink_secondary</item>
+        <item name="primaryColorTrans80">@color/bolt_eink_secondary</item>
+        <item name="primaryInverseColor">@color/bolt_eink_ivory</item>
+        <item name="primaryColorInverseTrans90">@color/bolt_eink_ivory</item>
+        <item name="primaryColorInverseTrans80">@color/bolt_eink_ivory</item>
+        <item name="primaryColorInverseTrans50">@color/bolt_eink_ivory</item>
+        <item name="primaryShadeColor">@color/bolt_eink_ivory</item>
+        <item name="primaryShadeDarkColor">@color/bolt_eink_ivory</item>
+        <item name="dialogShadeColor">@color/bolt_eink_ivory</item>
+        <item name="boltDockColor">@color/bolt_eink_ivory</item>
+        <item name="boltPanelColor">@color/bolt_eink_ivory</item>
+        <item name="boltDialogTopColor">@color/bolt_eink_ivory</item>
+        <item name="boltDialogBottomColor">@color/bolt_eink_ivory</item>
+        <item name="boltPopupTopColor">@color/bolt_eink_ivory</item>
+        <item name="boltPopupBottomColor">@color/bolt_eink_ivory</item>
+        <item name="boltSettingsSurfaceColor">@color/bolt_eink_ivory</item>
+        <item name="boltSettingsCardColor">@color/bolt_eink_ivory</item>
+        <item name="boltSettingsCardBottomColor">@color/bolt_eink_ivory</item>
+        <item name="boltDialogOutlineColor">@color/bolt_eink_rule</item>
+        <item name="boltPopupOutlineColor">@color/bolt_eink_rule</item>
+        <item name="boltSettingsCardOutlineColor">@color/bolt_eink_rule</item>
+        <item name="boltThunderDockColor">@color/bolt_eink_ink</item>
+        <item name="boltThunderPulseColor">@color/bolt_eink_secondary</item>
+        <item name="boltRowColor">@android:color/transparent</item>
+        <item name="boltRowBottomColor">@android:color/transparent</item>
+        <item name="boltSelectedRowColor">@color/bolt_eink_ink</item>
+        <item name="boltSelectedRowEndColor">@color/bolt_eink_ink</item>
+        <item name="boltSelectedRowOutlineColor">@android:color/transparent</item>
+        <item name="boltPanelCornerRadius">18dp</item>
+        <item name="boltThunderCursorColor">@color/bolt_eink_ivory</item>
+        <item name="boltSelectedRowCornerRadius">9dp</item>
+    </style>
+</resources>

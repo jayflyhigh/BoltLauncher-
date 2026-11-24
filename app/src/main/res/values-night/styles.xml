@@ -50,6 +50,7 @@
         <item name="boltSettingsCardOutlineColor">?attr/primaryColorTrans50</item>
         <item name="boltHomeMenuTextColor">@color/bolt_search_label</item>
         <item name="boltGlassTopEdgeColor">#D3EDF7FF</item>
+        <item name="boltSelectedRowCornerRadius">@dimen/bolt_search_corner_radius</item>
         <item name="boltSelectedRowEndColor">?attr/boltSelectedRowColor</item>
         <item name="boltSelectedRowColor">@color/bolt_search_selected</item>
         <item name="boltSelectedRowOutlineWidth">1dp</item>
