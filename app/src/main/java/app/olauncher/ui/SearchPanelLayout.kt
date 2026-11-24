@@ -40,6 +40,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     }
     private val dockTopColor = context.getColorFromAttr(R.attr.boltDockTopColor)
     private var dockHighlight: LinearGradient? = null
+    private var dockHighlightHeight = 0
     private val dockGap = resources.getDimensionPixelSize(R.dimen.bolt_result_dock_gap)
     private val rowInset = resources.getDimensionPixelSize(R.dimen.bolt_search_results_inset)
     private val stroke = resources.displayMetrics.density
@@ -150,8 +151,9 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val dockTop = height - dock.measuredHeight
         dock.layout(0, dockTop, width, height)
-        if (changed && dockTopColor != 0 && dock.measuredHeight > 0) {
-            dockHighlight = LinearGradient(
+        if (dockTopColor != 0 && dock.measuredHeight != dockHighlightHeight) {
+            dockHighlightHeight = dock.measuredHeight
+            dockHighlight = if (dockHighlightHeight == 0) null else LinearGradient(
                 0f, 0f, 0f, dock.measuredHeight * 0.45f,
                 dockTopColor, dockTopColor and 0x00FFFFFF, Shader.TileMode.CLAMP,
             )

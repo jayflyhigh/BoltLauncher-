@@ -12,9 +12,11 @@ import app.olauncher.helper.getColorFromAttr
 
 class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     AppCompatEditText(context, attrs) {
-    private var thunderCursor = false
+    private var darkCursor = false
+    private val darkCursorColor = context.getColorFromAttr(R.attr.boltThunderCursorColor)
+    private val idleCursorColor = context.getColorFromAttr(R.attr.boltSearchCursorColor)
     private var blinkStart = 0L
-    private val cursorPaint = android.graphics.Paint().apply { color = context.getColorFromAttr(R.attr.boltThunderCursorColor) }
+    private val cursorPaint = android.graphics.Paint().apply { color = darkCursorColor }
 
     var onImeCommit: (() -> Unit)? = null
     var onEmptyBackspace: (() -> Boolean)? = null
@@ -48,11 +50,18 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
         }
     }
 
-    fun setThunderCursor(enabled: Boolean) {
-        // Keep the framework cursor yellow so it cannot retain Thunder's black drawable.
+    fun setDarkDockText(enabled: Boolean) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            // Let TextView handle cursor geometry, blinking, and selection on supported devices.
+            textCursorDrawable = androidx.appcompat.content.res.AppCompatResources
+                .getDrawable(context, R.drawable.bolt_cursor_yellow)?.mutate()?.apply {
+                    setTint(if (enabled) darkCursorColor else idleCursorColor)
+                }
+            return
+        }
         isCursorVisible = !enabled
-        if (thunderCursor == enabled) return
-        thunderCursor = enabled
+        if (darkCursor == enabled) return
+        darkCursor = enabled
         blinkStart = android.os.SystemClock.uptimeMillis()
         invalidate()
     }
@@ -77,7 +86,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        if (!thunderCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
+        if (!darkCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
             selectionStart != selectionEnd) return
         val textLayout = layout ?: return
         val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart

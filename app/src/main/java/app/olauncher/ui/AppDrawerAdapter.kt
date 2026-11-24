@@ -71,7 +71,8 @@ class AppDrawerAdapter(
         val DIFF_CALLBACK = object : DiffUtil.ItemCallback<AppModel>() {
             override fun areItemsTheSame(oldItem: AppModel, newItem: AppModel): Boolean = when {
                 oldItem is AppModel.App && newItem is AppModel.App ->
-                    oldItem.appPackage == newItem.appPackage && oldItem.user == newItem.user
+                    oldItem.appPackage == newItem.appPackage && oldItem.user == newItem.user &&
+                        oldItem.activityClassName == newItem.activityClassName
 
                 oldItem is AppModel.PinnedShortcut && newItem is AppModel.PinnedShortcut ->
                     oldItem.identity == newItem.identity
@@ -111,6 +112,7 @@ class AppDrawerAdapter(
     }
 
     private var requestedQuery = ""
+    private var displayedQuery = ""
     var committedQuery: String? = null
         private set
     private var thunderMode = false
@@ -226,8 +228,10 @@ class AppDrawerAdapter(
             typoMatches = fuzzy
             displayedItems = items
             committedQuery = query
+            val previousQuery = displayedQuery
+            displayedQuery = query
             changes?.dispatchUpdatesTo(this@AppDrawerAdapter)
-            if (thunder) notifyItemRangeChanged(0, itemCount, SEARCH_STYLE)
+            if (thunder && previousQuery != query) notifyItemRangeChanged(0, itemCount, SEARCH_STYLE)
             else if (previousTypoMatches != fuzzy) {
                 items.forEachIndexed { index, app ->
                     if ((app in previousTypoMatches) != (app in fuzzy)) notifyItemChanged(index, SEARCH_STYLE)
@@ -292,7 +296,7 @@ class AppDrawerAdapter(
         if (holder is ViewHolder && payloads.isNotEmpty() && payloads.all { it == SEARCH_STYLE }) {
             val app = getItem(position)
             val highlighted = !thunderMode && app == enterHighlightedResult
-            holder.bindSearchStyle(app, thunderMode, committedQuery.orEmpty(), highlighted, animateHighlight = true)
+            holder.bindSearchStyle(app, thunderMode, displayedQuery, highlighted, animateHighlight = true)
             holder.bindSearchActions(app, app == actionApp)
             holder.bindTypoHint(showTypoHints && app in typoMatches && app != actionApp)
         } else {
@@ -331,7 +335,7 @@ class AppDrawerAdapter(
                         appAliasListener,
                         iconScope,
                         iconCache,
-                        thunderMode, committedQuery.orEmpty(), !thunderMode && appModel == enterHighlightedResult,
+                        thunderMode, displayedQuery, !thunderMode && appModel == enterHighlightedResult,
                         appModel == actionApp
                     )
                     holder.bindTypoHint(showTypoHints && appModel in typoMatches && appModel != actionApp)
@@ -409,6 +413,11 @@ class AppDrawerAdapter(
                     setPadding(inset, inset, inset, inset)
                 }
             }
+        }
+
+        private fun configureActionIcons() {
+            val context = binding.root.context
+            val theme = Prefs(context).launcherTheme
             with(binding) {
                 when (theme) {
                     Prefs.LauncherTheme.WINDOWS_XP -> {
@@ -427,9 +436,7 @@ class AppDrawerAdapter(
                         searchUninstall.setThemeTileIcon(R.drawable.ic_delete)
                     }
                     else -> {
-                        if (theme == Prefs.LauncherTheme.DEFAULT) {
-                            searchPlayStore.setImageResource(R.drawable.bolt_google_play_icon)
-                        }
+                        searchPlayStore.setImageResource(R.drawable.bolt_google_play_icon)
                         val tint = AppCompatResources.getColorStateList(context, R.color.bolt_app_action_tint)
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint
@@ -441,6 +448,7 @@ class AppDrawerAdapter(
                 }
             }
         }
+        private var actionIconsConfigured = false
         private var renameWatcher: TextWatcher? = null
 
         private var boundApp: AppModel? = null
@@ -512,6 +520,10 @@ class AppDrawerAdapter(
                 app.user == android.os.Process.myUserHandle()
             if (show) {
                 if (!searchAppActions.isVisible) {
+                    if (!actionIconsConfigured) {
+                        configureActionIcons()
+                        actionIconsConfigured = true
+                    }
                     val context = root.context
                     searchUninstall.isVisible = app is AppModel.App &&
                         app.user == android.os.Process.myUserHandle() &&
@@ -558,7 +570,7 @@ class AppDrawerAdapter(
         ) = with(binding) {
             boundApp = appModel
             val identity = when (appModel) {
-                is AppModel.App -> appModel.appPackage to appModel.user
+                is AppModel.App -> Triple(appModel.appPackage, appModel.user, appModel.activityClassName)
                 is AppModel.PinnedShortcut -> appModel.identity
                 else -> appModel
             }

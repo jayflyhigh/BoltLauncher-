@@ -30,10 +30,13 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
     private val rowText = color(R.attr.boltSelectedRowTextColor)
     private val dock = color(R.attr.boltDockColor)
     private val dockTop = color(R.attr.boltDockTopColor)
+    private val cursor = color(R.attr.boltSearchCursorColor)
     private val accent = color(R.attr.boltThunderDockColor)
     private val panelFill = gradient(panel, panelEnd, 0f, 0f, 64f, 0f)
     private val rowFill = gradient(row, rowEnd, 5f, 0f, 59f, 0f)
-    private val dockFill = gradient(dock, dockTop, 0f, 31f, 0f, 23f)
+    private val dockFill = gradient(
+        dock, androidx.core.graphics.ColorUtils.compositeColors(dockTop, dock), 0f, 31f, 0f, 23f,
+    )
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     override fun getIntrinsicWidth() = (64 * density).roundToInt()
@@ -53,6 +56,7 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         fill(canvas, 20f, 12f, 46f, 14f, 1f, rowText)
         fill(canvas, 6f, 23f, 58f, 31f, 4f, dock, dockFill)
         fill(canvas, 11f, 26f, 29f, 28f, 1f, 0xFFD8E6F0.toInt())
+        fill(canvas, 30f, 25f, 31f, 29f, 0.5f, cursor)
         fill(canvas, 50f, 25f, 54f, 29f, 2f, accent)
         canvas.restoreToCount(save)
     }
