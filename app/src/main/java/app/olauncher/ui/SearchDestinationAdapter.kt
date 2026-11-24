@@ -61,17 +61,20 @@ internal fun TextView.bindAliasBadge(target: InAppSearch.Target, description: In
     tag = target
     text = target.code
     contentDescription = context.getString(description, target.code)
-    styleAliasBadge(target.color)
+    styleAliasBadge(target.color, target.usesPresetColor)
 }
 
-internal fun TextView.styleAliasBadge(color: Int) {
+internal fun TextView.styleAliasBadge(color: Int, usesPresetColor: Boolean = false) {
     val density = resources.displayMetrics.density
     val stroke = density.roundToInt().coerceAtLeast(1)
     setTextColor(Color.WHITE)
-    when (Prefs(context).launcherTheme) {
+    val theme = Prefs(context).launcherTheme
+    when (theme) {
         Prefs.LauncherTheme.E_INK -> setBackgroundResource(R.drawable.bolt_eink_alias)
-        Prefs.LauncherTheme.DEFAULT, Prefs.LauncherTheme.PAPER_NOTEBOOK -> {
-            val opaqueColor = color or Color.BLACK
+        Prefs.LauncherTheme.DEFAULT, Prefs.LauncherTheme.PAPER_NOTEBOOK, Prefs.LauncherTheme.COZY_QUEST -> {
+            val opaqueColor = if (theme == Prefs.LauncherTheme.COZY_QUEST && usesPresetColor) {
+                androidx.core.content.ContextCompat.getColor(context, R.color.bolt_cozy_chip)
+            } else color or Color.BLACK
             val fill = if (ColorUtils.calculateContrast(Color.WHITE, opaqueColor) >= 4.5) {
                 opaqueColor
             } else {

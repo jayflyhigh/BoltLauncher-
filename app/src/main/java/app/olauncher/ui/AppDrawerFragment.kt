@@ -191,6 +191,7 @@ class AppDrawerFragment : BaseFragment() {
     private var dockIdleColor = 0
     private var paperNotebook = false
     private var eInk = false
+    private var cozyQuest = false
     private var dockGraphite = Color.BLACK
     private var windowsXpTheme = false
     private var usesThemeTileIcons = false
@@ -357,6 +358,7 @@ class AppDrawerFragment : BaseFragment() {
         dockUsesDarkText = null
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
+        cozyQuest = prefs.launcherTheme == Prefs.LauncherTheme.COZY_QUEST
         eInk = prefs.launcherTheme == Prefs.LauncherTheme.E_INK
         paperNotebook = prefs.launcherTheme == Prefs.LauncherTheme.PAPER_NOTEBOOK
         dockGraphite = requireContext().getColorFromAttr(R.attr.boltResultTextColor)
@@ -408,7 +410,24 @@ class AppDrawerFragment : BaseFragment() {
                 )
             }
         }
-        if (eInk) {
+        if (cozyQuest) {
+            with(binding) {
+                dockBolt.setImageResource(R.drawable.bolt_cozy_lightning)
+                for ((button, icon) in listOf(
+                    contactCall to R.drawable.bolt_cozy_call,
+                    contactMessage to R.drawable.bolt_cozy_message,
+                    contactWhatsapp to R.drawable.bolt_cozy_whatsapp,
+                    dockWeb to R.drawable.bolt_cozy_web,
+                )) {
+                    button.imageTintList = null
+                    button.setImageResource(icon)
+                }
+                dockSearchDestinations.imageTintList = ColorStateList.valueOf(
+                    requireContext().getColorFromAttr(R.attr.boltSearchCursorColor),
+                )
+                dockWebDivider.setBackgroundColor(requireContext().getColorFromAttr(R.attr.boltPanelOutlineColor))
+            }
+        } else if (eInk) {
             binding.dockBolt.setImageResource(R.drawable.bolt_eink_lightning)
             binding.dockWeb.updateLayoutParams<android.widget.LinearLayout.LayoutParams> {
                 width = resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width)
@@ -839,7 +858,10 @@ class AppDrawerFragment : BaseFragment() {
         binding.searchPanel.setDockAppearance(dockColor, progress)
         binding.search.updateDockCursor(thunder = progress >= 0.5f, dockColor = dockColor)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
-        if (eInk) {
+        if (cozyQuest) {
+            bolt.scaleX = 1f - 0.22f * (1f - kotlin.math.abs(2f * progress - 1f))
+        }
+        if (eInk || cozyQuest) {
             if (dockUsesDarkText != lightDock) {
                 dockUsesDarkText = lightDock
                 val ink = if (lightDock) dockGraphite else dockIdleColor
@@ -847,8 +869,13 @@ class AppDrawerFragment : BaseFragment() {
                 binding.search.setHintTextColor(ink)
                 binding.renameConfirm.setTextColor(ink)
                 binding.renameCancel.setTextColor(ink)
-                bolt.imageTintList = ColorStateList.valueOf(ink)
-                binding.dockWeb.imageTintList = ColorStateList.valueOf(ink)
+                if (cozyQuest) {
+                    bolt.setImageResource(if (lightDock) R.drawable.bolt_cozy_lightning
+                        else R.drawable.bolt_cozy_lightning_active)
+                } else {
+                    bolt.imageTintList = ColorStateList.valueOf(ink)
+                    binding.dockWeb.imageTintList = ColorStateList.valueOf(ink)
+                }
                 binding.dockActiveAlias.isSelected = !lightDock
             }
         } else if (paperNotebook) {
@@ -1179,7 +1206,7 @@ class AppDrawerFragment : BaseFragment() {
         web.isVisible = showWeb
         val groupBackground = if (paperNotebook) R.drawable.bolt_notebook_contact_actions
             else R.drawable.bolt_contact_action_group
-        if (!eInk && (actions.background != null) != slot.isVisible) {
+        if (!eInk && !cozyQuest && (actions.background != null) != slot.isVisible) {
             actions.setBackgroundResource(if (!slot.isVisible) 0 else groupBackground)
             actions.setPadding(0, 0, 0, 0)
         }
@@ -1585,6 +1612,7 @@ class AppDrawerFragment : BaseFragment() {
             Prefs.LauncherTheme.DEFAULT to R.string.bolt_theme_default,
             Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
             Prefs.LauncherTheme.LIQUID_GLASS to R.string.bolt_liquid_glass,
+            Prefs.LauncherTheme.COZY_QUEST to R.string.bolt_cozy,
             Prefs.LauncherTheme.E_INK to R.string.bolt_eink,
             Prefs.LauncherTheme.PAPER_NOTEBOOK to R.string.bolt_paper_notebook,
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
@@ -1749,8 +1777,8 @@ class AppDrawerFragment : BaseFragment() {
         )
         layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
-        if (prefs.launcherTheme == Prefs.LauncherTheme.E_INK) {
-            binding.recyclerView.addItemDecoration(EInkResultDividers(requireContext()))
+        if (prefs.launcherTheme in setOf(Prefs.LauncherTheme.E_INK, Prefs.LauncherTheme.COZY_QUEST)) {
+            binding.recyclerView.addItemDecoration(SearchResultDividers(requireContext()))
         }
         contactsAdapter = ContactSearchAdapter(tap = ::selectContact, hold = ::openContact)
         appsSection = SearchSectionAdapter(getString(R.string.bolt_apps_section))

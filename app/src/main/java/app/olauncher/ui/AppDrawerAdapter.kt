@@ -401,14 +401,16 @@ class AppDrawerAdapter(
         private val theme = Prefs(binding.root.context).launcherTheme
         private val paperNotebook = theme == Prefs.LauncherTheme.PAPER_NOTEBOOK
         private val eInk = theme == Prefs.LauncherTheme.E_INK
-        private val allowsTwoLineNames = paperNotebook || eInk
+        private val cozyQuest = theme == Prefs.LauncherTheme.COZY_QUEST
+        private val allowsTwoLineNames = paperNotebook || eInk || cozyQuest
 
         init {
+            if (cozyQuest) binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
             if (allowsTwoLineNames) {
                 binding.root.minimumHeight = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
                 binding.root.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
                 binding.appTitle.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-                if (eInk) {
+                if (eInk || cozyQuest) {
                     (binding.appTitle.layoutParams as android.widget.FrameLayout.LayoutParams).gravity =
                         android.view.Gravity.CENTER_VERTICAL
                 }
@@ -456,7 +458,7 @@ class AppDrawerAdapter(
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint
                         }
-                        searchUninstall.imageTintList = if (eInk) tint else
+                        searchUninstall.imageTintList = if (eInk || cozyQuest) tint else
                             AppCompatResources.getColorStateList(context, R.color.bolt_app_uninstall_tint)
                     }
                 }

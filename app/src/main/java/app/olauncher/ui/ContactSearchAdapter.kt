@@ -206,6 +206,10 @@ class ContactSearchAdapter(
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         init {
+            if (app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
+                app.olauncher.data.Prefs.LauncherTheme.COZY_QUEST) {
+                binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
+            }
             LauncherMotion.configureResultPress(binding.root)
             val density = binding.root.resources.displayMetrics.density
             binding.root.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT

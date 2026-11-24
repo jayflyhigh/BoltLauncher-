@@ -3,18 +3,18 @@ package app.olauncher.ui
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import androidx.core.content.ContextCompat
+import app.olauncher.helper.getColorFromAttr
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import app.olauncher.R
 
 /** Draws a rule in the existing gap between rows in each result section. */
-internal class EInkResultDividers(context: Context) : RecyclerView.ItemDecoration() {
+internal class SearchResultDividers(context: Context) : RecyclerView.ItemDecoration() {
     private val density = context.resources.displayMetrics.density
     private val inset = 12f * density
     private val gap = context.resources.getDimension(R.dimen.bolt_result_row_margin)
     private val rule = Paint().apply {
-        color = ContextCompat.getColor(context, R.color.bolt_eink_rule)
+        color = context.getColorFromAttr(R.attr.boltPanelOutlineColor)
         strokeWidth = density
     }
 

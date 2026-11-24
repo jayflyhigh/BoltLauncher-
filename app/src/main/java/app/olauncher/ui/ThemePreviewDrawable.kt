@@ -23,6 +23,11 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
             setBounds(47, 25, 55, 33)
         }
     } else null
+    private val cozyQuest = candidate == Prefs.LauncherTheme.COZY_QUEST
+    private val orchard = if (cozyQuest) ContextCompat.getDrawable(context, R.drawable.bolt_cozy_orchard)
+        ?.apply { setBounds(1, 1, 63, 35) } else null
+    private val leafBolt = if (cozyQuest) ContextCompat.getDrawable(context, R.drawable.bolt_cozy_lightning)
+        ?.apply { setBounds(48, 25, 56, 33) } else null
     private val density = context.resources.displayMetrics.density
     private val theme = context.resources.newTheme().apply {
         applyStyle(R.style.AppTheme, true)
@@ -56,6 +61,23 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         val save = canvas.save()
         canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
         canvas.scale(bounds.width() / 64f, bounds.height() / 36f)
+        if (cozyQuest) {
+            fill(canvas, 0f, 0f, 64f, 36f, 7f, rim)
+            val clip = android.graphics.Path().apply {
+                addRoundRect(1f, 1f, 63f, 35f, 6f, 6f, android.graphics.Path.Direction.CW)
+            }
+            canvas.clipPath(clip)
+            orchard?.draw(canvas)
+            fill(canvas, 4f, 17f, 60f, 34f, 4f, panel)
+            fill(canvas, 6f, 19f, 58f, 25f, 2f, rowRim)
+            fill(canvas, 7f, 20f, 57f, 24f, 1f, row)
+            fill(canvas, 10f, 21f, 34f, 23f, 1f, rowText)
+            fill(canvas, 9f, 28f, 27f, 30f, 1f, cursor)
+            fill(canvas, 29f, 27f, 30f, 31f, 0.5f, cursor)
+            leafBolt?.draw(canvas)
+            canvas.restoreToCount(save)
+            return
+        }
         fill(canvas, 0f, 0f, 64f, 36f, 8f, 0xFF152237.toInt())
         fill(canvas, 1f, 1f, 63f, 35f, 7f, rim)
         fill(canvas, 2f, 2f, 62f, 34f, 6f, panel, panelFill)
