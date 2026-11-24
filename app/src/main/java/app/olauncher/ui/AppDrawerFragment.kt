@@ -87,6 +87,7 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var layoutManager: LinearLayoutManager
     private lateinit var contactsAdapter: ContactSearchAdapter
     private var contactsLoad: Job? = null
+    private var contactNumberDialog: AlertDialog? = null
     private var contactsLoaded = false
     private var contactsLoadFailed = false
     private var observingContacts = false
@@ -609,12 +610,15 @@ class AppDrawerFragment : BaseFragment() {
             clearThunderEmpty()
             if (thunderMode && expanded && query.isNotBlank()) thunderEditAt = SystemClock.uptimeMillis()
             binding.appRename.isVisible = canRename && query.isNotBlank()
+            val hadContactShortcuts = shortcutsRequested
             highlightedContactQuery = null
             contactsAdapter.clearSelection()
             dismissedShortcutsQuery = null
             binding.root.removeCallbacks(clearFeedback)
             clearFeedback.run()
-            if (binding.dockWeb.isVisible != (destinationsOnly || canOpenWebSearch(query))) updateDockButtons()
+            if (hadContactShortcuts || binding.dockWeb.isVisible != (destinationsOnly || canOpenWebSearch(query))) {
+                updateDockButtons(query, waitingForResults = true)
+            }
             if (queryVisibilityChanged) refreshDestinations()
             if (!destinationsOnly) {
                 adapter.filterApps(query)
@@ -663,7 +667,10 @@ class AppDrawerFragment : BaseFragment() {
                 .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, InAppSearch.Target::appLabel))
         } else emptyList()
         if (destinationsOnly) {
-            searchResults.removeAdapter(normalResults)
+            if (searchResults.removeAdapter(normalResults)) {
+                adapter.cancelFiltering()
+                contactsAdapter.cancelFiltering()
+            }
             layoutManager.reverseLayout = true
         } else if (normalResults !in searchResults.adapters) {
             searchResults.addAdapter(0, normalResults)
@@ -1224,20 +1231,31 @@ class AppDrawerFragment : BaseFragment() {
         adapter.enterHighlightedResult = if (winningContact == null) movedApp ?: app else null
         contactsAdapter.enterHighlightedResult = winningContact
         highlightedContactQuery = query.takeIf { winningContact != null }
-        updateDockButtons()
+        updateDockButtons(query, waitingForResults = showHighlight && !ready)
     }
 
-    private fun updateDockButtons() {
-        val contact = contactsAdapter.enterHighlightedResult
-        val showShortcuts = !destinationsOnly && expanded && !thunderMode && contact != null && searchRename == null &&
-            dismissedShortcutsQuery != currentResultsQuery()
+    private fun shortcutContact(query: String): ContactSearchAdapter.Contact? {
+        if (destinationsOnly || !canOpenWebSearch(query) || dismissedShortcutsQuery == query ||
+            highlightedContactQuery != query || contactsAdapter.committedQuery != query) return null
+        return contactsAdapter.enterHighlightedResult
+    }
+
+    private fun updateDockButtons(
+        query: String = currentResultsQuery(),
+        waitingForResults: Boolean = false,
+    ) {
+        val contact = shortcutContact(query)
+        val showWeb = canOpenWebSearch(query) || (expanded && destinationsOnly)
+        // Keep the dock width steady between results, but disable actions on the previous match.
+        val keepSlot = waitingForResults && shortcutsRequested && !destinationsOnly && canOpenWebSearch(query)
+        val showShortcuts = contact != null || keepSlot
         binding.renameControls.isVisible = searchRename != null
         val shortcuts = binding.contactShortcuts
         val slot = binding.contactShortcutSlot
         val shortcutWidth = 3 * resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width)
         val shortcutsChanged = shortcutsRequested != showShortcuts
         val animate = (shortcutsChanged || slot.isVisible != showShortcuts) &&
-            canOpenWebSearch(currentResultsQuery()) && LauncherMotion.isEnabled(shortcuts.context)
+            canOpenWebSearch(query) && LauncherMotion.isEnabled(shortcuts.context)
         if (shortcutsChanged || (!animate && slot.isVisible != showShortcuts)) {
             shortcutsRequested = showShortcuts
             shortcuts.animate().cancel()
@@ -1264,14 +1282,12 @@ class AppDrawerFragment : BaseFragment() {
                     }.start()
             }
         }
-        val hasNumber = showShortcuts && contact?.numbers?.isNotEmpty() == true
-        listOf(binding.contactCall, binding.contactMessage, binding.contactWhatsapp).forEach {
-            it.isEnabled = hasNumber
-            if (showShortcuts) it.alpha = if (hasNumber) 1f else 0.64f
-        }
+        val hasNumber = contact?.numbers?.isNotEmpty() == true
+        updateContactButton(binding.contactCall, showShortcuts, hasNumber)
+        updateContactButton(binding.contactMessage, showShortcuts, hasNumber)
+        updateContactButton(binding.contactWhatsapp, showShortcuts, hasNumber)
         updateBoltVisibility()
         val web = binding.dockWeb
-        val showWeb = canOpenWebSearch(currentResultsQuery()) || (expanded && destinationsOnly)
         val target = activeAlias
         binding.dockSearchDestinations.isVisible = !expanded && supportsDestinations && isHomePage
         binding.dockActiveAlias.isVisible = target != null
@@ -1326,10 +1342,14 @@ class AppDrawerFragment : BaseFragment() {
         bolt.alpha = if (available) 1f else (boltProgress * 3f).coerceAtMost(1f)
     }
 
+    private fun updateContactButton(button: View, visible: Boolean, enabled: Boolean) {
+        if (button.isEnabled != enabled) button.isEnabled = enabled
+        if (visible) button.alpha = if (enabled) 1f else 0.64f
+    }
+
     private fun runContactAction(action: String, scheme: String) {
-        val query = binding.search.text.toString()
-        if (highlightedContactQuery != query || contactsAdapter.committedQuery != query) return
-        val contact = contactsAdapter.enterHighlightedResult ?: return
+        val contact = shortcutContact(currentResultsQuery()) ?: return
+        if (!hasContactsPermission() || contactNumberDialog?.isShowing == true) return
         fun launch(number: String) {
             val intent = if (scheme == "https") {
                 val international = PhoneNumberUtils.formatNumberToE164(number, Locale.getDefault().country) ?: number
@@ -1344,13 +1364,16 @@ class AppDrawerFragment : BaseFragment() {
         when (contact.numbers.size) {
             0 -> Unit
             1 -> launch(contact.numbers.first())
-            else -> androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle(contact.name)
-                .setItems(contact.numbers.map(::formatContactNumber).toTypedArray()) { _, index ->
-                    launch(contact.numbers[index])
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show().applyWallpaperBackground()
+            else -> {
+                contactNumberDialog = AlertDialog.Builder(requireContext())
+                    .setTitle(contact.name)
+                    .setItems(contact.numbers.map(::formatContactNumber).toTypedArray()) { _, index ->
+                        launch(contact.numbers[index])
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setOnDismissListener { contactNumberDialog = null }
+                    .show().also { it.applyWallpaperBackground() }
+            }
         }
     }
 
@@ -1867,7 +1890,7 @@ class AppDrawerFragment : BaseFragment() {
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val textColor = builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
         val density = resources.displayMetrics.density
-        val previews = options.map { (theme, _) -> ThemePreviewDrawable(builder.context, theme) }
+        val previews = arrayOfNulls<ThemePreviewDrawable>(options.size)
         val labels = object : android.widget.ArrayAdapter<String>(
             builder.context,
             android.R.layout.simple_list_item_single_choice,
@@ -1879,7 +1902,9 @@ class AppDrawerFragment : BaseFragment() {
                     compoundDrawablePadding = (12 * density).toInt()
                     setTextColor(textColor)
                     checkMarkTintList = ColorStateList.valueOf(textColor)
-                    setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, previews[position], null)
+                    val preview = previews[position] ?: ThemePreviewDrawable(builder.context, options[position].first)
+                        .also { previews[position] = it }
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, preview, null)
                 }
             }
         }
@@ -2228,12 +2253,15 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.onImeCommit = null
         binding.search.onEmptyBackspace = null
         stopLoadingContacts()
+        contactNumberDialog?.dismiss()
+        contactNumberDialog = null
         boltAnimator?.cancel()
         boltAnimator = null
         LauncherMotion.reset(binding.recyclerView)
         LauncherMotion.reset(binding.dock)
         LauncherMotion.reset(binding.contactShortcuts)
-        adapter.cancelFiltering()
+        adapter.dispose()
+        contactsAdapter.dispose()
         binding.recyclerView.adapter = null
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
         androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(binding.root, null)

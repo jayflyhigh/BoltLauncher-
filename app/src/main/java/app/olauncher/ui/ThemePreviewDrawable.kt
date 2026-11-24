@@ -26,6 +26,9 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
     private val cozyQuest = candidate == Prefs.LauncherTheme.COZY_QUEST
     private val orchard = if (cozyQuest) ContextCompat.getDrawable(context, R.drawable.bolt_cozy_orchard)
         ?.apply { setBounds(1, 1, 63, 35) } else null
+    private val orchardClip = if (cozyQuest) android.graphics.Path().apply {
+        addRoundRect(1f, 1f, 63f, 35f, 6f, 6f, android.graphics.Path.Direction.CW)
+    } else null
     private val leafBolt = if (cozyQuest) ContextCompat.getDrawable(context, R.drawable.bolt_cozy_lightning)
         ?.apply { setBounds(48, 25, 56, 33) } else null
     private val density = context.resources.displayMetrics.density
@@ -67,12 +70,9 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         val save = canvas.save()
         canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
         canvas.scale(bounds.width() / 64f, bounds.height() / 36f)
-        if (cozyQuest) {
+        if (orchardClip != null) {
             fill(canvas, 0f, 0f, 64f, 36f, 7f, rim)
-            val clip = android.graphics.Path().apply {
-                addRoundRect(1f, 1f, 63f, 35f, 6f, 6f, android.graphics.Path.Direction.CW)
-            }
-            canvas.clipPath(clip)
+            canvas.clipPath(orchardClip)
             orchard?.draw(canvas)
             fill(canvas, 4f, 17f, 60f, 34f, 4f, panel)
             fill(canvas, 6f, 19f, 58f, 25f, 2f, rowRim)

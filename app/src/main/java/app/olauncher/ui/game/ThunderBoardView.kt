@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import android.view.View
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
@@ -53,6 +54,26 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
         0xFF8CD4AF.toInt(), 0xFFEEA6C0.toInt(), 0xFFADBCEA.toInt(), 0xFFC6D786.toInt(),
     )
     private val spacing = resources.displayMetrics.density
+    private val inputInk = if (androidx.core.graphics.ColorUtils.calculateLuminance(dock) > 0.35) {
+        Color.BLACK
+    } else Color.WHITE
+    private var inputFeedbackUntil = 0L
+    private var blockedInput = false
+
+    fun showInputFeedback(blocked: Boolean) {
+        blockedInput = blocked
+        inputFeedbackUntil = SystemClock.uptimeMillis() + 120L
+        if (blocked) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        invalidate()
+        postInvalidateDelayed(120L)
+    }
+
+    override fun setPressed(pressed: Boolean) {
+        if (isPressed == pressed) return
+        super.setPressed(pressed)
+        invalidate()
+    }
+
     var cellSize = 0f
         private set
 
@@ -98,8 +119,13 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
             canvas.drawLine(left, y, right, y, paint)
         }
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = spacing
-        paint.color = edge
+        val inputFeedback = SystemClock.uptimeMillis() < inputFeedbackUntil
+        paint.strokeWidth = if (isPressed || inputFeedback) spacing * 2f else spacing
+        paint.color = when {
+            inputFeedback && blockedInput -> 0xFFFF7043.toInt()
+            isPressed || inputFeedback -> inputInk
+            else -> edge
+        }
         canvas.drawRoundRect(bounds, corner, corner, paint)
         paint.style = Paint.Style.FILL
 
