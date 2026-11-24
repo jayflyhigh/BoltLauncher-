@@ -106,10 +106,10 @@ class AppDrawerAdapter(
         super.onViewRecycled(holder)
     }
 
-    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+    // ConcatAdapter also detaches children when the best-match section moves.
+    fun dispose() {
         cancelFiltering()
         iconScope.coroutineContext.cancelChildren()
-        super.onDetachedFromRecyclerView(recyclerView)
     }
 
     private var requestedQuery = ""
@@ -183,7 +183,7 @@ class AppDrawerAdapter(
             .takeIf { !thunder && flag == Constants.FLAG_LAUNCH_APP }
         requestedQuery = query
         val apps = appsList
-        val labelIndex = normalizedLabels
+        val labelIndex = searchLabels
         val previous = displayedItems
         filterJob = iconScope.launch {
             val (items, changes, fuzzy) = withContext(Dispatchers.Default) {
@@ -197,14 +197,13 @@ class AppDrawerAdapter(
                         if (app is AppModel.PrivateSpaceHeader) return@mapNotNull null
                         val label = labels.getValue(app.appLabel)
                         val original = app.originalLabel
-                        val originalNormalized = if (original == app.appLabel) null else labels.getValue(original)
+                        val originalNormalized = if (original == app.appLabel) null else labels.getValue(original).normalized
                         when {
-                            exactName != null && app.appLabel.normalizeDisplayedName()
-                                .equals(exactName, ignoreCase = true) -> app to -1
-                            matches(app.appLabel, label) -> app to appSearchRank(app.appLabel, trimmed)
+                            exactName != null && label.displayedName.equals(exactName, ignoreCase = true) -> app to -1
+                            matches(app.appLabel, label.normalized) -> app to appSearchRank(app.appLabel, trimmed)
                             originalNormalized != null && matches(original, originalNormalized) ->
                                 app to (4 + appSearchRank(original, trimmed))
-                            typoMatcher?.matches(label) == true -> app to 8
+                            typoMatcher?.matches(label.normalized) == true -> app to 8
                             originalNormalized != null && typoMatcher?.matches(originalNormalized) == true -> app to 9
                             else -> null
                         }
@@ -266,7 +265,9 @@ class AppDrawerAdapter(
             }
         }
 
-    private var normalizedLabels = lazy { emptyMap<String, String>() }
+    private data class SearchLabel(val normalized: String, val displayedName: String)
+
+    private var searchLabels = lazy { emptyMap<String, SearchLabel>() }
     var appsList: List<AppModel> = emptyList()
         private set
 
@@ -363,9 +364,9 @@ class AppDrawerAdapter(
         val snapshot = appsList.toList()
         this.appsList = snapshot
         // Build the index on the search dispatcher only when a nonblank query needs it.
-        normalizedLabels = lazy(LazyThreadSafetyMode.PUBLICATION) {
+        searchLabels = lazy {
             snapshot.asSequence().flatMap { sequenceOf(it.appLabel, it.originalLabel) }
-                .distinct().associateWith { it.normalizeForSearch() }
+                .distinct().associateWith { SearchLabel(it.normalizeForSearch(), it.normalizeDisplayedName()) }
         }
         filterApps(requestedQuery)
     }

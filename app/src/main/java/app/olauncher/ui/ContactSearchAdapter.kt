@@ -57,7 +57,7 @@ class ContactSearchAdapter(
     var committedQuery: String? = null
         private set
     val selectedContact: Contact?
-        get() = results.firstOrNull { it.uri == selectedUri }
+        get() = selectedUri?.let { uri -> results.firstOrNull { it.uri == uri } }
 
     val currentList: List<Contact> get() = results
     val firstResult: Contact? get() = results.firstOrNull()
@@ -90,13 +90,17 @@ class ContactSearchAdapter(
         }
     }
 
-    fun clearResults() {
+    fun cancelFiltering() {
         filterGeneration++
         filterJob?.cancel()
+        committedQuery = null
+    }
+
+    fun clearResults() {
+        cancelFiltering()
         val previousSize = results.size
         results = emptyList()
         typoMatches = emptySet()
-        committedQuery = null
         enterHighlightedResult = null
         selectedUri = null
         if (previousSize > 0) notifyItemRangeRemoved(0, previousSize)
@@ -119,7 +123,7 @@ class ContactSearchAdapter(
 
     fun filter(query: String, showAll: Boolean = true, applied: (Boolean) -> Unit = {}) {
         filterJob?.cancel()
-        committedQuery = null
+        if (committedQuery != query) committedQuery = null
         val generation = ++filterGeneration
         val source = contacts
         val trimmed = query.trim()
@@ -183,11 +187,11 @@ class ContactSearchAdapter(
         holder.photoJob?.cancel()
         super.onViewRecycled(holder)
     }
-    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-        filterGeneration++
-        committedQuery = null
+
+    // Section moves detach this adapter temporarily.
+    fun dispose() {
+        cancelFiltering()
         photoScope.coroutineContext.cancelChildren()
-        super.onDetachedFromRecyclerView(recyclerView)
     }
 
     inner class Holder(private val binding: AdapterAppDrawerBinding) : RecyclerView.ViewHolder(binding.root) {

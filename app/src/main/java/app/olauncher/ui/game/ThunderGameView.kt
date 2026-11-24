@@ -68,6 +68,7 @@ internal class ThunderGameView(
     private var drag: Drag? = null
     private var trackingTouch = false
     private var tapCandidate = false
+    private var blockedDrag = false
     private var anchorX = 0f
     private var anchorY = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
@@ -178,6 +179,7 @@ internal class ThunderGameView(
     override fun onDetachedFromWindow() {
         removeCallbacks(tick)
         lockClock = null
+        endBoardTouch()
         exitConfirmation?.dismiss()
         saveBest()
         abandonMusicFocus()
@@ -210,7 +212,7 @@ internal class ThunderGameView(
         if (!running) return
         settleLockClock()
         paused = true
-        trackingTouch = false
+        endBoardTouch()
         scheduleTick()
         saveBest()
         updateMusic()
@@ -242,7 +244,6 @@ internal class ThunderGameView(
     }
 
     private fun onLock() {
-        trackingTouch = false
         best = max(best, game.score)
         if (game.clearedLastMove > 0) {
             play(clearSound)
@@ -251,6 +252,7 @@ internal class ThunderGameView(
             play(lockSound)
         }
         if (game.gameOver) {
+            endBoardTouch()
             saveBest()
             updateMusic()
         }
@@ -258,20 +260,29 @@ internal class ThunderGameView(
     }
 
     private fun rotatePiece() {
-        if (!running || finishExpiredLock()) return
+        if (!running) return
+        val locked = settleLockClock()
+        if (!running) return
         val wasGrounded = game.lockRemaining != null
-        if (game.rotate()) {
-            play(rotateSound)
-            board.invalidate()
-        }
-        if (wasGrounded || game.lockRemaining != null) scheduleTick()
+        val rotated = game.rotate()
+        board.showInputFeedback(blocked = !rotated)
+        if (rotated) play(rotateSound)
+        if (locked || wasGrounded || game.lockRemaining != null) scheduleTick()
     }
 
     private fun hardDrop() {
-        if (!running || finishExpiredLock()) return
+        if (!running) return
+        settleLockClock()
+        if (!running) return
         game.drop()
         onLock()
+        board.showInputFeedback(blocked = false)
         scheduleTick()
+    }
+
+    private fun endBoardTouch() {
+        trackingTouch = false
+        board.isPressed = false
     }
 
     private fun handleBoardTouch(event: MotionEvent): Boolean {
@@ -279,66 +290,83 @@ internal class ThunderGameView(
             MotionEvent.ACTION_DOWN -> {
                 trackingTouch = running
                 tapCandidate = running
+                board.isPressed = running
+                blockedDrag = false
                 drag = null
                 anchorX = event.x
                 anchorY = event.y
             }
-            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> trackingTouch = false
-            MotionEvent.ACTION_MOVE -> {
-                if (trackingTouch && running) {
-                    val dx = event.x - anchorX
-                    val dy = event.y - anchorY
-                    if (drag == null && max(abs(dx), abs(dy)) > touchSlop) {
-                        tapCandidate = false
-                        drag = when {
-                            abs(dx) >= abs(dy) -> Drag.HORIZONTAL
-                            dy > 0 -> Drag.DOWN
-                            else -> null
-                        }
-                    }
-                    if (drag != null) moveWithFinger(dx, dy)
-                }
-            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> endBoardTouch()
+            MotionEvent.ACTION_MOVE -> if (trackingTouch && running) moveWithFinger(event.x, event.y)
             MotionEvent.ACTION_UP -> {
-                if (trackingTouch && running && tapCandidate &&
-                    max(abs(event.x - anchorX), abs(event.y - anchorY)) <= touchSlop
-                ) {
-                    board.performClick()
+                if (trackingTouch && running) {
+                    moveWithFinger(event.x, event.y)
+                    if (tapCandidate) board.performClick()
                 }
-                trackingTouch = false
+                endBoardTouch()
             }
         }
         return true
     }
 
-    private fun moveWithFinger(dx: Float, dy: Float) {
+    private fun moveWithFinger(x: Float, y: Float) {
+        val dx = x - anchorX
+        val dy = y - anchorY
+        val distance = max(abs(dx), abs(dy))
         val cell = board.cellSize
-        if (cell <= 0f) return
-        val wasGrounded = game.lockRemaining != null
-        when (drag) {
-            Drag.HORIZONTAL -> {
-                val shift = (dx / cell).toInt()
-                if (shift == 0 || finishExpiredLock()) return
-                for (step in 0 until abs(shift).coerceAtMost(ThunderBlocks.COLUMNS)) {
-                    if (!game.move(if (shift > 0) 1 else -1)) break
-                }
-                anchorX += shift * cell
+        if (distance <= touchSlop || cell <= 0f) return
+        tapCandidate = false
+        board.isPressed = false
+        val direction = when {
+            abs(dx) >= abs(dy) -> Drag.HORIZONTAL
+            dy > 0 -> Drag.DOWN
+            else -> {
+                // Upward travel has no game action. Reset the baseline for the next gesture segment.
+                anchorX = x
+                anchorY = y
+                drag = null
+                blockedDrag = false
+                return
             }
-            Drag.DOWN -> {
-                if (dy < 0) anchorY += dy
-                val down = (dy / cell).toInt()
-                if (down <= 0 || finishExpiredLock()) return
-                anchorY += down * cell
-                for (step in 0 until down.coerceAtMost(ThunderBlocks.ROWS)) {
-                    if (!game.step(softDrop = true) || game.lockRemaining != null) break
-                }
-                best = max(best, game.score)
-                updateStats()
-            }
-            null -> return
         }
-        board.invalidate()
-        if (wasGrounded || game.lockRemaining != null) scheduleTick()
+        val delta = if (direction == Drag.HORIZONTAL) dx else dy
+        val changedDirection = direction != drag
+        val steps = (abs(delta) / cell).toInt().coerceAtLeast(if (changedDirection) 1 else 0)
+        if (steps == 0) return
+        drag = direction
+        val consumed = minOf(steps * cell, abs(delta))
+        if (direction == Drag.HORIZONTAL) {
+            anchorX += if (delta > 0) consumed else -consumed
+            anchorY = y
+        } else {
+            anchorX = x
+            anchorY += consumed
+        }
+
+        val locked = settleLockClock()
+        if (!running) return
+        val wasGrounded = game.lockRemaining != null
+        val maxSteps = if (direction == Drag.HORIZONTAL) ThunderBlocks.COLUMNS else ThunderBlocks.ROWS
+        var moved = false
+        var blocked = false
+        val horizontalStep = if (delta > 0) 1 else -1
+        for (step in 0 until steps.coerceAtMost(maxSteps)) {
+            val accepted = if (direction == Drag.HORIZONTAL) game.move(horizontalStep)
+                else game.step(softDrop = true)
+            if (!accepted) {
+                blocked = true
+                break
+            }
+            moved = true
+        }
+        if (moved && direction == Drag.DOWN) {
+            best = max(best, game.score)
+            updateStats()
+        }
+        if (moved) board.invalidate()
+        if (blocked && (!blockedDrag || changedDirection)) board.showInputFeedback(blocked = true)
+        blockedDrag = blocked
+        if (locked || wasGrounded || game.lockRemaining != null) scheduleTick()
     }
 
     private fun settleLockClock(): Boolean {
@@ -346,12 +374,6 @@ internal class ThunderGameView(
         lockClock = null
         if (!game.elapseLockTime(SystemClock.uptimeMillis() - started)) return false
         onLock()
-        return true
-    }
-
-    private fun finishExpiredLock(): Boolean {
-        if (!settleLockClock()) return false
-        scheduleTick()
         return true
     }
 
