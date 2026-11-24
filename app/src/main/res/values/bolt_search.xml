@@ -66,4 +66,5 @@
     <string name="bolt_power_menu_unavailable">Android’s power menu is unavailable.</string>
     <dimen name="bolt_result_row_margin">2dp</dimen>
     <dimen name="bolt_result_dock_gap">3dp</dimen>
+    <string name="bolt_paper_notebook">Paper Notebook</string>
 </resources>

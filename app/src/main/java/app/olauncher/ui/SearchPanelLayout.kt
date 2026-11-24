@@ -46,6 +46,8 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private val stroke = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glassReflection = context.getColorFromAttr(R.attr.boltGlassReflectionColor)
+    private val paperNotebook = app.olauncher.data.Prefs(context).launcherTheme ==
+        app.olauncher.data.Prefs.LauncherTheme.PAPER_NOTEBOOK
     private val dockEdge = if (context.getColorFromAttr(R.attr.boltSmokedControlColor) != 0) {
         context.getColorFromAttr(R.attr.boltGlassTopEdgeColor)
     } else {
@@ -243,9 +245,11 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         }
         drawGlassSheen(canvas, dockTop, height.toFloat(), dividerAlpha)
         // In Thunder mode the transition from charcoal to yellow already separates the bar.
-        if (dividerAlpha > 0 && (resultsHeight > 0 || statusInPanel)) {
-            paint.color = dockEdge
-            paint.alpha = paint.alpha * dividerAlpha / 255
+        if ((paperNotebook || dividerAlpha > 0) && (resultsHeight > 0 || statusInPanel)) {
+            paint.color = if (paperNotebook) {
+                androidx.core.graphics.ColorUtils.blendARGB(dockEdge, Color.BLACK, 1f - dividerAlpha / 255f)
+            } else dockEdge
+            if (!paperNotebook) paint.alpha = paint.alpha * dividerAlpha / 255
             canvas.drawRect(rowInset.toFloat(), dockTop, (width - rowInset).toFloat(), dockTop + stroke, paint)
         }
         canvas.restoreToCount(save)

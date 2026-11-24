@@ -12,7 +12,9 @@ import app.olauncher.helper.getColorFromAttr
 
 class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     AppCompatEditText(context, attrs) {
-    private var darkCursor = false
+    private var drawLegacyCursor = false
+    private val paperNotebook = app.olauncher.data.Prefs(context).launcherTheme ==
+        app.olauncher.data.Prefs.LauncherTheme.PAPER_NOTEBOOK
     private val darkCursorColor = context.getColorFromAttr(R.attr.boltThunderCursorColor)
     private val idleCursorColor = context.getColorFromAttr(R.attr.boltSearchCursorColor)
     private var blinkStart = 0L
@@ -59,9 +61,12 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
                 }
             return
         }
-        isCursorVisible = !enabled
-        if (darkCursor == enabled) return
-        darkCursor = enabled
+        val useCustomCursor = enabled || paperNotebook
+        isCursorVisible = !useCustomCursor
+        val color = if (enabled) darkCursorColor else idleCursorColor
+        if (drawLegacyCursor == useCustomCursor && cursorPaint.color == color) return
+        drawLegacyCursor = useCustomCursor
+        cursorPaint.color = color
         blinkStart = android.os.SystemClock.uptimeMillis()
         invalidate()
     }
@@ -86,7 +91,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        if (!darkCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
+        if (!drawLegacyCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
             selectionStart != selectionEnd) return
         val textLayout = layout ?: return
         val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart

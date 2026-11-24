@@ -198,6 +198,7 @@ class Prefs(context: Context) {
         DEFAULT("default"),
         FROSTED_GLASS("frosted_glass", R.style.FrostedGlassOverlay),
         LIQUID_GLASS("liquid_glass", R.style.LiquidGlassOverlay),
+        PAPER_NOTEBOOK("paper_notebook", R.style.PaperNotebookOverlay),
         SMOKED_GLASS("smoked_glass", R.style.SmokedGlassOverlay),
         WINDOWS_XP("windows_xp", R.style.WindowsXpOverlay),
         WII_U("wii_u", R.style.WiiUOverlay),

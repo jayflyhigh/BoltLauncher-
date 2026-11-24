@@ -195,7 +195,10 @@ class ContactSearchAdapter(
         private val liquidGlass = app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
             app.olauncher.data.Prefs.LauncherTheme.LIQUID_GLASS
         private val avatarText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
-        private val avatarFill = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowColor)
+        private val avatarFill = if (app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
+            app.olauncher.data.Prefs.LauncherTheme.PAPER_NOTEBOOK) {
+            androidx.core.content.ContextCompat.getColor(binding.root.context, R.color.bolt_notebook_rule)
+        } else binding.root.context.getColorFromAttr(R.attr.boltSelectedRowColor)
         private val initial = TextView(binding.root.context).apply {
             gravity = android.view.Gravity.CENTER
             setTextColor(avatarText)
@@ -253,6 +256,7 @@ class ContactSearchAdapter(
             val selected = contact.uri == selectedUri
             val highlighted = contact == enterHighlightedResult
             LauncherMotion.setRowHighlight(binding.root, highlighted, animate = animateHighlight)
+            binding.appTitle.markerSelected = highlighted
             val state = when {
                 selected -> R.string.bolt_contact_selected
                 highlighted -> R.string.bolt_enter_target

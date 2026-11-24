@@ -19,6 +19,10 @@ class SearchSectionAdapter(private val title: String) : RecyclerView.Adapter<Sea
         val density = parent.resources.displayMetrics.density
         return Holder(TextView(parent.context).apply {
             layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            if (app.olauncher.data.Prefs(context).launcherTheme ==
+                app.olauncher.data.Prefs.LauncherTheme.PAPER_NOTEBOOK) {
+                setBackgroundResource(R.drawable.bolt_notebook_section)
+            }
             setPadding((20 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (8 * density).toInt())
             setTextColor(context.getColorFromAttr(R.attr.boltSearchSectionColor))
             textSize = 13f

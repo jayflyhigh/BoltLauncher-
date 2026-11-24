@@ -16,6 +16,7 @@ internal class ThunderLaunchAnimation(
     private val source: View,
     private val icon: Drawable,
     private val iconBounds: RectF,
+    private val markerTitle: SearchResultTitle?,
 ) : Drawable() {
     private val density = source.resources.displayMetrics.density
     private val lift = 4f * density
@@ -44,6 +45,7 @@ internal class ThunderLaunchAnimation(
     var progress = 0.25f
         set(value) {
             field = value
+            markerTitle?.markerSweep = ((value - 0.25f) / 0.75f).coerceIn(0f, 1f)
             invalidateSelf()
         }
 
@@ -53,6 +55,7 @@ internal class ThunderLaunchAnimation(
 
     fun restoreIcon() {
         source.alpha = originalAlpha
+        markerTitle?.markerSweep = 0f
     }
 
     override fun draw(canvas: Canvas) {

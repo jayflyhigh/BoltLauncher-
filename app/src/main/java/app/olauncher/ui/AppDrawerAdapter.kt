@@ -398,6 +398,16 @@ class AppDrawerAdapter(
             binding.appTitle.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
 
+        private val paperNotebook = Prefs(binding.root.context).launcherTheme == Prefs.LauncherTheme.PAPER_NOTEBOOK
+
+        init {
+            if (paperNotebook) {
+                binding.root.minimumHeight = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
+                binding.root.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                binding.appTitle.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+        }
+
         private val selectedText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
         private val normalText = binding.root.context.getColorFromAttr(R.attr.boltResultTextColor)
         private val thunderMatchText = binding.root.context.getColorFromAttr(R.attr.boltThunderMatchTextColor)
@@ -465,7 +475,9 @@ class AppDrawerAdapter(
             val x = (location[0] - origin[0]).toFloat()
             val y = (location[1] - origin[1]).toFloat()
             return ThunderLaunchAnimation(source, icon,
-                android.graphics.RectF(x, y, x + source.width, y + source.height))
+                android.graphics.RectF(x, y, x + source.width, y + source.height),
+                binding.appTitle.takeIf { paperNotebook && it.isShown },
+            )
         }
 
         private fun copyDisplayedIcon(app: AppModel): Drawable? {
@@ -496,6 +508,7 @@ class AppDrawerAdapter(
             animateHighlight: Boolean = false,
         ) = with(binding) {
             LauncherMotion.setRowHighlight(root, enterHighlighted, animate = animateHighlight)
+            appTitle.markerSelected = enterHighlighted
             val textColor = if (enterHighlighted) selectedText else normalText
             if (appTitle.currentTextColor != textColor) appTitle.setTextColor(textColor)
             androidx.core.view.ViewCompat.setStateDescription(root,
@@ -577,7 +590,7 @@ class AppDrawerAdapter(
             root.setTag(R.id.bolt_result_identity, identity)
             (root.parent as? DockResultsView)?.rememberRow(root, identity)
             bindSearchStyle(appModel, thunderMode, query, enterHighlighted)
-            appTitle.maxLines = 1
+            appTitle.maxLines = if (paperNotebook) 2 else 1
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(appTitle, 0)
             appTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
             appTitle.ellipsize = android.text.TextUtils.TruncateAt.END

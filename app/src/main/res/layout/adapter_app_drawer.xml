@@ -10,7 +10,7 @@
 
     <ImageView android:id="@+id/appIcon" android:layout_width="36dp" android:layout_height="36dp" android:layout_gravity="start|center_vertical" android:layout_marginStart="16dp" android:importantForAccessibility="no"/>
 
-    <TextView
+    <app.olauncher.ui.SearchResultTitle
         android:id="@+id/appTitle"
         style="@style/TextLarge"
         android:layout_width="match_parent"
