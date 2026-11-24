@@ -16,6 +16,7 @@ import kotlin.math.roundToInt
 
 /** Miniature of the launcher panel using the candidate theme's actual colors. */
 internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherTheme) : Drawable() {
+    private val paperNotebook = candidate == Prefs.LauncherTheme.PAPER_NOTEBOOK
     private val density = context.resources.displayMetrics.density
     private val theme = context.resources.newTheme().apply {
         applyStyle(R.style.AppTheme, true)
@@ -37,6 +38,8 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
     private val dockFill = gradient(
         dock, androidx.core.graphics.ColorUtils.compositeColors(dockTop, dock), 0f, 31f, 0f, 23f,
     )
+    private val notebookMarker = androidx.core.content.ContextCompat.getColor(context, R.color.bolt_notebook_marker)
+    private val notebookRule = androidx.core.content.ContextCompat.getColor(context, R.color.bolt_notebook_rule)
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     override fun getIntrinsicWidth() = (64 * density).roundToInt()
@@ -50,12 +53,19 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         fill(canvas, 0f, 0f, 64f, 36f, 8f, 0xFF152237.toInt())
         fill(canvas, 1f, 1f, 63f, 35f, 7f, rim)
         fill(canvas, 2f, 2f, 62f, 34f, 6f, panel, panelFill)
-        fill(canvas, 6f, 6f, 58f, 20f, 4f, rowRim)
-        fill(canvas, 7f, 7f, 57f, 19f, 3f, row, rowFill)
+        if (paperNotebook) {
+            fill(canvas, 6f, 6f, 58f, 7f, 0f, notebookRule)
+            fill(canvas, 6f, 9f, 58f, 10f, 0f, notebookRule)
+            fill(canvas, 18f, 11f, 48f, 17f, 2f, notebookMarker)
+            fill(canvas, 6f, 22f, 58f, 32f, 5f, rim)
+        } else {
+            fill(canvas, 6f, 6f, 58f, 20f, 4f, rowRim)
+            fill(canvas, 7f, 7f, 57f, 19f, 3f, row, rowFill)
+        }
         fill(canvas, 10f, 10f, 16f, 16f, 2f, rowText)
         fill(canvas, 20f, 12f, 46f, 14f, 1f, rowText)
         fill(canvas, 6f, 23f, 58f, 31f, 4f, dock, dockFill)
-        fill(canvas, 11f, 26f, 29f, 28f, 1f, 0xFFD8E6F0.toInt())
+        fill(canvas, 11f, 26f, 29f, 28f, 1f, if (paperNotebook) rowText else 0xFFD8E6F0.toInt())
         fill(canvas, 30f, 25f, 31f, 29f, 0.5f, cursor)
         fill(canvas, 50f, 25f, 54f, 29f, 2f, accent)
         canvas.restoreToCount(save)

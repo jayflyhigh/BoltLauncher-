@@ -1,0 +1,6 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="top|fill_horizontal" android:height="1dp" android:left="16dp" android:right="16dp"
+        android:drawable="@color/bolt_notebook_rule" />
+    <item android:gravity="bottom|fill_horizontal" android:height="1dp" android:left="16dp" android:right="16dp"
+        android:drawable="@color/bolt_notebook_rule" />
+</layer-list>

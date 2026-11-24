@@ -61,7 +61,7 @@ internal fun TextView.styleAliasBadge(color: Int) {
     val stroke = density.roundToInt().coerceAtLeast(1)
     setTextColor(Color.WHITE)
     when (Prefs(context).launcherTheme) {
-        Prefs.LauncherTheme.DEFAULT -> {
+        Prefs.LauncherTheme.DEFAULT, Prefs.LauncherTheme.PAPER_NOTEBOOK -> {
             val opaqueColor = color or Color.BLACK
             val fill = if (ColorUtils.calculateContrast(Color.WHITE, opaqueColor) >= 4.5) {
                 opaqueColor
