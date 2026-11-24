@@ -21,7 +21,10 @@ class InAppSearch(private val context: Context) {
         val code: String,
         val builtIn: Boolean,
         val hidden: Boolean,
-    )
+    ) {
+        val usesPresetColor: Boolean
+            get() = builtIn && defaults.any { it.packageName == packageName && it.color == color }
+    }
 
     private val prefs = context.getSharedPreferences("in_app_search", Context.MODE_PRIVATE)
     private val installedLabels = mutableMapOf<String, String>()

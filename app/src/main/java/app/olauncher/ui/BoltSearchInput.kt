@@ -17,7 +17,10 @@ import app.olauncher.helper.getColorFromAttr
 class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     AppCompatEditText(context, attrs) {
     private val useLegacyCursor = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
-    private val eInkTheme = Prefs(context).launcherTheme == Prefs.LauncherTheme.E_INK
+    private val steadyCaretTheme = when (Prefs(context).launcherTheme) {
+        Prefs.LauncherTheme.E_INK, Prefs.LauncherTheme.COZY_QUEST -> true
+        else -> false
+    }
     private var steadyThunderCaret = false
     private val thunderCursorColor = context.getColorFromAttr(R.attr.boltThunderCursorColor)
     private val regularCursorColor = context.getColorFromAttr(R.attr.boltSearchCursorColor)
@@ -64,7 +67,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     fun updateDockCursor(thunder: Boolean, dockColor: Int) {
-        val steady = eInkTheme && thunder
+        val steady = steadyCaretTheme && thunder
         if (steadyThunderCaret != steady) {
             steadyThunderCaret = steady
             isCursorVisible = !useLegacyCursor && !steady
@@ -119,7 +122,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
             selectionStart != selectionEnd) return
         val textLayout = layout ?: return
         val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart
-        // The E-Ink Thunder caret stays visible while editing, including between keystrokes.
+        // The steady Thunder caret stays visible while editing, including between keystrokes.
         if (steadyThunderCaret || (elapsed / 500L) % 2L == 0L) {
             val offset = selectionStart.coerceAtMost(textLayout.text.length)
             val line = textLayout.getLineForOffset(offset)

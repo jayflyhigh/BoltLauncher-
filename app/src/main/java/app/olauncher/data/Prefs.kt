@@ -198,6 +198,7 @@ class Prefs(context: Context) {
         DEFAULT("default"),
         FROSTED_GLASS("frosted_glass", R.style.FrostedGlassOverlay),
         LIQUID_GLASS("liquid_glass", R.style.LiquidGlassOverlay),
+        COZY_QUEST("cozy_quest", R.style.CozyQuestOverlay),
         E_INK("e_ink", R.style.EInkOverlay),
         PAPER_NOTEBOOK("paper_notebook", R.style.PaperNotebookOverlay),
         SMOKED_GLASS("smoked_glass", R.style.SmokedGlassOverlay),
