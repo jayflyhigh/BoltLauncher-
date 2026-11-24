@@ -59,7 +59,13 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
             val piece = game.next
             val columns = piece.cells.maxOf { it.x } + 1
             val rows = piece.cells.maxOf { it.y } + 1
-            cellSize = min(width / 4f, height / 4f)
+            val padding = spacing * 7
+            cellSize = min((width - 2 * padding) / columns, (height - 2 * padding) / rows)
+            if (cellSize <= 0f) return
+            bounds.set(0f, 0f, width.toFloat(), height.toFloat())
+            paint.color = 0xFF181A20.toInt()
+            val corner = spacing * 8
+            canvas.drawRoundRect(bounds, corner, corner, paint)
             val left = (width - columns * cellSize) / 2
             val top = (height - rows * cellSize) / 2
             piece.cells.forEach { drawCell(canvas, left, top, it.x, it.y, piece.color) }

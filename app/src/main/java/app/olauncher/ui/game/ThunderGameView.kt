@@ -5,8 +5,12 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.SoundPool
+import android.os.Build
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -15,6 +19,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
 import kotlin.math.abs
@@ -22,12 +27,13 @@ import kotlin.math.max
 
 internal class ThunderGameView(
     context: Context,
+    restoredState: ThunderBlocks.State? = null,
     private val exit: () -> Unit,
 ) : LinearLayout(context) {
     private val settings = context.getSharedPreferences("thunder_blocks", Context.MODE_PRIVATE)
-    private var game = ThunderBlocks()
-    private var best = settings.getLong("best", 0L)
-    private var paused = false
+    private var game = ThunderBlocks(state = restoredState)
+    private var best = max(settings.getLong("best", 0L), game.score)
+    private var paused = restoredState != null
     private var musicEnabled = settings.getBoolean("music", true)
     private var soundEnabled = settings.getBoolean("sound", true)
     private val board = ThunderBoardView(context)
@@ -39,8 +45,15 @@ internal class ThunderGameView(
         .setUsage(AudioAttributes.USAGE_GAME)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
         .build()
+    private val audioManager = context.getSystemService(AudioManager::class.java)
+    private var focusListener: AudioManager.OnAudioFocusChangeListener? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private var focusGranted = false
+    private var focusBlocked = false
     private var music: MediaPlayer? = null
     private var musicReady = false
+    private var musicPlaying = false
+    private var exitConfirmation: AlertDialog? = null
     private val sounds = SoundPool.Builder().setMaxStreams(3).setAudioAttributes(audioAttributes).build()
     private val lockSound = sounds.load(context, R.raw.thunder_lock, 1)
     private val clearSound = sounds.load(context, R.raw.thunder_clear, 1)
@@ -63,6 +76,7 @@ internal class ThunderGameView(
     private val dropButton = button(R.string.thunder_game_drop_icon, ::hardDrop)
     private val musicButton = button(R.string.thunder_game_music_on) {
         musicEnabled = !musicEnabled
+        focusBlocked = false
         settings.edit().putBoolean("music", musicEnabled).apply()
         updateMusic()
         updateControls()
@@ -76,9 +90,13 @@ internal class ThunderGameView(
     private val dockResumeButton = button(R.string.thunder_game_resume, ::resumeGame)
     private val dockExitButton = button(R.string.thunder_game_exit, exit)
     private val running get() = !paused && !game.gameOver
+    private var lockClock: Long? = null
     private val tick = Runnable {
         if (running) {
-            if (game.step()) onLock() else board.invalidate()
+            if (lockClock != null) settleLockClock() else {
+                game.step()
+                board.invalidate()
+            }
             scheduleTick()
         }
     }
@@ -112,7 +130,7 @@ internal class ThunderGameView(
         }
         rail.addView(stats)
         rail.addView(label(R.string.thunder_game_next))
-        rail.addView(preview, LayoutParams(LayoutParams.MATCH_PARENT, dp(56)))
+        rail.addView(preview, LayoutParams(LayoutParams.MATCH_PARENT, dp(64)))
         listOf(pauseButton, musicButton, soundButton, button(R.string.thunder_game_exit, exit)).forEach {
             rail.addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }
@@ -146,22 +164,45 @@ internal class ThunderGameView(
         scheduleTick()
     }
 
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        if (isVisible) updateMusic() else suspendMusic()
+    }
+
     override fun onDetachedFromWindow() {
         removeCallbacks(tick)
+        lockClock = null
+        exitConfirmation?.dismiss()
         saveBest()
-        music?.release()
-        music = null
-        musicReady = false
+        abandonMusicFocus()
+        releaseMusic()
         sounds.release()
         super.onDetachedFromWindow()
     }
 
+    fun snapshot(): ThunderBlocks.State =
+        game.snapshot(lockClock?.let { SystemClock.uptimeMillis() - it } ?: 0L)
+
     fun handleBack() {
-        if (game.gameOver) exit() else pauseGame()
+        when {
+            game.gameOver -> exit()
+            !paused -> pauseGame()
+            exitConfirmation == null -> {
+                exitConfirmation = AlertDialog.Builder(context)
+                    .setMessage(R.string.thunder_game_confirm_exit)
+                    .setNegativeButton(R.string.thunder_game_resume) { _, _ -> resumeGame() }
+                    .setPositiveButton(R.string.thunder_game_exit) { _, _ -> exit() }
+                    .create().apply {
+                        setOnDismissListener { exitConfirmation = null }
+                        show()
+                    }
+            }
+        }
     }
 
     fun pauseGame() {
-        if (paused || game.gameOver) return
+        if (!running) return
+        settleLockClock()
         paused = true
         trackingTouch = false
         scheduleTick()
@@ -172,6 +213,7 @@ internal class ThunderGameView(
 
     private fun resumeGame() {
         paused = false
+        focusBlocked = false
         updateMusic()
         scheduleTick()
         updateControls()
@@ -210,14 +252,17 @@ internal class ThunderGameView(
     }
 
     private fun rotatePiece() {
-        if (running && game.rotate()) {
+        if (!running || finishExpiredLock()) return
+        val wasGrounded = game.lockRemaining != null
+        if (game.rotate()) {
             play(rotateSound)
             board.invalidate()
         }
+        if (wasGrounded || game.lockRemaining != null) scheduleTick()
     }
 
     private fun hardDrop() {
-        if (!running) return
+        if (!running || finishExpiredLock()) return
         game.drop()
         onLock()
         scheduleTick()
@@ -263,24 +308,23 @@ internal class ThunderGameView(
     private fun moveWithFinger(dx: Float, dy: Float) {
         val cell = board.cellSize
         if (cell <= 0f) return
+        val wasGrounded = game.lockRemaining != null
         when (drag) {
             Drag.HORIZONTAL -> {
                 val shift = (dx / cell).toInt()
-                if (shift == 0) return
-                repeat(abs(shift).coerceAtMost(ThunderBlocks.COLUMNS)) { game.move(if (shift > 0) 1 else -1) }
+                if (shift == 0 || finishExpiredLock()) return
+                for (step in 0 until abs(shift).coerceAtMost(ThunderBlocks.COLUMNS)) {
+                    if (!game.move(if (shift > 0) 1 else -1)) break
+                }
                 anchorX += shift * cell
             }
             Drag.DOWN -> {
                 if (dy < 0) anchorY += dy
                 val down = (dy / cell).toInt()
-                if (down <= 0) return
+                if (down <= 0 || finishExpiredLock()) return
                 anchorY += down * cell
                 for (step in 0 until down.coerceAtMost(ThunderBlocks.ROWS)) {
-                    if (game.step(softDrop = true)) {
-                        onLock()
-                        scheduleTick()
-                        break
-                    }
+                    if (!game.step(softDrop = true) || game.lockRemaining != null) break
                 }
                 best = max(best, game.score)
                 updateStats()
@@ -288,11 +332,30 @@ internal class ThunderGameView(
             null -> return
         }
         board.invalidate()
+        if (wasGrounded || game.lockRemaining != null) scheduleTick()
+    }
+
+    private fun settleLockClock(): Boolean {
+        val started = lockClock ?: return false
+        lockClock = null
+        if (!game.elapseLockTime(SystemClock.uptimeMillis() - started)) return false
+        onLock()
+        return true
+    }
+
+    private fun finishExpiredLock(): Boolean {
+        if (!settleLockClock()) return false
+        scheduleTick()
+        return true
     }
 
     private fun scheduleTick() {
         removeCallbacks(tick)
-        if (running && isAttachedToWindow) postDelayed(tick, game.interval)
+        lockClock = null
+        if (!running || !isAttachedToWindow) return
+        val remaining = game.lockRemaining
+        if (remaining != null) lockClock = SystemClock.uptimeMillis()
+        postDelayed(tick, remaining ?: game.interval)
     }
 
     private fun updateControls() {
@@ -323,13 +386,22 @@ internal class ThunderGameView(
         stats.text = if (status == null) values else context.getString(status) + "\n" + values
     }
 
+    private val wantsMusic get() = musicEnabled && running && isAttachedToWindow && isShown &&
+        windowVisibility == VISIBLE
+
     private fun updateMusic() {
-        if (!musicEnabled || !running || !isAttachedToWindow) {
-            if (musicReady) music?.pause()
+        if (!wantsMusic) {
+            suspendMusic()
             return
         }
+        if (focusBlocked) return
+        if (focusListener == null) requestMusicFocus()
+        if (!focusGranted) return
         if (musicReady) {
-            music?.start()
+            if (!musicPlaying) {
+                music?.start()
+                musicPlaying = true
+            }
         } else if (music == null) {
             val player = MediaPlayer()
             music = player
@@ -341,21 +413,98 @@ internal class ThunderGameView(
                 player.isLooping = true
                 player.setVolume(0.35f, 0.35f)
                 player.setOnPreparedListener {
+                    if (music !== it) return@setOnPreparedListener
                     musicReady = true
                     updateMusic()
                 }
                 player.setOnErrorListener { failed, _, _ ->
-                    failed.release()
-                    music = null
-                    musicReady = false
+                    if (music === failed) {
+                        releaseMusic()
+                        abandonMusicFocus()
+                    }
                     true
                 }
                 player.prepareAsync()
             } catch (_: Exception) {
-                player.release()
-                music = null
+                releaseMusic()
+                abandonMusicFocus()
             }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun requestMusicFocus() {
+        val listener = object : AudioManager.OnAudioFocusChangeListener {
+            override fun onAudioFocusChange(change: Int) {
+                if (focusListener !== this) return
+                when (change) {
+                    AudioManager.AUDIOFOCUS_GAIN -> {
+                        focusGranted = true
+                        updateMusic()
+                    }
+                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                    AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                        focusGranted = false
+                        pauseMusic()
+                    }
+                    AudioManager.AUDIOFOCUS_LOSS -> {
+                        focusBlocked = true
+                        abandonMusicFocus()
+                        releaseMusic()
+                    }
+                }
+            }
+        }
+        focusListener = listener
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(audioAttributes)
+                .setWillPauseWhenDucked(true)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(listener)
+                .build()
+            focusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            audioManager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        }
+        focusGranted = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_FAILED) {
+            focusBlocked = true
+            abandonMusicFocus()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun abandonMusicFocus() {
+        val listener = focusListener ?: return
+        focusListener = null
+        focusGranted = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            focusRequest = null
+        } else {
+            audioManager.abandonAudioFocus(listener)
+        }
+    }
+
+    private fun pauseMusic() {
+        if (!musicPlaying) return
+        music?.pause()
+        musicPlaying = false
+    }
+
+    private fun suspendMusic() {
+        pauseMusic()
+        abandonMusicFocus()
+    }
+
+    private fun releaseMusic() {
+        val player = music
+        music = null
+        musicReady = false
+        musicPlaying = false
+        player?.release()
     }
 
     private fun play(sound: Int) {
