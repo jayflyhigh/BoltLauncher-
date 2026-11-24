@@ -437,6 +437,13 @@ class AppDrawerAdapter(
             val context = binding.root.context
             with(binding) {
                 when (theme) {
+                    Prefs.LauncherTheme.COZY_QUEST -> {
+                        searchRename.setImageResource(R.drawable.bolt_cozy_rename)
+                        searchPlayStore.setImageResource(R.drawable.bolt_cozy_store)
+                        searchAddAlias.setImageResource(R.drawable.bolt_cozy_alias)
+                        searchAppInfo.setImageResource(R.drawable.bolt_cozy_info)
+                        searchUninstall.setImageResource(R.drawable.bolt_cozy_delete)
+                    }
                     Prefs.LauncherTheme.WINDOWS_XP -> {
                         searchRename.setXpIcon(R.drawable.xp_rename)
                         searchPlayStore.setXpIcon(R.drawable.xp_store)
@@ -458,7 +465,7 @@ class AppDrawerAdapter(
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint
                         }
-                        searchUninstall.imageTintList = if (eInk || cozyQuest) tint else
+                        searchUninstall.imageTintList = if (eInk) tint else
                             AppCompatResources.getColorStateList(context, R.color.bolt_app_uninstall_tint)
                     }
                 }

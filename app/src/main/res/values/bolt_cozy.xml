@@ -1,13 +1,26 @@
 <resources>
     <string name="bolt_cozy" translatable="false">Cozy Quest</string>
-    <color name="bolt_cozy_ivory">#F7E9C7</color>
-    <color name="bolt_cozy_ink">#38271D</color>
-    <color name="bolt_cozy_rule">#6B7D3A</color>
-    <color name="bolt_cozy_secondary">#654B37</color>
-    <color name="bolt_cozy_chip">#394A26</color>
+    <color name="bolt_cozy_ivory">#FFF1D2</color>
+    <color name="bolt_cozy_ink">#463427</color>
+    <color name="bolt_cozy_rule">#718953</color>
+    <color name="bolt_cozy_secondary">#66513F</color>
+    <color name="bolt_cozy_chip">#315648</color>
     <color name="bolt_cozy_whatsapp">#157443</color>
 
+    <string name="bolt_cozy_home_hint">Find something…</string>
+    <string name="bolt_cozy_search_hint">Find apps or people…</string>
+    <string name="bolt_cozy_destination_hint">Search in an app…</string>
+    <string name="bolt_cozy_thunder_hint">Quick launch…</string>
+    <string name="bolt_cozy_rename_hint">Give it a new name</string>
+    <string name="bolt_cozy_contacts_section">People</string>
+    <string name="bolt_cozy_destinations_section">Search in apps</string>
+    <string name="bolt_cozy_launcher_settings">Launcher settings</string>
+    <string name="bolt_cozy_system_settings">Phone settings</string>
+    <string name="bolt_cozy_theme_menu">Themes</string>
+    <string name="bolt_cozy_power_menu">Power options</string>
+
     <style name="CozyQuestOverlay">
+        <item name="mainFontFamily">sans-serif</item>
         <item name="android:textColorPrimary">@color/bolt_cozy_ink</item>
         <item name="colorAccent">@color/bolt_cozy_ink</item>
         <item name="primaryColor">@color/bolt_cozy_ink</item>
@@ -39,17 +52,17 @@
         <item name="boltPopupTopColor">@color/bolt_cozy_ivory</item>
         <item name="boltPopupBottomColor">@color/bolt_cozy_ivory</item>
         <item name="boltSettingsSurfaceColor">@color/bolt_cozy_ivory</item>
-        <item name="boltSettingsCardColor">@color/bolt_cozy_ivory</item>
-        <item name="boltSettingsCardBottomColor">@color/bolt_cozy_ivory</item>
+        <item name="boltSettingsCardColor">#FFF8E9</item>
+        <item name="boltSettingsCardBottomColor">#F4E4BA</item>
         <item name="boltDialogOutlineColor">@color/bolt_cozy_rule</item>
         <item name="boltPopupOutlineColor">@color/bolt_cozy_rule</item>
         <item name="boltSettingsCardOutlineColor">@color/bolt_cozy_rule</item>
-        <item name="boltThunderDockColor">#253C22</item>
+        <item name="boltThunderDockColor">#224E43</item>
         <item name="boltThunderPulseColor">@color/bolt_cozy_secondary</item>
         <item name="boltRowColor">@android:color/transparent</item>
         <item name="boltRowBottomColor">@android:color/transparent</item>
-        <item name="boltSelectedRowColor">#F8D5B5</item>
-        <item name="boltSelectedRowEndColor">#F8D5B5</item>
+        <item name="boltSelectedRowColor">#FFD4AE</item>
+        <item name="boltSelectedRowEndColor">#FFD4AE</item>
         <item name="boltSelectedRowOutlineColor">@color/bolt_cozy_rule</item>
         <item name="boltPanelCornerRadius">18dp</item>
         <item name="boltThunderCursorColor">@color/bolt_cozy_ivory</item>
