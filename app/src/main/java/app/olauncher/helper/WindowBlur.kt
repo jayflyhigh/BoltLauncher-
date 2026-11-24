@@ -23,7 +23,9 @@ private const val DIM_WITH_BLUR = 0.3f
  */
 class WindowBlur(private val window: Window) {
 
-    private val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !window.context.isEinkDisplay()
+    private val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        !window.context.isEinkDisplay() && !window.context.isSystemAnimationsDisabled() &&
+        window.attributes.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0
     private val duration = window.context.resources.getInteger(R.integer.dialog_anim_duration).toLong()
     private val radius = window.context.resources.getDimensionPixelSize(R.dimen.dialog_blur_behind_radius)
     private val dimWithoutBlur = window.attributes.dimAmount
@@ -34,9 +36,7 @@ class WindowBlur(private val window: Window) {
 
     /** Call after the window is shown so its theme attributes have been resolved. */
     fun fadeIn() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !supported ||
-            window.attributes.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND == 0
-        ) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !supported) return
         start()
     }
 
@@ -64,7 +64,11 @@ class WindowBlur(private val window: Window) {
                 animateTo(1f)
             } else {
                 animator?.cancel()
-                window.setDimAmount(dimWithoutBlur)
+                fraction = 0f
+                window.attributes = window.attributes.apply {
+                    blurBehindRadius = 0
+                    dimAmount = dimWithoutBlur
+                }
             }
         }
         window.windowManager.addCrossWindowBlurEnabledListener(onAvailabilityChanged)
@@ -91,7 +95,9 @@ class WindowBlur(private val window: Window) {
     @RequiresApi(Build.VERSION_CODES.S)
     private fun apply(fraction: Float) {
         this.fraction = fraction
-        window.attributes = window.attributes.apply { blurBehindRadius = (radius * fraction).toInt() }
-        window.setDimAmount(DIM_WITH_BLUR * fraction)
+        window.attributes = window.attributes.apply {
+            blurBehindRadius = (radius * fraction).toInt()
+            dimAmount = DIM_WITH_BLUR * fraction
+        }
     }
 }

@@ -568,7 +568,8 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun refreshDestinations() {
-        val show = supportsDestinations && expanded && (destinationsOnly || currentResultsQuery().isNotBlank())
+        val show = supportsDestinations && expanded && !thunderMode &&
+            (destinationsOnly || currentResultsQuery().isNotBlank())
         val targets = if (show) {
             activeAlias?.let(::listOf) ?: inAppSearch.targets.filterNot { it.hidden }
                 .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, InAppSearch.Target::appLabel))
@@ -797,7 +798,6 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun applySearchColors() {
-        binding.search.setThunderCursor(thunderMode)
         binding.dockBolt.contentDescription = getString(
             when {
                 thunderMode -> R.string.bolt_disable_thunder
@@ -815,6 +815,7 @@ class AppDrawerFragment : BaseFragment() {
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
         if (dockUsesDarkText != lightDock) {
             dockUsesDarkText = lightDock
+            binding.search.setDarkDockText(lightDock)
             binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
             val renameActionColor = if (lightDock) 0xFF303030.toInt() else Color.WHITE
             binding.renameConfirm.setTextColor(renameActionColor)
@@ -892,17 +893,18 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun filterContacts(query: String) {
         if (destinationsOnly) return
-        if (!expanded || thunderMode || flag != Constants.FLAG_LAUNCH_APP || query.isBlank()) {
+        if (!expanded || thunderMode || flag != Constants.FLAG_LAUNCH_APP || query.isBlank() ||
+            !hasContactsPermission()) {
             contactsAdapter.clearResults()
             updateSearchSections()
             updateDockButtons()
             return
         }
-        contactsAdapter.filter(query, showAll = false) {
+        contactsAdapter.filter(query, showAll = false) { changed ->
             if (destinationsOnly) return@filter
             updateSearchSections()
             updateResultHighlight(query)
-            positionResults()
+            if (changed) positionResults()
             updateSearchStatus()
         }
         loadContactsIfAllowed()
@@ -1008,12 +1010,13 @@ class AppDrawerFragment : BaseFragment() {
             }
             if (text != status) text = status
             val color = context.getColorFromAttr(
-                if (statusIsResult) R.attr.boltResultSecondaryColor else R.attr.boltHomeMenuTextColor,
+                if (statusIsResult) R.attr.boltSelectedRowSecondaryColor else R.attr.boltHomeMenuTextColor,
             )
             if (currentTextColor != color) setTextColor(color)
             isVisible = feedback != null || offerWeb || thunderEmpty
             if (panel.statusIsResult != statusIsResult) {
                 panel.statusIsResult = statusIsResult
+                isSelected = statusIsResult
                 setBackgroundResource(
                     if (statusIsResult) R.drawable.bolt_search_best_match else R.drawable.rounded_primary_gradient,
                 )
@@ -1081,8 +1084,10 @@ class AppDrawerFragment : BaseFragment() {
         val shortcuts = binding.contactShortcuts
         val slot = binding.contactShortcutSlot
         val shortcutWidth = 3 * resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width)
-        val animate = canOpenWebSearch(currentResultsQuery()) && LauncherMotion.isEnabled(shortcuts.context)
-        if (shortcutsRequested != showShortcuts || (!animate && slot.isVisible != showShortcuts)) {
+        val shortcutsChanged = shortcutsRequested != showShortcuts
+        val animate = (shortcutsChanged || slot.isVisible != showShortcuts) &&
+            canOpenWebSearch(currentResultsQuery()) && LauncherMotion.isEnabled(shortcuts.context)
+        if (shortcutsChanged || (!animate && slot.isVisible != showShortcuts)) {
             shortcutsRequested = showShortcuts
             shortcuts.animate().cancel()
             if (!animate) {
@@ -1128,11 +1133,12 @@ class AppDrawerFragment : BaseFragment() {
             actions.setBackgroundResource(if (slot.isVisible) R.drawable.bolt_contact_action_group else 0)
             actions.setPadding(0, 0, 0, 0)
         }
+        val boltWidth = resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
         val actionsWidth = when {
             showWeb -> web.layoutParams.width + if (slot.isVisible) shortcutWidth else 0
-            searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2
-            thunderMode || (!expanded && flag == Constants.FLAG_LAUNCH_APP) ->
-                resources.getDimensionPixelSize(R.dimen.bolt_search_button_width)
+            searchRename != null -> resources.getDimensionPixelSize(R.dimen.bolt_rename_action_width) * 2 +
+                if (thunderMode) boltWidth else 0
+            thunderMode || (!expanded && flag == Constants.FLAG_LAUNCH_APP) -> boltWidth
             else -> 0
         }
         val divider = binding.dockWebDivider

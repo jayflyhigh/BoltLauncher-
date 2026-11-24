@@ -114,7 +114,7 @@
     </style>
 
     <style name="SmokedGlassOverlay">
-        <item name="boltSelectedTypoHintColor">?attr/boltResultActionColor</item>
+        <item name="boltSelectedTypoHintColor">#FFF8E8</item>
         <item name="boltDockColor">#E818191C</item>
         <item name="boltPanelColor">#D4191A1D</item>
         <item name="boltSearchSectionColor">#D7D8DC</item>
@@ -169,8 +169,7 @@
         <item name="boltSelectedTypoHintColor">#FFFFFF</item>
         <item name="boltSearchSectionColor">#173D70</item>
         <item name="boltThunderDockColor">#28622B</item>
-        <item name="boltThunderCursorColor">#FFFFFF</item>
-        <item name="boltThunderMatchTextColor">#143E7B</item>
+        <item name="boltThunderMatchTextColor">#0056A8</item>
     </style>
 
     <style name="WiiUOverlay">
@@ -221,7 +220,7 @@
         <item name="boltThunderDockColor">#55D9FA</item>
         <item name="boltThunderPulseColor">#006585</item>
         <item name="boltSearchCursorColor">#D0F5FF</item>
-        <item name="boltThunderMatchTextColor">#005B78</item>
+        <item name="boltThunderMatchTextColor">#006D91</item>
         <item name="boltIconTileTopColor">#08688B</item>
         <item name="boltIconTileBottomColor">#004965</item>
         <item name="boltIconTileOutlineColor">#086180</item>

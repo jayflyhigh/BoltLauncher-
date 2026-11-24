@@ -6,7 +6,6 @@ import androidx.core.view.isVisible
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.ContactNameMatcher
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.ContactsContract
@@ -118,7 +117,7 @@ class ContactSearchAdapter(
     private var filterJob: Job? = null
     private var filterGeneration = 0L
 
-    fun filter(query: String, showAll: Boolean = true, applied: () -> Unit = {}) {
+    fun filter(query: String, showAll: Boolean = true, applied: (Boolean) -> Unit = {}) {
         filterJob?.cancel()
         committedQuery = null
         val generation = ++filterGeneration
@@ -153,9 +152,9 @@ class ContactSearchAdapter(
             if (generation != filterGeneration || source !== contacts) return@launch
             val previousTypoMatches = typoMatches
             typoMatches = fuzzy
-            if (results != filtered) {
+            if (changes != null) {
                 results = filtered
-                changes?.dispatchUpdatesTo(this@ContactSearchAdapter)
+                changes.dispatchUpdatesTo(this@ContactSearchAdapter)
             }
             if (previousTypoMatches != fuzzy) {
                 filtered.forEachIndexed { index, contact ->
@@ -165,7 +164,7 @@ class ContactSearchAdapter(
                 }
             }
             committedQuery = query
-            applied()
+            applied(changes != null)
         }
     }
 
@@ -195,9 +194,11 @@ class ContactSearchAdapter(
         var photoJob: Job? = null
         private val liquidGlass = app.olauncher.data.Prefs(binding.root.context).launcherTheme ==
             app.olauncher.data.Prefs.LauncherTheme.LIQUID_GLASS
+        private val avatarText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+        private val avatarFill = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowColor)
         private val initial = TextView(binding.root.context).apply {
             gravity = android.view.Gravity.CENTER
-            setTextColor(if (liquidGlass) Color.WHITE else Color.BLACK)
+            setTextColor(avatarText)
             textSize = 20f
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
@@ -230,7 +231,21 @@ class ContactSearchAdapter(
                 marginEnd = (24 * density).toInt()
             })
             binding.root.addView(initial, FrameLayout.LayoutParams(binding.appIcon.layoutParams as FrameLayout.LayoutParams))
+            val radius = (36f * 18f / 52f) * binding.root.resources.displayMetrics.density
+            binding.appIcon.apply {
+                if (liquidGlass) {
+                    setBackgroundResource(R.drawable.liquid_glass_icon_frame)
+                    val inset = (3 * resources.displayMetrics.density).toInt()
+                    setPadding(inset, inset, inset, inset)
+                } else {
+                    background = GradientDrawable().apply { setColor(avatarFill); cornerRadius = radius }
+                }
+                clipToOutline = true
+                scaleType = ImageView.ScaleType.CENTER_CROP
+            }
         }
+        private val normalText = binding.root.context.getColorFromAttr(R.attr.boltResultTextColor)
+        private val normalNumber = binding.root.context.getColorFromAttr(R.attr.boltResultSecondaryColor)
         private val selectedText = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
         private val selectedNumber = binding.root.context.getColorFromAttr(R.attr.boltSelectedRowSecondaryColor)
 
@@ -245,11 +260,9 @@ class ContactSearchAdapter(
             }
             androidx.core.view.ViewCompat.setStateDescription(binding.root,
                 state?.let(binding.root.resources::getString))
-            binding.appTitle.setTextColor(if (highlighted) selectedText else
-                binding.root.context.getColorFromAttr(R.attr.boltResultTextColor))
+            binding.appTitle.setTextColor(if (highlighted) selectedText else normalText)
             binding.updateTypoHint(showTypoHints && contact.uri in typoMatches)
-            binding.contactNumber.setTextColor(if (highlighted) selectedNumber else
-                binding.root.context.getColorFromAttr(R.attr.boltResultSecondaryColor))
+            binding.contactNumber.setTextColor(if (highlighted) selectedNumber else normalNumber)
         }
 
         fun bind(contact: Contact) {
@@ -264,19 +277,7 @@ class ContactSearchAdapter(
             binding.otherProfileIndicator.visibility = View.GONE
             binding.appHideLayout.visibility = View.GONE
             binding.renameLayout.visibility = View.GONE
-            val radius = (36f * 18f / 52f) * binding.root.resources.displayMetrics.density
-            binding.appIcon.apply {
-                if (liquidGlass) {
-                    setBackgroundResource(R.drawable.liquid_glass_icon_frame)
-                    val inset = (3 * resources.displayMetrics.density).toInt()
-                    setPadding(inset, inset, inset, inset)
-                } else {
-                    background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = radius }
-                }
-                clipToOutline = true
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageDrawable(null)
-            }
+            binding.appIcon.setImageDrawable(null)
             initial.text = contact.name.trim().let { name ->
                 if (name.isEmpty()) "?" else String(Character.toChars(name.codePointAt(0))).uppercase(Locale.getDefault())
             }

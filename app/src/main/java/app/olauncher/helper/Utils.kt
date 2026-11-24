@@ -77,8 +77,9 @@ suspend fun getAppsList(
         val appList: MutableList<AppModel> = mutableListOf()
 
         try {
-            if (!Prefs(context).hiddenAppsUpdated) upgradeHiddenApps(Prefs(context))
-            val hiddenApps = Prefs(context).hiddenApps
+            if (!prefs.hiddenAppsUpdated) upgradeHiddenApps(prefs)
+            val hiddenApps = prefs.hiddenApps
+            val newAppCutoff = System.currentTimeMillis() - Constants.ONE_HOUR_IN_MILLIS
 
             val userManager = context.getSystemService(Context.USER_SERVICE) as UserManager
             val launcherApps =
@@ -95,33 +96,25 @@ suspend fun getAppsList(
                     e.printStackTrace()
                     continue
                 }
+                val profileKey = profile.toString()
                 for (app in activityList) {
                     ensureActive()
                     try {
+                        val packageName = app.componentName.packageName
+                        val hidden = "$packageName|$profileKey" in hiddenApps
+                        if (hidden && !includeHiddenApps || !hidden && !includeRegularApps) continue
+
                         val originalLabel = app.label.toString()
-                        val appLabelShown = prefs.getAppRenameLabel(app.applicationInfo.packageName)
-                            .ifBlank { originalLabel }
-                        val appModel = AppModel.App(
+                        val appLabelShown = prefs.getAppRenameLabel(packageName).ifBlank { originalLabel }
+                        appList.add(AppModel.App(
                             appLabel = appLabelShown,
                             originalLabel = originalLabel,
                             key = collator.getCollationKey(appLabelShown),
-                            appPackage = app.applicationInfo.packageName,
+                            appPackage = packageName,
                             activityClassName = app.componentName.className,
-                            isNew = (System.currentTimeMillis() - app.firstInstallTime) < Constants.ONE_HOUR_IN_MILLIS,
-                            user = profile
-                        )
-
-                        // is this a hidden app?
-                        if (hiddenApps.contains(app.applicationInfo.packageName + "|" + profile.toString())) {
-                            if (includeHiddenApps) {
-                                appList.add(appModel)
-                            }
-                        } else {
-                            // this is a regular app
-                            if (includeRegularApps) {
-                                appList.add(appModel)
-                            }
-                        }
+                            isNew = app.firstInstallTime > newAppCutoff,
+                            user = profile,
+                        ))
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
