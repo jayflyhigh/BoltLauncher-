@@ -57,6 +57,7 @@ import app.olauncher.data.Prefs
 import app.olauncher.databinding.DialogHomeSettingsBinding
 import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.ContactLoadResult
+import app.olauncher.helper.contactWinsBestMatch
 import app.olauncher.helper.InAppSearch
 import app.olauncher.helper.MyAccessibilityService
 import app.olauncher.helper.deletePinnedShortcut
@@ -81,11 +82,13 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var contactsAdapter: ContactSearchAdapter
     private var contactsLoad: Job? = null
     private var contactsLoaded = false
+    private var contactsLoadFailed = false
     private var observingContacts = false
     private var askedForContacts = false
     private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
             contactsLoaded = false
+            contactsLoadFailed = false
             contactsLoad?.cancel()
             contactsLoad = null
             loadContactsIfAllowed()
@@ -112,7 +115,10 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var inAppSearch: InAppSearch
     private lateinit var destinationAdapter: SearchDestinationAdapter
     private lateinit var destinationSection: SearchSectionAdapter
+    private lateinit var appResults: ConcatAdapter
+    private lateinit var contactResults: ConcatAdapter
     private lateinit var normalResults: ConcatAdapter
+    private val contactsFirst get() = normalResults.adapters.firstOrNull() === contactResults
     private lateinit var searchResults: ConcatAdapter
     private var displayedDestinations = emptyList<InAppSearch.Target>()
     private var homeDestinations = false
@@ -597,6 +603,7 @@ class AppDrawerFragment : BaseFragment() {
                     activeAlias?.takeIf { query.isNotBlank() }?.let { launchDestination(it, query) }
                     return@setOnEditorActionListener true
                 }
+                updateResultHighlight(query)
                 val highlightedContact = contactsAdapter.enterHighlightedResult
                     ?.takeIf { highlightedContactQuery == query && contactsAdapter.committedQuery == query }
                 when {
@@ -604,7 +611,8 @@ class AppDrawerFragment : BaseFragment() {
                     offersWebFallback(query) -> openWebSearch(query)
                     adapter.committedQuery == query -> {
                         val app = adapter.enterHighlightedResult?.takeIf { it in adapter.currentList }
-                        if (app != null) launchResult(app) else adapter.launchFirstInList()
+                        if (app != null) launchResult(app)
+                        else if (query.isBlank() || flag != Constants.FLAG_LAUNCH_APP) adapter.launchFirstInList()
                     }
                 }
             }
@@ -727,22 +735,25 @@ class AppDrawerFragment : BaseFragment() {
         val appCount = adapter.itemCount.takeIf { adapter.committedQuery == query } ?: return
         val contacts = contactsAdapter.currentList.takeIf { contactsAdapter.committedQuery == query }.orEmpty()
         val highlighted = currentHighlight(query) ?: return
-        // The concatenated adapter starts at the bottom. Section headers are outside this index.
+        // Adapter order follows the bottom-first section order, excluding headers here.
+        val appOffset = if (contactsFirst) contacts.size else 0
+        val contactOffset = if (contactsFirst) 0 else appCount
         val currentIndex = if (highlighted.app != null) {
-            adapter.currentList.indexOf(highlighted.app).takeIf { it >= 0 } ?: return
+            val index = adapter.currentList.indexOf(highlighted.app).takeIf { it >= 0 } ?: return
+            appOffset + index
         } else {
             val index = contacts.indexOfFirst { it.uri == highlighted.contact }.takeIf { it >= 0 } ?: return
-            appCount + index
+            contactOffset + index
         }
         val nextIndex = currentIndex + direction
         if (nextIndex !in 0 until (appCount + contacts.size)) return
         adapter.closeSearchActions()
-        val position = if (nextIndex < appCount) {
-            movedHighlight = ResultHighlight(query, app = adapter.currentList[nextIndex])
-            nextIndex
+        val position = if (nextIndex in appOffset until appOffset + appCount) {
+            movedHighlight = ResultHighlight(query, app = adapter.currentList[nextIndex - appOffset])
+            nextIndex + if (contactsFirst) contactsSection.itemCount else 0
         } else {
-            movedHighlight = ResultHighlight(query, contact = contacts[nextIndex - appCount].uri)
-            nextIndex + appsSection.itemCount
+            movedHighlight = ResultHighlight(query, contact = contacts[nextIndex - contactOffset].uri)
+            nextIndex + if (contactsFirst) 0 else appsSection.itemCount
         }
         contactsAdapter.clearSelection()
         dismissedShortcutsQuery = null
@@ -962,6 +973,7 @@ class AppDrawerFragment : BaseFragment() {
             when (val result = ContactSearchAdapter.load(context)) {
                 is ContactLoadResult.Success -> {
                     contactsLoaded = true
+                    contactsLoadFailed = false
                     contactsAdapter.contacts = result.contacts
                     filterContacts(currentResultsQuery())
                 }
@@ -971,7 +983,11 @@ class AppDrawerFragment : BaseFragment() {
                     updateSearchStatus()
                     updateResultHighlight(currentResultsQuery())
                 }
-                is ContactLoadResult.Failure -> Unit
+                is ContactLoadResult.Failure -> {
+                    contactsLoadFailed = true
+                    updateResultHighlight(currentResultsQuery())
+                    updateSearchStatus()
+                }
             }
         }
     }
@@ -986,7 +1002,7 @@ class AppDrawerFragment : BaseFragment() {
             return
         }
         contactsAdapter.filter(query, showAll = false) { changed ->
-            if (destinationsOnly) return@filter
+            if (query != currentResultsQuery() || destinationsOnly || thunderMode) return@filter
             updateSearchSections()
             updateResultHighlight(query)
             if (changed) positionResults()
@@ -1057,8 +1073,8 @@ class AppDrawerFragment : BaseFragment() {
     private fun hasEmptySearchResults(query: String): Boolean {
         return expanded && flag == Constants.FLAG_LAUNCH_APP && searchRename == null &&
             query.isNotBlank() && adapter.committedQuery == query && adapter.itemCount == 0 &&
-            (thunderMode || (contactsAdapter.committedQuery == query && contactsAdapter.itemCount == 0) ||
-                !hasContactsPermission())
+            (thunderMode || !hasContactsPermission() || contactsLoadFailed ||
+                (contactsLoaded && contactsAdapter.committedQuery == query && contactsAdapter.itemCount == 0))
     }
 
     private fun canOpenWebSearch(query: String): Boolean =
@@ -1141,23 +1157,33 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun updateResultHighlight(query: String) {
-        val showHighlight = expanded && !thunderMode && flag == Constants.FLAG_LAUNCH_APP && query.isNotBlank()
-        val appsReady = showHighlight && adapter.committedQuery == query
-        val contactsReady = showHighlight && contactsAdapter.committedQuery == query
-        val moved = movedHighlight?.takeIf { showHighlight && it.query == query }
-        val movedApp = moved?.app?.takeIf { appsReady && it in adapter.currentList }
-        val movedContact = moved?.contact?.takeIf { contactsReady }?.let { uri ->
-            contactsAdapter.currentList.firstOrNull { it.uri == uri }
+        val showHighlight = expanded && !thunderMode && !destinationsOnly &&
+            flag == Constants.FLAG_LAUNCH_APP && query.isNotBlank()
+        val contactsAvailable = showHighlight && hasContactsPermission()
+        val contactsReady = contactsAvailable && (contactsLoaded || contactsLoadFailed) &&
+            contactsAdapter.committedQuery == query
+        val ready = showHighlight && adapter.committedQuery == query &&
+            (!contactsAvailable || contactsReady || contactsLoadFailed)
+        val app = adapter.firstLaunchableResult.takeIf { ready }
+        val contact = contactsAdapter.firstResult.takeIf { ready && contactsReady }
+        val contactWins = contactWinsBestMatch(query, app?.appLabel, contact?.name)
+        if ((!showHighlight || ready) && contactsFirst != contactWins) {
+            val firstSection = if (contactWins) contactResults else appResults
+            normalResults.removeAdapter(firstSection)
+            normalResults.addAdapter(0, firstSection)
+            scrolledFromBestMatch = false
+            positionResults()
         }
-        val selected = if (contactsReady) movedContact ?: contactsAdapter.selectedContact else null
-        if (showHighlight && selected == null && !appsReady) return
-        val app = if (appsReady && selected == null) movedApp ?: adapter.firstLaunchableResult else null
-        if (showHighlight && selected == null && app == null && !contactsReady &&
-            contactsLoaded && hasContactsPermission()) return
-        adapter.enterHighlightedResult = app
-        contactsAdapter.enterHighlightedResult = selected ?: if (contactsReady && appsReady && app == null)
-            contactsAdapter.firstResult else null
-        highlightedContactQuery = query.takeIf { contactsAdapter.enterHighlightedResult != null }
+        val moved = movedHighlight?.takeIf { ready && it.query == query }
+        val selected = if (contactsReady) {
+            moved?.contact?.let { uri -> contactsAdapter.currentList.firstOrNull { it.uri == uri } }
+                ?: contactsAdapter.selectedContact
+        } else null
+        val movedApp = moved?.app?.takeIf { it in adapter.currentList }
+        val winningContact = selected ?: contact.takeIf { contactWins && movedApp == null }
+        adapter.enterHighlightedResult = if (winningContact == null) movedApp ?: app else null
+        contactsAdapter.enterHighlightedResult = winningContact
+        highlightedContactQuery = query.takeIf { winningContact != null }
         updateDockButtons()
     }
 
@@ -1292,6 +1318,7 @@ class AppDrawerFragment : BaseFragment() {
         contactsLoad?.cancel()
         contactsLoad = null
         contactsLoaded = false
+        contactsLoadFailed = false
         if (observingContacts) {
             requireContext().contentResolver.unregisterContentObserver(contactsObserver)
             observingContacts = false
@@ -1805,7 +1832,9 @@ class AppDrawerFragment : BaseFragment() {
         contactsSection = SearchSectionAdapter(getString(if (cozySections) R.string.bolt_cozy_contacts_section else R.string.bolt_contacts_section))
         destinationSection = SearchSectionAdapter(getString(if (cozySections) R.string.bolt_cozy_destinations_section else R.string.bolt_search_section))
         destinationAdapter = SearchDestinationAdapter(::selectDestination, { activateAlias(it) }, { editAlias(it) })
-        normalResults = ConcatAdapter(adapter, appsSection, contactsAdapter, contactsSection)
+        appResults = ConcatAdapter(adapter, appsSection)
+        contactResults = ConcatAdapter(contactsAdapter, contactsSection)
+        normalResults = ConcatAdapter(appResults, contactResults)
         searchResults = ConcatAdapter(normalResults, destinationAdapter, destinationSection)
         binding.recyclerView.adapter = searchResults
         binding.recyclerView.itemAnimator = null

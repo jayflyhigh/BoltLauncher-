@@ -42,6 +42,7 @@ import app.olauncher.helper.thunderMatchRanges
 import app.olauncher.helper.normalizeForSearch
 import app.olauncher.helper.SearchTypoMatcher
 import app.olauncher.helper.appSearchRank
+import app.olauncher.helper.normalizeDisplayedName
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.showKeyboard
@@ -178,6 +179,8 @@ class AppDrawerAdapter(
         val generation = filterGeneration
         val thunder = thunderMode
         val trimmed = query.trim()
+        val exactName = query.normalizeDisplayedName()
+            .takeIf { !thunder && flag == Constants.FLAG_LAUNCH_APP }
         requestedQuery = query
         val apps = appsList
         val labelIndex = normalizedLabels
@@ -196,6 +199,8 @@ class AppDrawerAdapter(
                         val original = app.originalLabel
                         val originalNormalized = if (original == app.appLabel) null else labels.getValue(original)
                         when {
+                            exactName != null && app.appLabel.normalizeDisplayedName()
+                                .equals(exactName, ignoreCase = true) -> app to -1
                             matches(app.appLabel, label) -> app to appSearchRank(app.appLabel, trimmed)
                             originalNormalized != null && matches(original, originalNormalized) ->
                                 app to (4 + appSearchRank(original, trimmed))
