@@ -37,7 +37,15 @@ internal class SearchDestinationAdapter(
         }
     }
 
-    class Holder(val binding: AdapterSearchDestinationBinding) : RecyclerView.ViewHolder(binding.root)
+    class Holder(val binding: AdapterSearchDestinationBinding) : RecyclerView.ViewHolder(binding.root) {
+        init {
+            if (Prefs(binding.root.context).launcherTheme == Prefs.LauncherTheme.E_INK) {
+                binding.destinationBadge.isDuplicateParentStateEnabled = true
+                binding.destinationBadge.layoutParams.height =
+                    binding.root.resources.getDimensionPixelSize(R.dimen.bolt_eink_chip_height)
+            }
+        }
+    }
 
     private object Diff : DiffUtil.ItemCallback<InAppSearch.Target>() {
         override fun areItemsTheSame(oldItem: InAppSearch.Target, newItem: InAppSearch.Target): Boolean =
@@ -61,6 +69,7 @@ internal fun TextView.styleAliasBadge(color: Int) {
     val stroke = density.roundToInt().coerceAtLeast(1)
     setTextColor(Color.WHITE)
     when (Prefs(context).launcherTheme) {
+        Prefs.LauncherTheme.E_INK -> setBackgroundResource(R.drawable.bolt_eink_alias)
         Prefs.LauncherTheme.DEFAULT, Prefs.LauncherTheme.PAPER_NOTEBOOK -> {
             val opaqueColor = color or Color.BLACK
             val fill = if (ColorUtils.calculateContrast(Color.WHITE, opaqueColor) >= 4.5) {

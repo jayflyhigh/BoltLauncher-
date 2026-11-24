@@ -1,24 +1,35 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.graphics.Color
+import android.os.Build
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import androidx.appcompat.widget.AppCompatEditText
+import androidx.core.graphics.ColorUtils
 import app.olauncher.R
+import app.olauncher.data.Prefs
 import app.olauncher.helper.getColorFromAttr
 
 class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     AppCompatEditText(context, attrs) {
-    private var drawLegacyCursor = false
-    private val paperNotebook = app.olauncher.data.Prefs(context).launcherTheme ==
-        app.olauncher.data.Prefs.LauncherTheme.PAPER_NOTEBOOK
-    private val darkCursorColor = context.getColorFromAttr(R.attr.boltThunderCursorColor)
-    private val idleCursorColor = context.getColorFromAttr(R.attr.boltSearchCursorColor)
+    private val useLegacyCursor = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
+    private val eInkTheme = Prefs(context).launcherTheme == Prefs.LauncherTheme.E_INK
+    private var steadyThunderCaret = false
+    private val thunderCursorColor = context.getColorFromAttr(R.attr.boltThunderCursorColor)
+    private val regularCursorColor = context.getColorFromAttr(R.attr.boltSearchCursorColor)
+    private val cursorWidth = 2f * resources.displayMetrics.density
     private var blinkStart = 0L
-    private val cursorPaint = android.graphics.Paint().apply { color = darkCursorColor }
+    private val cursorPaint = android.graphics.Paint().apply { color = regularCursorColor }
+    private var appliedCursorColor: Int? = null
+
+    init {
+        isCursorVisible = !useLegacyCursor
+        applyCursorColor(regularCursorColor)
+    }
 
     var onImeCommit: (() -> Unit)? = null
     var onEmptyBackspace: (() -> Boolean)? = null
@@ -52,22 +63,35 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
         }
     }
 
-    fun setDarkDockText(enabled: Boolean) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            // Let TextView handle cursor geometry, blinking, and selection on supported devices.
-            textCursorDrawable = androidx.appcompat.content.res.AppCompatResources
-                .getDrawable(context, R.drawable.bolt_cursor_yellow)?.mutate()?.apply {
-                    setTint(if (enabled) darkCursorColor else idleCursorColor)
-                }
-            return
+    fun updateDockCursor(thunder: Boolean, dockColor: Int) {
+        val steady = eInkTheme && thunder
+        if (steadyThunderCaret != steady) {
+            steadyThunderCaret = steady
+            isCursorVisible = !useLegacyCursor && !steady
+            invalidate()
         }
-        val useCustomCursor = enabled || paperNotebook
-        isCursorVisible = !useCustomCursor
-        val color = if (enabled) darkCursorColor else idleCursorColor
-        if (drawLegacyCursor == useCustomCursor && cursorPaint.color == color) return
-        drawLegacyCursor = useCustomCursor
+        val preferred = if (thunder) thunderCursorColor else regularCursorColor
+        val opaqueDock = dockColor or Color.BLACK
+        // During the dock transition, use an ink color with sufficient contrast on intermediate shades.
+        val color = if (ColorUtils.calculateContrast(preferred, opaqueDock) >= 3.0) {
+            preferred
+        } else if (ColorUtils.calculateLuminance(opaqueDock) > 0.179) {
+            Color.BLACK
+        } else {
+            Color.WHITE
+        }
+        applyCursorColor(color)
+    }
+
+    private fun applyCursorColor(color: Int) {
+        if (appliedCursorColor == color) return
+        appliedCursorColor = color
         cursorPaint.color = color
         blinkStart = android.os.SystemClock.uptimeMillis()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            textCursorDrawable = androidx.appcompat.content.res.AppCompatResources
+                .getDrawable(context, R.drawable.bolt_cursor_yellow)?.mutate()?.apply { setTint(color) }
+        }
         invalidate()
     }
 
@@ -91,19 +115,24 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        if (!drawLegacyCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
+        if ((!useLegacyCursor && !steadyThunderCaret) || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
             selectionStart != selectionEnd) return
         val textLayout = layout ?: return
         val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart
-        if ((elapsed / 500L) % 2L == 0L) {
+        // The E-Ink Thunder caret stays visible while editing, including between keystrokes.
+        if (steadyThunderCaret || (elapsed / 500L) % 2L == 0L) {
             val offset = selectionStart.coerceAtMost(textLayout.text.length)
             val line = textLayout.getLineForOffset(offset)
-            val x = compoundPaddingLeft + textLayout.getPrimaryHorizontal(offset)
+            val left = (scrollX + compoundPaddingLeft).toFloat()
+            val right = (scrollX + width - compoundPaddingRight).toFloat()
+            if (right - left < cursorWidth) return
+            val x = (compoundPaddingLeft + textLayout.getPrimaryHorizontal(offset))
+                .coerceIn(left, right - cursorWidth)
             val originY = baseline - textLayout.getLineBaseline(0)
             val top = (originY + textLayout.getLineTop(line)).toFloat()
             val bottom = (originY + textLayout.getLineBottom(line)).toFloat()
-            canvas.drawRect(x, top, x + 2f * resources.displayMetrics.density, bottom, cursorPaint)
+            canvas.drawRect(x, top, x + cursorWidth, bottom, cursorPaint)
         }
-        postInvalidateDelayed(500L - elapsed % 500L)
+        if (!steadyThunderCaret) postInvalidateDelayed(500L - elapsed % 500L)
     }
 }

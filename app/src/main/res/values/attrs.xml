@@ -36,6 +36,7 @@
     <attr name="boltRowOutlineColor" format="color" />
     <attr name="boltSettingsCardBottomColor" format="color" />
     <attr name="boltGlassTopEdgeColor" format="color" />
+    <attr name="boltSelectedRowCornerRadius" format="dimension" />
     <attr name="boltSelectedRowColor" format="color" />
     <attr name="boltSelectedRowOutlineWidth" format="dimension" />
     <attr name="boltSelectedRowOutlineColor" format="color" />

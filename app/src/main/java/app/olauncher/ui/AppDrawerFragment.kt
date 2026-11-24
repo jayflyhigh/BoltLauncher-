@@ -190,6 +190,7 @@ class AppDrawerFragment : BaseFragment() {
     private var boltProgress = 0f
     private var dockIdleColor = 0
     private var paperNotebook = false
+    private var eInk = false
     private var dockGraphite = Color.BLACK
     private var windowsXpTheme = false
     private var usesThemeTileIcons = false
@@ -356,6 +357,7 @@ class AppDrawerFragment : BaseFragment() {
         dockUsesDarkText = null
         dockIdleColor = requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
+        eInk = prefs.launcherTheme == Prefs.LauncherTheme.E_INK
         paperNotebook = prefs.launcherTheme == Prefs.LauncherTheme.PAPER_NOTEBOOK
         dockGraphite = requireContext().getColorFromAttr(R.attr.boltResultTextColor)
         windowsXpTheme = prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP
@@ -390,7 +392,7 @@ class AppDrawerFragment : BaseFragment() {
             binding.contactMessage.setXpIcon(R.drawable.xp_message, compact = true)
             binding.contactWhatsapp.setXpIcon(R.drawable.xp_whatsapp, compact = true)
         } else {
-            val tint = ColorStateList.valueOf(if (paperNotebook) dockGraphite
+            val tint = ColorStateList.valueOf(if (paperNotebook || eInk) dockGraphite
                 else ContextCompat.getColor(requireContext(), R.color.bolt_search_label))
             with(binding) {
                 dockSearchDestinations.imageTintList = tint
@@ -398,12 +400,28 @@ class AppDrawerFragment : BaseFragment() {
                 contactCall.imageTintList = tint
                 contactMessage.imageTintList = tint
                 contactWhatsapp.imageTintList = ColorStateList.valueOf(
-                    ContextCompat.getColor(requireContext(), if (paperNotebook) R.color.bolt_notebook_whatsapp
-                        else R.color.bolt_search_whatsapp),
+                    ContextCompat.getColor(requireContext(), when {
+                        eInk -> R.color.bolt_eink_whatsapp
+                        paperNotebook -> R.color.bolt_notebook_whatsapp
+                        else -> R.color.bolt_search_whatsapp
+                    }),
                 )
             }
         }
-        if (paperNotebook) binding.dockWebDivider.setBackgroundColor(dockGraphite)
+        if (eInk) {
+            binding.dockBolt.setImageResource(R.drawable.bolt_eink_lightning)
+            binding.dockWeb.updateLayoutParams<android.widget.LinearLayout.LayoutParams> {
+                width = resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width)
+            }
+            binding.dockWebDivider.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), R.color.bolt_eink_rule),
+            )
+            binding.dockActiveAlias.updateLayoutParams<FrameLayout.LayoutParams> {
+                height = resources.getDimensionPixelSize(R.dimen.bolt_eink_chip_height)
+            }
+        } else if (paperNotebook) {
+            binding.dockWebDivider.setBackgroundColor(dockGraphite)
+        }
         binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
             if (thunderCommitted) {
                 dest.subSequence(from, to)
@@ -819,13 +837,25 @@ class AppDrawerFragment : BaseFragment() {
         val bolt = binding.dockBolt
         val dockColor = androidx.core.graphics.ColorUtils.blendARGB(dockIdleColor, thunderDockColor, progress)
         binding.searchPanel.setDockAppearance(dockColor, progress)
+        binding.search.updateDockCursor(thunder = progress >= 0.5f, dockColor = dockColor)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
-        if (paperNotebook) {
+        if (eInk) {
+            if (dockUsesDarkText != lightDock) {
+                dockUsesDarkText = lightDock
+                val ink = if (lightDock) dockGraphite else dockIdleColor
+                binding.search.setTextColor(ink)
+                binding.search.setHintTextColor(ink)
+                binding.renameConfirm.setTextColor(ink)
+                binding.renameCancel.setTextColor(ink)
+                bolt.imageTintList = ColorStateList.valueOf(ink)
+                binding.dockWeb.imageTintList = ColorStateList.valueOf(ink)
+                binding.dockActiveAlias.isSelected = !lightDock
+            }
+        } else if (paperNotebook) {
             val markerDock = progress >= 0.5f
             if (dockUsesDarkText != markerDock) {
                 dockUsesDarkText = markerDock
                 val ink = if (markerDock) Color.BLACK else dockGraphite
-                binding.search.setDarkDockText(markerDock)
                 binding.search.setTextColor(ink)
                 binding.search.setHintTextColor(ink)
                 binding.renameConfirm.setTextColor(ink)
@@ -834,7 +864,6 @@ class AppDrawerFragment : BaseFragment() {
             }
         } else if (dockUsesDarkText != lightDock) {
             dockUsesDarkText = lightDock
-            binding.search.setDarkDockText(lightDock)
             binding.search.setTextColor(if (lightDock) Color.BLACK else Color.WHITE)
             val renameActionColor = if (lightDock) 0xFF303030.toInt() else Color.WHITE
             binding.renameConfirm.setTextColor(renameActionColor)
@@ -1150,7 +1179,7 @@ class AppDrawerFragment : BaseFragment() {
         web.isVisible = showWeb
         val groupBackground = if (paperNotebook) R.drawable.bolt_notebook_contact_actions
             else R.drawable.bolt_contact_action_group
-        if ((actions.background != null) != slot.isVisible) {
+        if (!eInk && (actions.background != null) != slot.isVisible) {
             actions.setBackgroundResource(if (!slot.isVisible) 0 else groupBackground)
             actions.setPadding(0, 0, 0, 0)
         }
@@ -1556,6 +1585,7 @@ class AppDrawerFragment : BaseFragment() {
             Prefs.LauncherTheme.DEFAULT to R.string.bolt_theme_default,
             Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
             Prefs.LauncherTheme.LIQUID_GLASS to R.string.bolt_liquid_glass,
+            Prefs.LauncherTheme.E_INK to R.string.bolt_eink,
             Prefs.LauncherTheme.PAPER_NOTEBOOK to R.string.bolt_paper_notebook,
             Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
             Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
@@ -1719,6 +1749,9 @@ class AppDrawerFragment : BaseFragment() {
         )
         layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.layoutManager = layoutManager
+        if (prefs.launcherTheme == Prefs.LauncherTheme.E_INK) {
+            binding.recyclerView.addItemDecoration(EInkResultDividers(requireContext()))
+        }
         contactsAdapter = ContactSearchAdapter(tap = ::selectContact, hold = ::openContact)
         appsSection = SearchSectionAdapter(getString(R.string.bolt_apps_section))
         contactsSection = SearchSectionAdapter(getString(R.string.bolt_contacts_section))

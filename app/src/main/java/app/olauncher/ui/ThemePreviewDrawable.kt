@@ -10,6 +10,7 @@ import android.graphics.PixelFormat
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.util.TypedValue
+import androidx.core.content.ContextCompat
 import app.olauncher.R
 import app.olauncher.data.Prefs
 import kotlin.math.roundToInt
@@ -17,6 +18,11 @@ import kotlin.math.roundToInt
 /** Miniature of the launcher panel using the candidate theme's actual colors. */
 internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherTheme) : Drawable() {
     private val paperNotebook = candidate == Prefs.LauncherTheme.PAPER_NOTEBOOK
+    private val eInkBolt = if (candidate == Prefs.LauncherTheme.E_INK) {
+        ContextCompat.getDrawable(context, R.drawable.bolt_eink_lightning)?.apply {
+            setBounds(47, 25, 55, 33)
+        }
+    } else null
     private val density = context.resources.displayMetrics.density
     private val theme = context.resources.newTheme().apply {
         applyStyle(R.style.AppTheme, true)
@@ -53,6 +59,11 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         fill(canvas, 0f, 0f, 64f, 36f, 8f, 0xFF152237.toInt())
         fill(canvas, 1f, 1f, 63f, 35f, 7f, rim)
         fill(canvas, 2f, 2f, 62f, 34f, 6f, panel, panelFill)
+        if (eInkBolt != null) {
+            drawEInk(canvas, eInkBolt)
+            canvas.restoreToCount(save)
+            return
+        }
         if (paperNotebook) {
             fill(canvas, 6f, 6f, 58f, 7f, 0f, notebookRule)
             fill(canvas, 6f, 9f, 58f, 10f, 0f, notebookRule)
@@ -69,6 +80,18 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         fill(canvas, 30f, 25f, 31f, 29f, 0.5f, cursor)
         fill(canvas, 50f, 25f, 54f, 29f, 2f, accent)
         canvas.restoreToCount(save)
+    }
+
+    private fun drawEInk(canvas: Canvas, bolt: Drawable) {
+        fill(canvas, 8f, 6f, 25f, 8f, 0.5f, cursor)
+        fill(canvas, 8f, 11f, 33f, 13f, 1f, cursor)
+        fill(canvas, 8f, 15f, 56f, 16f, 0f, rim)
+        fill(canvas, 6f, 17f, 58f, 23f, 2f, row)
+        fill(canvas, 9f, 19f, 35f, 21f, 1f, rowText)
+        fill(canvas, 6f, 24f, 58f, 25f, 0f, rim)
+        fill(canvas, 9f, 28f, 29f, 30f, 1f, cursor)
+        fill(canvas, 31f, 27f, 32f, 31f, 0.5f, cursor)
+        bolt.draw(canvas)
     }
 
     private fun fill(

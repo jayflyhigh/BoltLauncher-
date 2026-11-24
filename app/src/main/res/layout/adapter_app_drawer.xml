@@ -243,6 +243,7 @@
 
         <androidx.appcompat.widget.AppCompatEditText
             android:id="@+id/etAppRename"
+            android:textCursorDrawable="@drawable/bolt_rename_cursor"
             style="@style/TextLarge"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
