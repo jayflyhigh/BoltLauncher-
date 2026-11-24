@@ -427,6 +427,9 @@ class AppDrawerAdapter(
                         searchUninstall.setThemeTileIcon(R.drawable.ic_delete)
                     }
                     else -> {
+                        if (theme == Prefs.LauncherTheme.DEFAULT) {
+                            searchPlayStore.setImageResource(R.drawable.bolt_google_play_icon)
+                        }
                         val tint = AppCompatResources.getColorStateList(context, R.color.bolt_app_action_tint)
                         for (button in listOf(searchRename, searchPlayStore, searchAddAlias, searchAppInfo)) {
                             button.imageTintList = tint

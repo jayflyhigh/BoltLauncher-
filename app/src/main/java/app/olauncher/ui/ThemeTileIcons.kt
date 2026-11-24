@@ -15,9 +15,11 @@ import app.olauncher.helper.getColorFromAttr
 import kotlin.math.roundToInt
 
 internal fun AppCompatImageButton.setThemeTileIcon(@DrawableRes icon: Int, compact: Boolean = false) {
-    val tile = context.themeTileIcon(icon, if (compact) 24 else 32) ?: return
+    val glassShortcut = compact && Prefs(context).launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS
+    val smallTile = compact && !glassShortcut
+    val tile = context.themeTileIcon(icon, if (smallTile) 24 else 32, glassShortcut) ?: return
     val density = resources.displayMetrics.density
-    val padding = ((if (compact) 8f else 4f) * density).roundToInt()
+    val padding = ((if (smallTile) 8f else 4f) * density).roundToInt()
     setPadding(padding, 0, padding, 0)
     scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
     setImageDrawable(tile)
@@ -28,13 +30,18 @@ internal fun AppCompatButton.setThemeTileIcon(@DrawableRes icon: Int) {
     setCompoundDrawablesRelativeWithIntrinsicBounds(tile, null, null, null)
 }
 
-private fun Context.themeTileIcon(@DrawableRes icon: Int, sizeDp: Int = 32): Drawable? {
+private fun Context.themeTileIcon(
+    @DrawableRes icon: Int,
+    sizeDp: Int = 32,
+    glassShortcut: Boolean = false,
+): Drawable? {
     val glyph = AppCompatResources.getDrawable(this, icon)?.mutate() ?: return null
     val density = resources.displayMetrics.density
     val size = (sizeDp * density).roundToInt()
     val inset = (sizeDp / 8f * density).roundToInt()
     val glassFrame = if (Prefs(this).launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS) {
-        AppCompatResources.getDrawable(this, R.drawable.liquid_glass_icon_frame)?.mutate() as? GradientDrawable
+        val frame = if (glassShortcut) R.drawable.liquid_glass_shortcut_frame else R.drawable.liquid_glass_icon_frame
+        AppCompatResources.getDrawable(this, frame)?.mutate() as? GradientDrawable
     } else null
     val tile = (glassFrame ?: GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,

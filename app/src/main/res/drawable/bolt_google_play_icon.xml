@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="@color/bolt_search_label"
+        android:pathData="M3.5,4.3 Q3.5,3.6 3.9,3.2 L12.5,12 L3.9,20.8 Q3.5,20.4 3.5,19.7 Z M5,2.7 Q5.6,2.6 6.2,2.9 L16.7,8.9 L13.3,11.2 Z M17.7,9.5 L20.4,11 Q22.1,12 20.4,13 L17.7,14.5 L14.1,12 Z M16.7,15.1 L6.2,21.1 Q5.6,21.4 5,21.3 L13.3,12.8 Z" />
+</vector>
