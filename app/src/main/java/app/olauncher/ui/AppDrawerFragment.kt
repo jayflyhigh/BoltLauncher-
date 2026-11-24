@@ -361,14 +361,18 @@ class AppDrawerFragment : BaseFragment() {
             else -> false
         }
         if (liquidGlass) {
-            binding.dockBolt.setThemeTileIcon(R.drawable.liquid_glass_bolt)
+            binding.dockBolt.setImageResource(R.drawable.liquid_glass_bolt)
             binding.dockSearchDestinations.setThemeTileIcon(R.drawable.liquid_glass_search)
             binding.dockWeb.setThemeTileIcon(R.drawable.liquid_glass_web, compact = true)
             binding.contactCall.setThemeTileIcon(R.drawable.liquid_glass_call, compact = true)
             binding.contactMessage.setThemeTileIcon(R.drawable.liquid_glass_message, compact = true)
             binding.contactWhatsapp.setThemeTileIcon(R.drawable.liquid_glass_whatsapp, compact = true)
         } else if (usesThemeTileIcons) {
-            binding.dockBolt.setThemeTileIcon(R.drawable.bolt_search_lightning)
+            if (prefs.launcherTheme == Prefs.LauncherTheme.SEATTLE_SEAHAWKS) {
+                binding.dockBolt.setImageResource(R.drawable.seahawks_logo)
+            } else {
+                binding.dockBolt.setThemeTileIcon(R.drawable.bolt_search_lightning)
+            }
             binding.dockSearchDestinations.setThemeTileIcon(R.drawable.dock_search)
             binding.dockWeb.setThemeTileIcon(R.drawable.dock_web, compact = true)
             binding.contactCall.setThemeTileIcon(R.drawable.contact_call, compact = true)

@@ -59,17 +59,22 @@ internal fun TextView.bindAliasBadge(target: InAppSearch.Target, description: In
 internal fun TextView.styleAliasBadge(color: Int) {
     val density = resources.displayMetrics.density
     val stroke = density.roundToInt().coerceAtLeast(1)
+    setTextColor(Color.WHITE)
     when (Prefs(context).launcherTheme) {
         Prefs.LauncherTheme.DEFAULT -> {
-            background = InAppSearch.background(color, density)
-            setTextColor(InAppSearch.foreground(color))
+            val opaqueColor = color or Color.BLACK
+            val fill = if (ColorUtils.calculateContrast(Color.WHITE, opaqueColor) >= 4.5) {
+                opaqueColor
+            } else {
+                ColorUtils.blendARGB(opaqueColor, Color.BLACK, 0.55f)
+            }
+            background = InAppSearch.background(fill, density)
         }
         Prefs.LauncherTheme.SMOKED_GLASS -> {
             val surface = context.getColorFromAttr(R.attr.boltSmokedControlColor)
             background = InAppSearch.background(surface, density).apply {
                 setStroke(stroke, ColorUtils.blendARGB(color, Color.WHITE, 0.35f))
             }
-            setTextColor(Color.WHITE)
         }
         Prefs.LauncherTheme.FROSTED_GLASS -> {
             background = GradientDrawable(
@@ -79,7 +84,6 @@ internal fun TextView.styleAliasBadge(color: Int) {
                 cornerRadius = 13f * density
                 setStroke(stroke, ColorUtils.blendARGB(color, 0xFFB7DFFF.toInt(), 0.55f))
             }
-            setTextColor(Color.WHITE)
         }
         Prefs.LauncherTheme.LIQUID_GLASS -> {
             background = GradientDrawable(
@@ -93,20 +97,18 @@ internal fun TextView.styleAliasBadge(color: Int) {
                 val rim = context.getColorFromAttr(R.attr.boltSelectedRowOutlineColor)
                 setStroke(stroke, ColorUtils.blendARGB(rim, color, 0.35f))
             }
-            setTextColor(context.getColorFromAttr(R.attr.boltSelectedRowTextColor))
         }
         Prefs.LauncherTheme.WINDOWS_XP -> {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(
-                    ColorUtils.blendARGB(color, Color.WHITE, 0.84f),
-                    ColorUtils.blendARGB(color, Color.WHITE, 0.50f),
+                    ColorUtils.blendARGB(color, 0xFF244C8A.toInt(), 0.86f),
+                    ColorUtils.blendARGB(color, 0xFF101D33.toInt(), 0.86f),
                 ),
             ).apply {
                 cornerRadius = 5f * density
                 setStroke(stroke, ColorUtils.blendARGB(color, 0xFF244C8A.toInt(), 0.55f))
             }
-            setTextColor(0xFF101D33.toInt())
         }
         Prefs.LauncherTheme.WII_U -> {
             background = GradientDrawable(
@@ -119,20 +121,18 @@ internal fun TextView.styleAliasBadge(color: Int) {
                 cornerRadius = 9f * density
                 setStroke(stroke, ColorUtils.blendARGB(color, 0xFF75DDFF.toInt(), 0.58f))
             }
-            setTextColor(Color.WHITE)
         }
         Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> {
             background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(
-                    ColorUtils.blendARGB(color, 0xFF2A455F.toInt(), 0.85f),
-                    0xFF0D2339.toInt(),
+                    0xFF002244.toInt(),
+                    0xFF001532.toInt(),
                 ),
             ).apply {
                 cornerRadius = 6f * density
-                setStroke(stroke, ColorUtils.blendARGB(color, 0xFFA1DC45.toInt(), 0.55f))
+                setStroke(stroke, 0xFF69BE28.toInt())
             }
-            setTextColor(Color.WHITE)
         }
     }
 }
