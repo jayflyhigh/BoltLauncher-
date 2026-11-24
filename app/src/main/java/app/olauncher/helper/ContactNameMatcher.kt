@@ -4,6 +4,7 @@ private val nameWords = Regex("[\\p{L}\\p{M}]+")
 private val termSeparator = Regex("\\s+")
 
 internal class ContactNameMatcher(private val query: String) {
+    private val exactName = query.normalizeDisplayedName()
     private val terms = query.split(termSeparator).filter { it.isNotEmpty() }
     private val normalizedTerms = terms.map { it.normalizeForSearch() }
     private val initialsQuery = query.normalizeForSearch()
@@ -15,11 +16,13 @@ internal class ContactNameMatcher(private val query: String) {
     private val allowTypos = query.length >= 4 && query.none(Char::isDigit)
 
     class SearchName(val raw: String) {
+        val displayedName = raw.normalizeDisplayedName()
         val normalized = raw.normalizeForSearch()
         val initials = nameWords.findAll(raw).map { it.value.first() }.joinToString("").normalizeForSearch()
     }
 
     fun rank(name: SearchName, numbers: List<String>): Int? {
+        if (name.displayedName.equals(exactName, ignoreCase = true)) return -1
         // Match individual terms so a surname-first query finds the same contact.
         if (terms.all { term ->
                 name.raw.contains(term, ignoreCase = true) || numbers.any { it.contains(term) }
