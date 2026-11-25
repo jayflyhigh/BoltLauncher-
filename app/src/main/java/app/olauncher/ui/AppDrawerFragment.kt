@@ -537,8 +537,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         binding.dockSearchDestinations.setOnClickListener {
             homeDestinations = true
-            expanded = true
-            updateSearchVisibility()
+            expandSearch()
             binding.search.showKeyboard()
         }
         binding.dockSearchDestinations.setOnLongClickListener {
@@ -840,9 +839,15 @@ class AppDrawerFragment : BaseFragment() {
         scrolledFromBestMatch = results.canScrollVertically(1)
     }
 
-    private fun openSearch(thunder: Boolean) {
+    private fun expandSearch() {
+        val openingFromHome = isHomePage && !expanded
         expanded = true
         updateSearchVisibility()
+        if (openingFromHome) LauncherMotion.revealForTheme(binding.dock, prefs.launcherTheme)
+    }
+
+    private fun openSearch(thunder: Boolean) {
+        expandSearch()
         setThunderMode(thunder)
         if (!thunder && flag == Constants.FLAG_LAUNCH_APP && !hasContactsPermission() && !askedForContacts) {
             askedForContacts = true
@@ -1740,8 +1745,10 @@ class AppDrawerFragment : BaseFragment() {
             dialog.dismiss()
             openPowerMenu()
         }
+        dialog.setOnDismissListener { LauncherMotion.reset(menu.root) }
         dialog.show()
         dialog.applyWallpaperBackground()
+        LauncherMotion.revealForTheme(menu.root, prefs.launcherTheme)
     }
 
     private fun canCustomizeWallpaper(): Boolean =
