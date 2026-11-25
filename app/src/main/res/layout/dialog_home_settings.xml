@@ -9,25 +9,9 @@
         android:orientation="vertical"
         android:padding="8dp">
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/launcherSettings"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/dock_settings"
-            android:text="@string/bolt_launcher_settings" />
-
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/systemSettings"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/bolt_system_settings_icon"
-            android:text="@string/bolt_system_settings" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginHorizontal="12dp"
-            android:layout_marginVertical="4dp"
-            android:background="?attr/boltDialogOutlineColor"
-            android:importantForAccessibility="no" />
+        <TextView
+            style="@style/BoltHomeMenuSection"
+            android:text="@string/bolt_home_menu_appearance" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/launcherTheme"
@@ -47,6 +31,26 @@
             android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
             android:text="@string/bolt_scan_wallpaper"
             android:visibility="gone" />
+
+        <TextView
+            style="@style/BoltHomeMenuSection"
+            android:text="@string/bolt_home_menu_settings" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/launcherSettings"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/dock_settings"
+            android:text="@string/bolt_launcher_settings" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/systemSettings"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_system_settings_icon"
+            android:text="@string/bolt_system_settings" />
+
+        <TextView
+            style="@style/BoltHomeMenuSection"
+            android:text="@string/bolt_home_menu_device" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/powerMenu"

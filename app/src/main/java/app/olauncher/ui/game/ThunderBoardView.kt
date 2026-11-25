@@ -10,13 +10,19 @@ import android.graphics.Typeface
 import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import android.view.View
+import androidx.core.graphics.ColorUtils
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
 import app.olauncher.ui.WallpaperThemeColors
 import app.olauncher.ui.LauncherMotion
 import kotlin.math.min
 
-internal class ThunderBoardView(context: Context, private val preview: Boolean = false) : View(context) {
+internal class ThunderBoardView(
+    context: Context,
+    surfaceColor: Int,
+    wallpaperColors: WallpaperThemeColors?,
+    private val preview: Boolean = false,
+) : View(context) {
     private companion object {
         const val STRIKE_DURATION = 360L
         const val STRIKE_SPACING = 55L
@@ -42,21 +48,34 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
     private val strikePath = Path()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bounds = RectF()
-    private val wallpaperColors = WallpaperThemeColors.from(context)
-    private val dock = (wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)).let {
-        (it and 0x00FFFFFF) or (Color.alpha(it).coerceAtMost(225) shl 24)
-    }
+    private val dock = ColorUtils.setAlphaComponent(surfaceColor, 255)
     private val edge = wallpaperColors?.outline ?: context.getColorFromAttr(R.attr.boltPanelOutlineColor)
     private val reflection = context.getColorFromAttr(R.attr.boltGlassReflectionColor)
-    private val accent = wallpaperColors?.accent ?: context.getColor(R.color.bolt_search_yellow)
-    private val palette = intArrayOf(
-        accent, 0xFF81D7ED.toInt(), 0xFFAA9EF1.toInt(), 0xFFF19D76.toInt(),
-        0xFF8CD4AF.toInt(), 0xFFEEA6C0.toInt(), 0xFFADBCEA.toInt(), 0xFFC6D786.toInt(),
-    )
-    private val spacing = resources.displayMetrics.density
-    private val inputInk = if (androidx.core.graphics.ColorUtils.calculateLuminance(dock) > 0.35) {
+    private val accent = wallpaperColors?.accent ?: context.getColorFromAttr(R.attr.boltSearchCursorColor)
+    private val celebrationOutline = if (ColorUtils.calculateLuminance(accent) > 0.18) {
         Color.BLACK
     } else Color.WHITE
+    private val inputInk = if (ColorUtils.calculateContrast(Color.BLACK, dock) >=
+        ColorUtils.calculateContrast(Color.WHITE, dock)
+    ) Color.BLACK else Color.WHITE
+    private val palette = makePiecePalette(
+        accent,
+        wallpaperColors?.row ?: context.getColorFromAttr(R.attr.boltSelectedRowColor),
+    )
+    private val cellOutlines = palette.map { ColorUtils.calculateContrast(it, dock) < 3.0 }
+    private val spacing = resources.displayMetrics.density
+
+    private fun makePiecePalette(primary: Int, secondary: Int): IntArray {
+        val hsl = FloatArray(3)
+        return IntArray(7) { index ->
+            // Keep each piece in the theme's color family and give it its own tone.
+            val mix = (index % 3) * 0.2f
+            ColorUtils.colorToHSL(ColorUtils.blendARGB(primary, secondary, mix), hsl)
+            hsl[2] = if (inputInk == Color.WHITE) 0.88f - 0.065f * index else 0.14f + 0.065f * index
+            ColorUtils.HSLToColor(hsl)
+        }
+    }
+
     private var inputFeedbackUntil = 0L
     private var blockedInput = false
 
@@ -86,7 +105,7 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
             cellSize = min((width - 2 * padding) / columns, (height - 2 * padding) / rows)
             if (cellSize <= 0f) return
             bounds.set(0f, 0f, width.toFloat(), height.toFloat())
-            paint.color = 0xFF181A20.toInt()
+            paint.color = dock
             val corner = spacing * 8
             canvas.drawRoundRect(bounds, corner, corner, paint)
             val left = (width - columns * cellSize) / 2
@@ -109,7 +128,7 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
         canvas.drawRoundRect(bounds, corner, corner, paint)
         paint.color = reflection
         canvas.drawLine(left + corner, top + spacing, right - corner, top + spacing, paint)
-        paint.color = 0x24FFFFFF
+        paint.color = ColorUtils.setAlphaComponent(inputInk, 32)
         for (col in 1 until columns) {
             val x = left + cellSize * col
             canvas.drawLine(x, top, x, bottom, paint)
@@ -229,7 +248,7 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
         val baseline = top + cellSize * 3.5f - (textPaint.ascent() + textPaint.descent()) / 2
         textPaint.style = Paint.Style.STROKE
         textPaint.strokeWidth = spacing * 3
-        textPaint.color = 0xFF181200.toInt()
+        textPaint.color = celebrationOutline
         textPaint.alpha = (opacity * 255).toInt()
         canvas.drawText(celebrationText, center, baseline, textPaint)
         textPaint.style = Paint.Style.FILL
@@ -290,6 +309,14 @@ internal class ThunderBoardView(context: Context, private val preview: Boolean =
         val radius = spacing * 2.5f
         if (ghost) paint.alpha = 95
         canvas.drawRoundRect(bounds, radius, radius, paint)
+        if (!ghost && cellOutlines[color - 1]) {
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = spacing
+            paint.color = inputInk
+            canvas.drawRoundRect(bounds, radius, radius, paint)
+            paint.style = Paint.Style.FILL
+            paint.strokeWidth = 0f
+        }
         if (ghost) {
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = spacing * 2.4f

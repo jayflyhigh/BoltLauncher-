@@ -44,6 +44,9 @@
     <string name="bolt_hint_hawks_destination">Search the playbook…</string>
     <string name="bolt_hint_hawks_thunder">Quick snap…</string>
     <string name="bolt_hint_hawks_rename">Call a new name</string>
+    <string name="bolt_home_menu_appearance">Appearance</string>
+    <string name="bolt_home_menu_settings">Settings</string>
+    <string name="bolt_home_menu_device">Device</string>
     <string name="bolt_current_theme">Current theme: %1$s</string>
     <string name="bolt_set_wallpaper">Set Wallpaper</string>
     <string name="bolt_set_wallpaper_description">Drag the image to position it, and zoom in to frame it before setting your home wallpaper.</string>

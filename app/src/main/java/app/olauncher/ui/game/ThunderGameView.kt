@@ -38,11 +38,11 @@ internal class ThunderGameView(
     private var paused = restoredState != null
     private var musicEnabled = settings.getBoolean("music", true)
     private var soundEnabled = settings.getBoolean("sound", true)
-    private val board = ThunderBoardView(context)
-    private val preview = ThunderBoardView(context, preview = true)
     private val density = resources.displayMetrics.density
     private val wallpaperColors = WallpaperThemeColors.from(context)
     private val surfaceColor = wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)
+    private val board = ThunderBoardView(context, surfaceColor, wallpaperColors)
+    private val preview = ThunderBoardView(context, surfaceColor, wallpaperColors, preview = true)
     private val opaqueSurface = surfaceColor or Color.BLACK
     private val textColor = readableColor(context.getColorFromAttr(R.attr.boltResultTextColor))
     private val accent = readableColor(wallpaperColors?.accent ?: context.getColorFromAttr(R.attr.boltSearchCursorColor))
