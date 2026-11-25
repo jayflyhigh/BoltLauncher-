@@ -34,16 +34,12 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
     private val density = context.resources.displayMetrics.density
     private val theme = context.resources.newTheme().apply {
         applyStyle(R.style.AppTheme, true)
-        val overlay = if (candidate == Prefs.LauncherTheme.DEFAULT) {
-            Prefs(context).wallpaperPalette?.overlay ?: 0
-        } else candidate.overlay
+        val overlay = Prefs(context).overlayFor(candidate)
         if (overlay != 0) applyStyle(overlay, true)
     }
-    private val wallpaperColors = if (candidate == Prefs.LauncherTheme.DEFAULT) {
-        Prefs(context).wallpaperSample?.let(::WallpaperThemeColors)
-    } else null
+    private val wallpaperColors = WallpaperThemeColors.forTheme(Prefs(context), candidate)
     private val panel = wallpaperColors?.panel ?: color(R.attr.boltPanelColor)
-    private val panelEnd = color(R.attr.boltPanelEndColor)
+    private val panelEnd = wallpaperColors?.panelEnd ?: color(R.attr.boltPanelEndColor)
     private val rim = wallpaperColors?.outline ?: color(R.attr.boltPanelOutlineColor)
     private val row = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowColor)
     private val rowEnd = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowEndColor)

@@ -4,6 +4,7 @@ import android.Manifest
 import android.animation.ValueAnimator
 import android.app.WallpaperManager
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
@@ -11,10 +12,14 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
 import android.telephony.PhoneNumberUtils
+import java.io.IOException
 import java.text.Collator
 import java.util.Locale
 import android.os.Build
@@ -39,6 +44,7 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
 import androidx.core.widget.doOnTextChanged
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -61,6 +67,7 @@ import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
 import app.olauncher.data.WallpaperPalette
 import app.olauncher.databinding.DialogHomeSettingsBinding
+import app.olauncher.databinding.DialogWallpaperScanBinding
 import app.olauncher.databinding.FragmentAppDrawerBinding
 import app.olauncher.helper.ContactLoadResult
 import app.olauncher.helper.contactWinsBestMatch
@@ -103,6 +110,7 @@ class AppDrawerFragment : BaseFragment() {
     }
     private var wallpaperScan: Job? = null
     private var wallpaperCropDialog: AlertDialog? = null
+    private var settingHomeWallpaper = false
     private var choosingWallpaperImage = false
     private var scanningHomeExplicitly = false
     private var removeWallpaperListener: (() -> Unit)? = null
@@ -110,9 +118,16 @@ class AppDrawerFragment : BaseFragment() {
         if (_binding == null) return@registerForActivityResult
         if (uri == null) {
             finishChoosingWallpaper()
-        } else if (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT) {
-            choosingWallpaperImage = true
+        } else if (canCustomizeWallpaper()) {
             previewWallpaperImage(uri)
+        }
+    }
+    private val pickHomeWallpaper = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (_binding == null) return@registerForActivityResult
+        if (uri == null) {
+            finishChoosingWallpaper()
+        } else {
+            previewWallpaperImage(uri, setWallpaper = true)
         }
     }
     private val requestContacts = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -221,6 +236,7 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var searchHints: SearchHints
     private var wallpaperColors: WallpaperThemeColors? = null
     private var wallpaperColorsActive = false
+    private var generatedWallpaperActive = false
     private var cozyQuest = false
     private var dockGraphite = Color.BLACK
     private var windowsXpTheme = false
@@ -387,8 +403,10 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         dockUsesDarkText = null
         searchHints = SearchHints.forTheme(prefs.launcherTheme)
-        wallpaperColorsActive = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT && prefs.wallpaperPalette != null
+        wallpaperColorsActive = (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT && prefs.wallpaperPalette != null) ||
+            prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
         wallpaperColors = WallpaperThemeColors.from(requireContext())
+        generatedWallpaperActive = prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
         dockIdleColor = wallpaperColors?.dock ?: requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = wallpaperColors?.accent ?: requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
         wallpaperColors?.let { colors ->
@@ -1630,10 +1648,14 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun showHomeSettings() {
+        if (settingHomeWallpaper) return
         cancelAutoLaunch()
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val menu = DialogHomeSettingsBinding.inflate(LayoutInflater.from(builder.context))
-        val dialog = builder.setView(menu.root).create()
+        val dialog = builder
+            .setTitle(getString(R.string.bolt_current_theme, getString(prefs.launcherTheme.label)))
+            .setView(menu.root)
+            .create()
         if (cozyQuest) {
             menu.launcherSettings.text = getString(R.string.bolt_cozy_launcher_settings)
             menu.systemSettings.text = getString(R.string.bolt_cozy_system_settings)
@@ -1642,6 +1664,7 @@ class AppDrawerFragment : BaseFragment() {
             menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_settings, 0, 0, 0)
             menu.systemSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_phone, 0, 0, 0)
             menu.launcherTheme.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_themes, 0, 0, 0)
+            menu.setWallpaper.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_wallpaper, 0, 0, 0)
             menu.powerMenu.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_power, 0, 0, 0)
         } else if (liquidGlass) {
             menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(
@@ -1653,27 +1676,33 @@ class AppDrawerFragment : BaseFragment() {
             menu.launcherTheme.setCompoundDrawablesRelativeWithIntrinsicBounds(
                 R.drawable.liquid_glass_theme, 0, R.drawable.liquid_glass_chevron, 0,
             )
+            menu.setWallpaper.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.bolt_set_wallpaper_icon, 0, R.drawable.liquid_glass_chevron, 0,
+            )
             menu.powerMenu.setCompoundDrawablesRelativeWithIntrinsicBounds(
                 R.drawable.liquid_glass_power, 0, R.drawable.liquid_glass_chevron, 0,
             )
-            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.powerMenu).forEach {
+            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.powerMenu).forEach {
                 it.setBackgroundResource(R.drawable.bolt_result_press)
             }
         } else if (prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
             menu.launcherSettings.setXpIcon(R.drawable.xp_settings)
             menu.systemSettings.setXpIcon(R.drawable.xp_computer)
             menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
+            menu.setWallpaper.setXpIcon(R.drawable.xp_wallpaper)
             menu.powerMenu.setXpIcon(R.drawable.xp_power)
         } else if (usesThemeTileIcons) {
             menu.launcherSettings.setThemeTileIcon(R.drawable.dock_settings)
             menu.systemSettings.setThemeTileIcon(R.drawable.bolt_system_settings_icon)
             menu.launcherTheme.setThemeTileIcon(R.drawable.bolt_frosted_glass_icon)
+            menu.setWallpaper.setThemeTileIcon(R.drawable.bolt_set_wallpaper_icon)
+            menu.scanWallpaper.setThemeTileIcon(R.drawable.bolt_scan_wallpaper_icon)
             menu.powerMenu.setThemeTileIcon(R.drawable.bolt_power_menu_icon)
         } else {
             val tintAttr = if (wallpaperColorsActive) R.attr.boltResultActionColor else R.attr.boltHomeMenuTextColor
             val tint = ColorStateList.valueOf(builder.context.getColorFromAttr(tintAttr))
             val iconTint = wallpaperColors?.let { ColorStateList.valueOf(it.accent) } ?: tint
-            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.scanWallpaper, menu.powerMenu).forEach {
+            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.scanWallpaper, menu.powerMenu).forEach {
                 it.supportCompoundDrawablesTintList = iconTint
             }
         }
@@ -1693,7 +1722,16 @@ class AppDrawerFragment : BaseFragment() {
             dialog.dismiss()
             showThemePicker()
         }
-        menu.scanWallpaper.isVisible = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT
+        menu.setWallpaper.setOnClickListener {
+            dialog.dismiss()
+            val manager = WallpaperManager.getInstance(requireContext())
+            if (manager.isWallpaperSupported && manager.isSetWallpaperAllowed) {
+                chooseWallpaperImage(pickHomeWallpaper)
+            } else {
+                requireContext().showToast(getString(R.string.bolt_set_wallpaper_unavailable))
+            }
+        }
+        menu.scanWallpaper.isVisible = canCustomizeWallpaper()
         menu.scanWallpaper.setOnClickListener {
             dialog.dismiss()
             showWallpaperScanOptions()
@@ -1706,45 +1744,153 @@ class AppDrawerFragment : BaseFragment() {
         dialog.applyWallpaperBackground()
     }
 
+    private fun canCustomizeWallpaper(): Boolean =
+        prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT || prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
+
     private fun showWallpaperScanOptions() {
-        val options = buildList<Pair<Int, () -> Unit>> {
+        val builder = AlertDialog.Builder(requireContext())
+        val menu = DialogWallpaperScanBinding.inflate(LayoutInflater.from(builder.context))
+        val dialog = builder.setTitle(R.string.bolt_scan_wallpaper).setView(menu.root).create()
+        val tint = ColorStateList.valueOf(
+            wallpaperColors?.accent ?: builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor),
+        )
+        listOf(menu.matchWallpaper, menu.matchImage, menu.applyPalette, menu.reset).forEach {
+            it.supportCompoundDrawablesTintList = tint
+        }
+        menu.matchWallpaper.setOnClickListener {
+            dialog.dismiss()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                add(R.string.bolt_scan_current_wallpaper to { scanHomeWallpaper(explicit = true) })
-            }
-            add(R.string.bolt_scan_wallpaper_image to ::chooseWallpaperImage)
-            if (prefs.wallpaperPalette != null) {
-                add(R.string.bolt_reset_wallpaper_colors to {
-                    wallpaperScan?.cancel()
-                    scanningHomeExplicitly = false
-                    stopWatchingWallpaper()
-                    prefs.saveWallpaperSample(null)
-                    requireActivity().recreate()
-                })
+                scanHomeWallpaper(explicit = true)
+            } else {
+                requireContext().showToast(getString(R.string.bolt_wallpaper_match_unavailable))
             }
         }
-        AlertDialog.Builder(requireContext())
-            .setTitle(if (prefs.wallpaperNeedsRescan) R.string.bolt_wallpaper_rescan_needed
-                else R.string.bolt_scan_wallpaper)
-            .setItems(options.map { getString(it.first) }.toTypedArray()) { _, index ->
-                options[index].second()
+        menu.matchImage.setOnClickListener {
+            dialog.dismiss()
+            chooseWallpaperImage(pickWallpaperImage)
+        }
+        menu.applyPalette.setOnClickListener {
+            dialog.dismiss()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                loadWallpaperPalettes()
+            } else {
+                requireContext().showToast(getString(R.string.bolt_wallpaper_match_unavailable))
             }
+        }
+        menu.reset.setOnClickListener {
+            dialog.dismiss()
+            wallpaperScan?.cancel()
+            scanningHomeExplicitly = false
+            stopWatchingWallpaper()
+            val changed = prefs.wallpaperPalette != null || prefs.generatedWallpaperTheme != null
+            prefs.resetWallpaperAppearance()
+            if (changed) requireActivity().recreate()
+        }
+        dialog.show()
+        dialog.applyWallpaperBackground()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun loadWallpaperPalettes() {
+        wallpaperScan?.cancel()
+        scanningHomeExplicitly = true
+        val context = requireContext().applicationContext
+        wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
+            val manager = WallpaperManager.getInstance(context)
+            val wallpaperId = manager.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
+            val options = withContext(Dispatchers.IO) {
+                val distinct = mutableListOf<Pair<WallpaperPalette.GeneratedTheme, WallpaperThemeColors>>()
+                for (candidate in WallpaperPalette.paletteChoices(context, prefs.wallpaperCropSample(wallpaperId))) {
+                    val colors = WallpaperThemeColors(candidate.sample, candidate.supporting)
+                    if (distinct.all { colors.looksDistinctFrom(it.second) }) {
+                        distinct.add(candidate to colors)
+                        if (distinct.size == 10) break
+                    }
+                }
+                distinct
+            }
+            scanningHomeExplicitly = false
+            if (!canCustomizeWallpaper() || !isResumed) return@launch
+            when {
+                options.isEmpty() -> requireContext().showToast(getString(R.string.bolt_wallpaper_palette_unavailable))
+                manager.getWallpaperId(WallpaperManager.FLAG_SYSTEM) != wallpaperId ->
+                    requireContext().showToast(getString(R.string.bolt_wallpaper_palette_changed))
+                else -> showWallpaperPalettePicker(options, wallpaperId)
+            }
+            if (!generatedWallpaperActive && prefs.followsHomeWallpaper) watchHomeWallpaper()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun showWallpaperPalettePicker(
+        options: List<Pair<WallpaperPalette.GeneratedTheme, WallpaperThemeColors>>,
+        wallpaperId: Int,
+    ) {
+        val builder = AlertDialog.Builder(requireContext())
+        val density = resources.displayMetrics.density
+        val textColor = builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
+        val rowTextColors = options.map { (palette, _) ->
+            val themedContext = android.view.ContextThemeWrapper(builder.context, WallpaperPalette.forColor(palette.sample.base).overlay)
+            themedContext.getColorFromAttr(R.attr.boltResultTextColor) to
+                themedContext.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+        }
+        val names = options.indices.map { getString(R.string.bolt_wallpaper_palette_number, it + 1) }
+        val rows = object : android.widget.ArrayAdapter<String>(builder.context, 0, names) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val row = convertView as? android.widget.LinearLayout
+                    ?: android.widget.LinearLayout(context).apply {
+                        orientation = android.widget.LinearLayout.VERTICAL
+                        val inset = (16 * density).toInt()
+                        setPadding(inset, (8 * density).toInt(), inset, (8 * density).toInt())
+                        addView(android.widget.TextView(context).apply {
+                            setTextColor(textColor)
+                            textSize = 16f
+                            setPadding(0, 0, 0, (6 * density).toInt())
+                        })
+                        addView(
+                            WallpaperPalettePreview(context),
+                            android.widget.LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, (152 * density).toInt(),
+                            ),
+                        )
+                    }
+                (row.getChildAt(0) as android.widget.TextView).text = names[position]
+                val (resultText, selectedText) = rowTextColors[position]
+                (row.getChildAt(1) as WallpaperPalettePreview).bind(options[position].second, resultText, selectedText)
+                return row
+            }
+        }
+        builder.setTitle(R.string.bolt_apply_wallpaper_palette)
+            .setAdapter(rows) { dialog, index ->
+                dialog.dismiss()
+                val manager = WallpaperManager.getInstance(requireContext())
+                if (manager.getWallpaperId(WallpaperManager.FLAG_SYSTEM) != wallpaperId) {
+                    requireContext().showToast(getString(R.string.bolt_wallpaper_palette_changed))
+                    return@setAdapter
+                }
+                stopWatchingWallpaper()
+                prefs.applyGeneratedWallpaperTheme(options[index].first)
+                requireActivity().recreate()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show().applyWallpaperBackground()
     }
 
-    private fun chooseWallpaperImage() {
+    private fun chooseWallpaperImage(picker: ActivityResultLauncher<String>) {
         wallpaperScan?.cancel()
         scanningHomeExplicitly = false
         choosingWallpaperImage = true
         try {
-            pickWallpaperImage.launch("image/*")
+            picker.launch("image/*")
         } catch (_: ActivityNotFoundException) {
             finishChoosingWallpaper()
             requireContext().showToast(getString(R.string.bolt_wallpaper_picker_unavailable))
         }
     }
 
-    private fun previewWallpaperImage(uri: Uri) {
+    private fun previewWallpaperImage(uri: Uri, setWallpaper: Boolean = false) {
         wallpaperScan?.cancel()
+        choosingWallpaperImage = true
         val context = requireContext().applicationContext
         wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
             val bitmap = withContext(Dispatchers.IO) { WallpaperPalette.decodeImage(context, uri) }
@@ -1753,16 +1899,33 @@ class AppDrawerFragment : BaseFragment() {
                 requireContext().showToast(getString(R.string.bolt_wallpaper_image_unreadable))
                 return@launch
             }
-            val dialog = createWallpaperCropDialog(requireActivity(), bitmap) { crop ->
+            val activity = requireActivity()
+            val bounds = wallpaperScreenBounds(activity)
+            val dialog = createWallpaperCropDialog(activity, bitmap, bounds, setWallpaper) { crop ->
                 wallpaperCropDialog = null
-                wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
+                wallpaperScan = viewLifecycleOwner.lifecycleScope.launch applyCrop@{
+                    if (setWallpaper) {
+                        settingHomeWallpaper = true
+                        val applied = try {
+                            withContext(Dispatchers.IO) {
+                                applyHomeWallpaper(context, bitmap, crop, bounds)
+                            }
+                        } finally {
+                            settingHomeWallpaper = false
+                        }
+                        requireContext().showToast(getString(
+                            if (applied) R.string.bolt_set_wallpaper_applied else R.string.bolt_set_wallpaper_failed,
+                        ))
+                        finishChoosingWallpaper()
+                        return@applyCrop
+                    }
                     val sample = withContext(Dispatchers.Default) {
                         WallpaperPalette.scanImage(bitmap, crop)
                     }
                     choosingWallpaperImage = false
                     if (sample == null) {
                         requireContext().showToast(getString(R.string.bolt_wallpaper_image_unreadable))
-                    } else if (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT) {
+                    } else if (canCustomizeWallpaper()) {
                         applyWallpaperSample(sample, followHome = false, announce = true)
                     }
                 }
@@ -1779,17 +1942,36 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private fun applyHomeWallpaper(context: Context, source: Bitmap, crop: Rect, bounds: Rect): Boolean {
+        val manager = WallpaperManager.getInstance(context)
+        val destination = Rect(0, 0, bounds.width().coerceAtLeast(1), bounds.height().coerceAtLeast(1))
+        val wallpaper = Bitmap.createBitmap(destination.width(), destination.height(), Bitmap.Config.ARGB_8888)
+        return try {
+            Canvas(wallpaper).drawBitmap(source, crop, destination, Paint(Paint.FILTER_BITMAP_FLAG))
+            val wallpaperId = manager.setBitmap(wallpaper, destination, true, WallpaperManager.FLAG_SYSTEM)
+            if (wallpaperId <= 0) return false
+            Prefs(context).saveWallpaperCropSample(wallpaperId, WallpaperPalette.scanImage(source, crop))
+            true
+        } catch (_: IOException) {
+            false
+        } catch (_: SecurityException) {
+            false
+        } finally {
+            wallpaper.recycle()
+        }
+    }
+
     private fun finishChoosingWallpaper() {
         choosingWallpaperImage = false
         if (isResumed) refreshHomeWallpaper()
     }
 
     private fun refreshHomeWallpaper() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1 || choosingWallpaperImage ||
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1 || choosingWallpaperImage || scanningHomeExplicitly ||
             prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT || !prefs.followsHomeWallpaper
         ) return
         watchHomeWallpaper()
-        scanHomeWallpaper(explicit = scanningHomeExplicitly)
+        scanHomeWallpaper(explicit = false)
     }
 
     @RequiresApi(Build.VERSION_CODES.O_MR1)
@@ -1819,9 +2001,10 @@ class AppDrawerFragment : BaseFragment() {
         wallpaperScan = viewLifecycleOwner.lifecycleScope.launch {
             val sample = withContext(Dispatchers.IO) { WallpaperPalette.scan(context) }
             scanningHomeExplicitly = false
-            if (prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT) return@launch
+            if (!canCustomizeWallpaper()) return@launch
             if (sample == null) {
-                val needsRescan = prefs.followsHomeWallpaper
+                val needsRescan = !generatedWallpaperActive && prefs.followsHomeWallpaper
+                if (needsRescan && isResumed) watchHomeWallpaper()
                 val alreadyMarked = prefs.wallpaperNeedsRescan
                 if (needsRescan && !alreadyMarked) prefs.wallpaperNeedsRescan = true
                 if (explicit || !alreadyMarked) requireContext().showToast(getString(
@@ -1834,16 +2017,17 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun applyWallpaperSample(sample: WallpaperPalette.Sample, followHome: Boolean, announce: Boolean) {
-        val changed = prefs.wallpaperSample != sample
+        val changed = generatedWallpaperActive || prefs.wallpaperSample != sample
         val sourceChanged = followHome != prefs.followsHomeWallpaper
         if (changed || sourceChanged || prefs.wallpaperNeedsRescan) {
             prefs.saveWallpaperSample(sample, followHome)
         }
         if (announce) requireContext().showToast(getString(R.string.bolt_wallpaper_colors_applied))
         if (changed) {
+            if (generatedWallpaperActive) prefs.launcherTheme = Prefs.LauncherTheme.DEFAULT
             requireActivity().recreate()
-        } else if (sourceChanged && followHome && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && isResumed) {
-            refreshHomeWallpaper()
+        } else if (followHome && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && isResumed) {
+            watchHomeWallpaper()
         } else if (!followHome) {
             stopWatchingWallpaper()
         }
@@ -1872,18 +2056,9 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun showThemePicker() {
         val collator = Collator.getInstance(resources.configuration.locales[0])
-        val options = listOf(
-            Prefs.LauncherTheme.DEFAULT to R.string.bolt_theme_default,
-            Prefs.LauncherTheme.FROSTED_GLASS to R.string.bolt_frosted_glass,
-            Prefs.LauncherTheme.LIQUID_GLASS to R.string.bolt_liquid_glass,
-            Prefs.LauncherTheme.COZY_QUEST to R.string.bolt_cozy,
-            Prefs.LauncherTheme.E_INK to R.string.bolt_eink,
-            Prefs.LauncherTheme.PAPER_NOTEBOOK to R.string.bolt_paper_notebook,
-            Prefs.LauncherTheme.SMOKED_GLASS to R.string.bolt_smoked_glass,
-            Prefs.LauncherTheme.WINDOWS_XP to R.string.bolt_windows_xp,
-            Prefs.LauncherTheme.WII_U to R.string.bolt_wii_u,
-            Prefs.LauncherTheme.SEATTLE_SEAHAWKS to R.string.bolt_seattle_seahawks,
-        ).map { (theme, label) -> theme to getString(label) }
+        val options = Prefs.LauncherTheme.entries
+            .filter { it != Prefs.LauncherTheme.WALLPAPER || prefs.generatedWallpaperTheme != null }
+            .map { it to getString(it.label) }
             .sortedWith(compareBy<Pair<Prefs.LauncherTheme, String>> { it.first != Prefs.LauncherTheme.DEFAULT }
                 .thenBy(collator) { it.second })
         val current = prefs.launcherTheme

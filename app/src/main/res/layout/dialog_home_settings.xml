@@ -1,47 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="8dp">
+    android:layout_height="wrap_content">
 
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/launcherSettings"
-        style="@style/BoltHomeMenuRow"
-        android:drawableStart="@drawable/dock_settings"
-        android:text="@string/bolt_launcher_settings" />
-
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/systemSettings"
-        style="@style/BoltHomeMenuRow"
-        android:drawableStart="@drawable/bolt_system_settings_icon"
-        android:text="@string/bolt_system_settings" />
-
-    <View
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginVertical="4dp"
-        android:background="?attr/boltDialogOutlineColor"
-        android:importantForAccessibility="no" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp">
 
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/launcherTheme"
-        style="@style/BoltHomeMenuRow"
-        android:drawableStart="@drawable/bolt_frosted_glass_icon"
-        android:text="@string/bolt_theme" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/launcherSettings"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/dock_settings"
+            android:text="@string/bolt_launcher_settings" />
 
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/scanWallpaper"
-        style="@style/BoltHomeMenuRow"
-        android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
-        android:text="@string/bolt_scan_wallpaper"
-        android:visibility="gone" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/systemSettings"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_system_settings_icon"
+            android:text="@string/bolt_system_settings" />
 
-    <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/powerMenu"
-        style="@style/BoltHomeMenuRow"
-        android:drawableStart="@drawable/bolt_power_menu_icon"
-        android:text="@string/bolt_power_menu" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginVertical="4dp"
+            android:background="?attr/boltDialogOutlineColor"
+            android:importantForAccessibility="no" />
 
-</LinearLayout>
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/launcherTheme"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_frosted_glass_icon"
+            android:text="@string/bolt_theme" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/setWallpaper"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_set_wallpaper_icon"
+            android:text="@string/bolt_set_wallpaper" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/scanWallpaper"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
+            android:text="@string/bolt_scan_wallpaper"
+            android:visibility="gone" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/powerMenu"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_power_menu_icon"
+            android:text="@string/bolt_power_menu" />
+
+    </LinearLayout>
+</ScrollView>

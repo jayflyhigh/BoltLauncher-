@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.annotation.StyleRes
+import androidx.core.graphics.ColorUtils
 import app.olauncher.R
 
 /** Selects a palette from the home wallpaper or a user-selected image crop. */
@@ -26,6 +27,8 @@ internal enum class WallpaperPalette(@StyleRes val overlay: Int) {
     SLATE(R.style.WallpaperPaletteSlate);
 
     data class Sample(val base: Int, val accent: Int)
+
+    data class GeneratedTheme(val sample: Sample, val supporting: Int)
 
     companion object {
         private const val MIN_COLORFUL_CHROMA = 26
@@ -167,14 +170,43 @@ internal enum class WallpaperPalette(@StyleRes val overlay: Int) {
 
         @RequiresApi(Build.VERSION_CODES.O_MR1)
         fun scan(context: Context): Sample? = readWallpaper {
+            select(homeSwatches(context))
+        }
+
+        @RequiresApi(Build.VERSION_CODES.O_MR1)
+        fun paletteChoices(context: Context, saved: Sample?): List<GeneratedTheme> {
+            val wallpaper = readWallpaper { homeSwatches(context) }.orEmpty()
+            val colors = (wallpaper.map { it.color } + listOfNotNull(saved?.base, saved?.accent)).distinct()
+            val first = colors.firstOrNull() ?: return emptyList()
+            val recommended = select(wallpaper) ?: saved ?: Sample(first, first)
+            val candidates = buildList {
+                val supporting = colors.firstOrNull { it != recommended.base && it != recommended.accent }
+                add(GeneratedTheme(recommended, supporting ?: recommended.accent))
+                for (base in colors) {
+                    for (accent in colors) {
+                        if (base == accent) continue
+                        val third = colors.firstOrNull { it != base && it != accent }
+                        add(GeneratedTheme(Sample(base, accent), third ?: accent))
+                    }
+                    val softer = ColorUtils.blendARGB(base, Color.WHITE, 0.40f)
+                    val deeper = ColorUtils.blendARGB(base, Color.BLACK, 0.45f)
+                    add(GeneratedTheme(Sample(softer, base), base))
+                    add(GeneratedTheme(Sample(deeper, softer), deeper))
+                }
+            }
+            return candidates.distinct()
+        }
+
+        @RequiresApi(Build.VERSION_CODES.O_MR1)
+        private fun homeSwatches(context: Context): List<Swatch> {
             val colors = WallpaperManager.getInstance(context)
-                .getWallpaperColors(WallpaperManager.FLAG_SYSTEM) ?: return@readWallpaper null
+                .getWallpaperColors(WallpaperManager.FLAG_SYSTEM) ?: return emptyList()
             // Android reports swatches in order of prominence without pixel counts.
-            select(listOfNotNull(
+            return listOfNotNull(
                 Swatch(colors.primaryColor.toArgb(), 1f),
                 colors.secondaryColor?.let { Swatch(it.toArgb(), 0.5f) },
                 colors.tertiaryColor?.let { Swatch(it.toArgb(), 0.25f) },
-            ))
+            )
         }
 
         private inline fun <T> readWallpaper(read: () -> T?): T? = try {
