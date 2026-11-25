@@ -66,6 +66,7 @@ import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
 import app.olauncher.data.WallpaperPalette
+import app.olauncher.databinding.RowThemePreviewBinding
 import app.olauncher.databinding.DialogHomeSettingsBinding
 import app.olauncher.databinding.DialogWallpaperScanBinding
 import app.olauncher.databinding.FragmentAppDrawerBinding
@@ -1652,26 +1653,37 @@ class AppDrawerFragment : BaseFragment() {
         updateSearchVisibility()
     }
 
-    private fun showHomeSettings() {
+    private fun showHomeSettings(showAppearance: Boolean = false) {
         if (settingHomeWallpaper) return
         cancelAutoLaunch()
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val menu = DialogHomeSettingsBinding.inflate(LayoutInflater.from(builder.context))
         val dialog = builder
-            .setTitle(getString(R.string.bolt_current_theme, getString(prefs.launcherTheme.label)))
+            .setTitle(if (showAppearance) R.string.bolt_home_menu_appearance else R.string.bolt_home_menu_title)
+            .apply {
+                if (showAppearance) {
+                    setNegativeButton(R.string.bolt_home_menu_back) { _, _ -> showHomeSettings() }
+                }
+            }
             .setView(menu.root)
             .create()
+        menu.homeOptions.isVisible = !showAppearance
+        menu.appearanceOptions.isVisible = showAppearance
+        if (showAppearance) dialog.setOnCancelListener { showHomeSettings() }
+
         if (cozyQuest) {
-            menu.launcherSettings.text = getString(R.string.bolt_cozy_launcher_settings)
-            menu.systemSettings.text = getString(R.string.bolt_cozy_system_settings)
-            menu.launcherTheme.text = getString(R.string.bolt_cozy_theme_menu)
-            menu.powerMenu.text = getString(R.string.bolt_cozy_power_menu)
+            menu.appearance.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.bolt_cozy_themes, 0, R.drawable.liquid_glass_chevron, 0,
+            )
             menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_settings, 0, 0, 0)
             menu.systemSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_phone, 0, 0, 0)
             menu.launcherTheme.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_themes, 0, 0, 0)
             menu.setWallpaper.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_wallpaper, 0, 0, 0)
             menu.powerMenu.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.bolt_cozy_power, 0, 0, 0)
         } else if (liquidGlass) {
+            menu.appearance.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                R.drawable.liquid_glass_theme, 0, R.drawable.liquid_glass_chevron, 0,
+            )
             menu.launcherSettings.setCompoundDrawablesRelativeWithIntrinsicBounds(
                 R.drawable.liquid_glass_settings, 0, R.drawable.liquid_glass_chevron, 0,
             )
@@ -1687,16 +1699,18 @@ class AppDrawerFragment : BaseFragment() {
             menu.powerMenu.setCompoundDrawablesRelativeWithIntrinsicBounds(
                 R.drawable.liquid_glass_power, 0, R.drawable.liquid_glass_chevron, 0,
             )
-            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.powerMenu).forEach {
+            listOf(menu.appearance, menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.powerMenu).forEach {
                 it.setBackgroundResource(R.drawable.bolt_result_press)
             }
         } else if (prefs.launcherTheme == Prefs.LauncherTheme.WINDOWS_XP) {
+            menu.appearance.setXpIcon(R.drawable.xp_theme)
             menu.launcherSettings.setXpIcon(R.drawable.xp_settings)
             menu.systemSettings.setXpIcon(R.drawable.xp_computer)
             menu.launcherTheme.setXpIcon(R.drawable.xp_theme)
             menu.setWallpaper.setXpIcon(R.drawable.xp_wallpaper)
             menu.powerMenu.setXpIcon(R.drawable.xp_power)
         } else if (usesThemeTileIcons) {
+            menu.appearance.setThemeTileIcon(R.drawable.bolt_frosted_glass_icon)
             menu.launcherSettings.setThemeTileIcon(R.drawable.dock_settings)
             menu.systemSettings.setThemeTileIcon(R.drawable.bolt_system_settings_icon)
             menu.launcherTheme.setThemeTileIcon(R.drawable.bolt_frosted_glass_icon)
@@ -1707,9 +1721,13 @@ class AppDrawerFragment : BaseFragment() {
             val tintAttr = if (wallpaperColorsActive) R.attr.boltResultActionColor else R.attr.boltHomeMenuTextColor
             val tint = ColorStateList.valueOf(builder.context.getColorFromAttr(tintAttr))
             val iconTint = wallpaperColors?.let { ColorStateList.valueOf(it.accent) } ?: tint
-            listOf(menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.scanWallpaper, menu.powerMenu).forEach {
+            listOf(menu.appearance, menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.scanWallpaper, menu.powerMenu).forEach {
                 it.supportCompoundDrawablesTintList = iconTint
             }
+        }
+        menu.appearance.setOnClickListener {
+            dialog.dismiss()
+            showHomeSettings(showAppearance = true)
         }
         menu.launcherSettings.setOnClickListener {
             dialog.dismiss()
@@ -1736,7 +1754,7 @@ class AppDrawerFragment : BaseFragment() {
                 requireContext().showToast(getString(R.string.bolt_set_wallpaper_unavailable))
             }
         }
-        menu.scanWallpaper.isVisible = canCustomizeWallpaper()
+        menu.scanWallpaper.isVisible = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT
         menu.scanWallpaper.setOnClickListener {
             dialog.dismiss()
             showWallpaperScanOptions()
@@ -1746,6 +1764,7 @@ class AppDrawerFragment : BaseFragment() {
             openPowerMenu()
         }
         dialog.setOnDismissListener { LauncherMotion.reset(menu.root) }
+        if (showAppearance) dialog.setCanceledOnTouchOutside(false)
         dialog.show()
         dialog.applyWallpaperBackground()
         LauncherMotion.revealForTheme(menu.root, prefs.launcherTheme)
@@ -2071,30 +2090,24 @@ class AppDrawerFragment : BaseFragment() {
         val current = prefs.launcherTheme
         val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext())
         val textColor = builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
-        val density = resources.displayMetrics.density
-        val previews = arrayOfNulls<ThemePreviewDrawable>(options.size)
-        val labels = object : android.widget.ArrayAdapter<String>(
-            builder.context,
-            android.R.layout.simple_list_item_single_choice,
-            options.map { it.second },
-        ) {
+        val inflater = LayoutInflater.from(builder.context)
+        val labels = object : android.widget.ArrayAdapter<String>(builder.context, 0, options.map { it.second }) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                return (super.getView(position, convertView, parent) as android.widget.CheckedTextView).apply {
-                    minimumHeight = (58 * density).toInt()
-                    compoundDrawablePadding = (12 * density).toInt()
+                val row = convertView?.let(RowThemePreviewBinding::bind)
+                    ?: RowThemePreviewBinding.inflate(inflater, parent, false)
+                val (candidate, name) = options[position]
+                row.themeName.apply {
+                    text = name
+                    isChecked = candidate == current
                     setTextColor(textColor)
                     checkMarkTintList = ColorStateList.valueOf(textColor)
-                    val preview = previews[position] ?: ThemePreviewDrawable(builder.context, options[position].first)
-                        .also { previews[position] = it }
-                    setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, preview, null)
                 }
+                row.themePreview.setImageDrawable(ThemePreviewDrawable(builder.context, candidate))
+                return row.root
             }
         }
         builder.setTitle(R.string.bolt_theme)
-            .setSingleChoiceItems(
-                labels,
-                options.indexOfFirst { it.first == current },
-            ) { picker, position ->
+            .setAdapter(labels) { picker, position ->
                 picker.dismiss()
                 val selected = options[position].first
                 if (selected != current) {
@@ -2102,6 +2115,7 @@ class AppDrawerFragment : BaseFragment() {
                     requireActivity().recreate()
                 }
             }
+            .setNegativeButton(android.R.string.cancel, null)
             .show().applyWallpaperBackground()
     }
 

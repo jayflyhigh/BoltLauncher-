@@ -9,54 +9,65 @@
         android:orientation="vertical"
         android:padding="8dp">
 
-        <TextView
-            style="@style/BoltHomeMenuSection"
-            android:text="@string/bolt_home_menu_appearance" />
+        <LinearLayout
+            android:id="@+id/homeOptions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/launcherTheme"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/bolt_frosted_glass_icon"
-            android:text="@string/bolt_theme" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/appearance"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/bolt_frosted_glass_icon"
+                android:drawableEnd="@drawable/liquid_glass_chevron"
+                android:text="@string/bolt_home_menu_appearance" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/setWallpaper"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/bolt_set_wallpaper_icon"
-            android:text="@string/bolt_set_wallpaper" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/launcherSettings"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/dock_settings"
+                android:text="@string/bolt_launcher_settings" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/scanWallpaper"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
-            android:text="@string/bolt_scan_wallpaper"
-            android:visibility="gone" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/systemSettings"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/bolt_system_settings_icon"
+                android:text="@string/bolt_system_settings" />
 
-        <TextView
-            style="@style/BoltHomeMenuSection"
-            android:text="@string/bolt_home_menu_settings" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/powerMenu"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/bolt_power_menu_icon"
+                android:text="@string/bolt_power_menu" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/launcherSettings"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/dock_settings"
-            android:text="@string/bolt_launcher_settings" />
+        </LinearLayout>
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/systemSettings"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/bolt_system_settings_icon"
-            android:text="@string/bolt_system_settings" />
+        <LinearLayout
+            android:id="@+id/appearanceOptions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-        <TextView
-            style="@style/BoltHomeMenuSection"
-            android:text="@string/bolt_home_menu_device" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/launcherTheme"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/bolt_frosted_glass_icon"
+                android:text="@string/bolt_theme" />
 
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/powerMenu"
-            style="@style/BoltHomeMenuRow"
-            android:drawableStart="@drawable/bolt_power_menu_icon"
-            android:text="@string/bolt_power_menu" />
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/setWallpaper"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/bolt_set_wallpaper_icon"
+                android:text="@string/bolt_set_wallpaper" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/scanWallpaper"
+                style="@style/BoltHomeMenuRow"
+                android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
+                android:text="@string/bolt_scan_wallpaper"
+                android:visibility="gone" />
+
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
