@@ -12,7 +12,7 @@ internal data class SearchHints(
 ) {
     companion object {
         fun forTheme(theme: Prefs.LauncherTheme): SearchHints = when (theme) {
-            Prefs.LauncherTheme.DEFAULT -> SearchHints(
+            Prefs.LauncherTheme.DEFAULT, Prefs.LauncherTheme.WALLPAPER -> SearchHints(
                 R.string.bolt_hint_default_home,
                 R.string.bolt_hint_default_regular,
                 R.string.bolt_hint_default_destination,

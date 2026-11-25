@@ -35,17 +35,21 @@ private fun Context.themeTileIcon(
     sizeDp: Int = 32,
     glassShortcut: Boolean = false,
 ): Drawable? {
-    val glyph = AppCompatResources.getDrawable(this, icon)?.mutate() ?: return null
+    val prefs = Prefs(this)
     val density = resources.displayMetrics.density
     val size = (sizeDp * density).roundToInt()
+    val glyph = AppCompatResources.getDrawable(this, icon)?.mutate() ?: return null
     val inset = (sizeDp / 8f * density).roundToInt()
-    val glassFrame = if (Prefs(this).launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS) {
+    val glassFrame = if (prefs.launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS) {
         val frame = if (glassShortcut) R.drawable.liquid_glass_shortcut_frame else R.drawable.liquid_glass_icon_frame
         AppCompatResources.getDrawable(this, frame)?.mutate() as? GradientDrawable
     } else null
     val tile = (glassFrame ?: GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
-        intArrayOf(getColorFromAttr(R.attr.boltIconTileTopColor), getColorFromAttr(R.attr.boltIconTileBottomColor)),
+        intArrayOf(
+            getColorFromAttr(R.attr.boltIconTileTopColor),
+            getColorFromAttr(R.attr.boltIconTileBottomColor),
+        ),
     ).apply {
         cornerRadius = 9f * density
         setStroke(density.roundToInt().coerceAtLeast(1), getColorFromAttr(R.attr.boltIconTileOutlineColor))

@@ -72,12 +72,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         prefs = Prefs(this)
+        prefs.removeLegacyWallpaperIconData()
         if (isEinkDisplay()) prefs.appTheme = AppCompatDelegate.MODE_NIGHT_NO
         AppCompatDelegate.setDefaultNightMode(prefs.appTheme)
         super.onCreate(savedInstanceState)
-        val launcherOverlay = if (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT) {
-            prefs.wallpaperPalette?.overlay ?: 0
-        } else prefs.launcherTheme.overlay
+        val launcherOverlay = prefs.overlayFor(prefs.launcherTheme)
         if (launcherOverlay != 0) theme.applyStyle(launcherOverlay, true)
         if (prefs.boldFont) theme.applyStyle(R.style.BoldFontOverlay, true)
         if (isEinkDisplay() || isSystemAnimationsDisabled()) theme.applyStyle(R.style.NoAnimationOverlay, true)

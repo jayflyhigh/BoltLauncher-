@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/matchWallpaper"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_scan_wallpaper_icon"
+            android:text="@string/bolt_scan_current_wallpaper" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/matchImage"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_set_wallpaper_icon"
+            android:text="@string/bolt_scan_wallpaper_image" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/applyPalette"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_wallpaper_palette_icon"
+            android:text="@string/bolt_apply_wallpaper_palette" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/reset"
+            style="@style/BoltHomeMenuRow"
+            android:drawableStart="@drawable/bolt_reset_wallpaper_icon"
+            android:text="@string/bolt_reset_wallpaper_colors" />
+
+    </LinearLayout>
+</ScrollView>

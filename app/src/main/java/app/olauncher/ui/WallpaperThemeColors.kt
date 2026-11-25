@@ -11,7 +11,10 @@ import app.olauncher.data.WallpaperPalette
 import androidx.appcompat.app.AlertDialog
 
 /** Keeps the sampled hue in the surfaces while giving text and highlights room for contrast. */
-internal class WallpaperThemeColors(sample: WallpaperPalette.Sample) {
+internal class WallpaperThemeColors(
+    sample: WallpaperPalette.Sample,
+    private val supporting: Int? = null,
+) {
     private val hsl = FloatArray(3).also { ColorUtils.colorToHSL(sample.base, it) }
 
     private val brightness = ColorUtils.calculateLuminance(sample.base).toFloat()
@@ -27,9 +30,9 @@ internal class WallpaperThemeColors(sample: WallpaperPalette.Sample) {
     }
 
     val panel = tone(rowLightness - 0.075f)
-    val dock = tone(rowLightness - 0.03f)
+    val panelEnd = supporting?.let { ColorUtils.blendARGB(panel, darkTone(it, 0.24f), 0.55f) }
+    val dock = supporting?.let { darkTone(it, 0.18f) } ?: tone(rowLightness - 0.03f)
     val row = tone(rowLightness)
-    val outline = ColorUtils.blendARGB(panel, Color.WHITE, 0.34f)
     val accent = FloatArray(3).let {
         ColorUtils.colorToHSL(sample.accent, it)
         it[1] = it[1].coerceAtMost(chromaLimit(sample.accent, 1f))
@@ -40,6 +43,31 @@ internal class WallpaperThemeColors(sample: WallpaperPalette.Sample) {
             color = ColorUtils.HSLToColor(it)
         }
         color
+    }
+
+    val outline = supporting?.let { ColorUtils.blendARGB(panel, accent, 0.52f) }
+        ?: ColorUtils.blendARGB(panel, Color.WHITE, 0.34f)
+
+
+    private val previewColors by lazy {
+        listOf(panel, panelEnd ?: panel, dock, row, accent).map { color ->
+            DoubleArray(3).also { ColorUtils.colorToLAB(color, it) }
+        }
+    }
+
+    fun looksDistinctFrom(other: WallpaperThemeColors): Boolean {
+        val differences = previewColors.zip(other.previewColors, ColorUtils::distanceEuclidean)
+        // A clear change in the highlight and icons, or a visible change across the surfaces.
+        return differences.last() >= 14.0 ||
+            (differences.dropLast(1).maxOrNull() ?: 0.0) >= 12.0 && differences.average() >= 5.0
+    }
+
+    private fun darkTone(color: Int, lightness: Float): Int {
+        val hsl = FloatArray(3)
+        ColorUtils.colorToHSL(color, hsl)
+        hsl[1] = hsl[1].coerceAtMost(chromaLimit(color, 0.72f))
+        hsl[2] = lightness
+        return ColorUtils.HSLToColor(hsl)
     }
 
     private fun chromaLimit(color: Int, limit: Float): Float {
@@ -65,8 +93,15 @@ internal class WallpaperThemeColors(sample: WallpaperPalette.Sample) {
     companion object {
         fun from(context: Context): WallpaperThemeColors? {
             val prefs = Prefs(context)
-            if (prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT) return null
-            return prefs.wallpaperSample?.let(::WallpaperThemeColors)
+            return forTheme(prefs, prefs.launcherTheme)
+        }
+
+        fun forTheme(prefs: Prefs, theme: Prefs.LauncherTheme): WallpaperThemeColors? = when (theme) {
+            Prefs.LauncherTheme.DEFAULT -> prefs.wallpaperSample?.let { WallpaperThemeColors(it) }
+            Prefs.LauncherTheme.WALLPAPER -> prefs.generatedWallpaperTheme?.let {
+                WallpaperThemeColors(it.sample, it.supporting)
+            }
+            else -> null
         }
     }
 }

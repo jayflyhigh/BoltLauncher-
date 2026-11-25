@@ -85,6 +85,18 @@ internal fun TextView.styleAliasBadge(color: Int, usesPresetColor: Boolean = fal
             }
             background = InAppSearch.background(fill, density)
         }
+        Prefs.LauncherTheme.WALLPAPER -> {
+            val colors = WallpaperThemeColors.from(context)
+            val fill = if (usesPresetColor && colors != null) colors.dock else color or Color.BLACK
+            val readable = if (ColorUtils.calculateContrast(Color.WHITE, fill) >= 4.5) {
+                fill
+            } else {
+                ColorUtils.blendARGB(fill, Color.BLACK, 0.55f)
+            }
+            background = InAppSearch.background(readable, density).apply {
+                colors?.let { setStroke(stroke, it.outline) }
+            }
+        }
         Prefs.LauncherTheme.SMOKED_GLASS -> {
             val surface = context.getColorFromAttr(R.attr.boltSmokedControlColor)
             background = InAppSearch.background(surface, density).apply {

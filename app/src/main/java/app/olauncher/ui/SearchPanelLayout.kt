@@ -27,7 +27,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
 
     private val wallpaperColors = WallpaperThemeColors.from(context)
     private val surface = wallpaperColors?.panel ?: context.getColorFromAttr(R.attr.boltPanelColor)
-    private val surfaceEnd = context.getColorFromAttr(R.attr.boltPanelEndColor)
+    private val surfaceEnd = wallpaperColors?.panelEnd ?: context.getColorFromAttr(R.attr.boltPanelEndColor)
     private var panelGradient: LinearGradient? = null
     private var glassDockTint: LinearGradient? = null
     private var glassRim: LinearGradient? = null

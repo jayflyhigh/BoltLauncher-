@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.view.Gravity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
+import androidx.annotation.StringRes
 import androidx.annotation.StyleRes
 import app.olauncher.R
 
@@ -194,17 +195,22 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean(SWIPE_RIGHT_ENABLED, true)
         set(value) = prefs.edit { putBoolean(SWIPE_RIGHT_ENABLED, value).apply() }
 
-    enum class LauncherTheme(val key: String, @StyleRes val overlay: Int = 0) {
-        DEFAULT("default"),
-        FROSTED_GLASS("frosted_glass", R.style.FrostedGlassOverlay),
-        LIQUID_GLASS("liquid_glass", R.style.LiquidGlassOverlay),
-        COZY_QUEST("cozy_quest", R.style.CozyQuestOverlay),
-        E_INK("e_ink", R.style.EInkOverlay),
-        PAPER_NOTEBOOK("paper_notebook", R.style.PaperNotebookOverlay),
-        SMOKED_GLASS("smoked_glass", R.style.SmokedGlassOverlay),
-        WINDOWS_XP("windows_xp", R.style.WindowsXpOverlay),
-        WII_U("wii_u", R.style.WiiUOverlay),
-        SEATTLE_SEAHAWKS("seattle_seahawks", R.style.SeattleSeahawksOverlay),
+    enum class LauncherTheme(
+        val key: String,
+        @StringRes val label: Int,
+        @StyleRes val overlay: Int = 0,
+    ) {
+        DEFAULT("default", R.string.bolt_theme_default),
+        WALLPAPER("wallpaper", R.string.bolt_wallpaper_theme),
+        FROSTED_GLASS("frosted_glass", R.string.bolt_frosted_glass, R.style.FrostedGlassOverlay),
+        LIQUID_GLASS("liquid_glass", R.string.bolt_liquid_glass, R.style.LiquidGlassOverlay),
+        COZY_QUEST("cozy_quest", R.string.bolt_cozy, R.style.CozyQuestOverlay),
+        E_INK("e_ink", R.string.bolt_eink, R.style.EInkOverlay),
+        PAPER_NOTEBOOK("paper_notebook", R.string.bolt_paper_notebook, R.style.PaperNotebookOverlay),
+        SMOKED_GLASS("smoked_glass", R.string.bolt_smoked_glass, R.style.SmokedGlassOverlay),
+        WINDOWS_XP("windows_xp", R.string.bolt_windows_xp, R.style.WindowsXpOverlay),
+        WII_U("wii_u", R.string.bolt_wii_u, R.style.WiiUOverlay),
+        SEATTLE_SEAHAWKS("seattle_seahawks", R.string.bolt_seattle_seahawks, R.style.SeattleSeahawksOverlay),
     }
 
     var launcherTheme: LauncherTheme
@@ -235,6 +241,68 @@ class Prefs(context: Context) {
 
     internal val wallpaperSample: WallpaperPalette.Sample?
         get() = wallpaperSeed?.let { WallpaperPalette.Sample(it, prefs.getInt("WALLPAPER_ACCENT", it)) }
+
+    internal val generatedWallpaperTheme: WallpaperPalette.GeneratedTheme?
+        get() = prefs.getInt("WALLPAPER_THEME_BASE", 0).takeUnless { it == 0 }?.let { base ->
+            val accent = prefs.getInt("WALLPAPER_THEME_ACCENT", base)
+            WallpaperPalette.GeneratedTheme(
+                WallpaperPalette.Sample(base, accent),
+                prefs.getInt("WALLPAPER_THEME_SUPPORTING", accent),
+            )
+        }
+
+    internal fun wallpaperCropSample(wallpaperId: Int): WallpaperPalette.Sample? {
+        if (wallpaperId <= 0 || prefs.getInt("BOLT_HOME_WALLPAPER_ID", 0) != wallpaperId) return null
+        val base = prefs.getInt("BOLT_HOME_WALLPAPER_BASE", 0).takeUnless { it == 0 } ?: return null
+        return WallpaperPalette.Sample(base, prefs.getInt("BOLT_HOME_WALLPAPER_ACCENT", base))
+    }
+
+    internal fun saveWallpaperCropSample(wallpaperId: Int, sample: WallpaperPalette.Sample?) {
+        prefs.edit {
+            putInt("BOLT_HOME_WALLPAPER_ID", wallpaperId)
+            putInt("BOLT_HOME_WALLPAPER_BASE", sample?.base ?: 0)
+            putInt("BOLT_HOME_WALLPAPER_ACCENT", sample?.accent ?: 0)
+        }
+    }
+
+    internal fun applyGeneratedWallpaperTheme(theme: WallpaperPalette.GeneratedTheme) {
+        prefs.edit {
+            putInt("WALLPAPER_THEME_BASE", theme.sample.base)
+            putInt("WALLPAPER_THEME_ACCENT", theme.sample.accent)
+            putInt("WALLPAPER_THEME_SUPPORTING", theme.supporting)
+            putString("LAUNCHER_THEME", LauncherTheme.WALLPAPER.key)
+        }
+    }
+
+    internal fun removeLegacyWallpaperIconData() {
+        prefs.edit {
+            remove("WALLPAPER_THEME_ICON_PACK")
+            remove("BOLT_HOME_WALLPAPER_HASHES")
+            remove("BOLT_HOME_WALLPAPER_NAME")
+            remove("BOLT_HOME_WALLPAPER_PREVIEW")
+        }
+    }
+
+    internal fun resetWallpaperAppearance() {
+        prefs.edit {
+            remove("WALLPAPER_PALETTE")
+            remove("WALLPAPER_NEEDS_RESCAN")
+            remove("WALLPAPER_COLOR")
+            remove("WALLPAPER_ACCENT")
+            remove("WALLPAPER_FOLLOWS_HOME")
+            remove("WALLPAPER_THEME_BASE")
+            remove("WALLPAPER_THEME_ACCENT")
+            remove("WALLPAPER_THEME_SUPPORTING")
+            putString("LAUNCHER_THEME", LauncherTheme.DEFAULT.key)
+        }
+    }
+
+    @StyleRes
+    internal fun overlayFor(theme: LauncherTheme): Int = when (theme) {
+        LauncherTheme.DEFAULT -> wallpaperPalette?.overlay ?: 0
+        LauncherTheme.WALLPAPER -> generatedWallpaperTheme?.let { WallpaperPalette.forColor(it.sample.base).overlay } ?: 0
+        else -> theme.overlay
+    }
 
     // Older samples have no recorded source. Keep them fixed until the user chooses a source.
     internal val followsHomeWallpaper: Boolean
