@@ -6,116 +6,150 @@ import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.text.TextPaint
+import android.text.TextUtils
 import android.util.TypedValue
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import app.olauncher.R
 import app.olauncher.data.Prefs
 import kotlin.math.roundToInt
 
-/** Miniature of the launcher panel using the candidate theme's actual colors. */
+/** A search preview rendered with the candidate theme's surfaces, text and launcher icons. */
 internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherTheme) : Drawable() {
-    private val paperNotebook = candidate == Prefs.LauncherTheme.PAPER_NOTEBOOK
-    private val eInkBolt = if (candidate == Prefs.LauncherTheme.E_INK) {
-        ContextCompat.getDrawable(context, R.drawable.bolt_eink_lightning)?.apply {
-            setBounds(47, 25, 55, 33)
-        }
-    } else null
-    private val cozyQuest = candidate == Prefs.LauncherTheme.COZY_QUEST
-    private val orchard = if (cozyQuest) ContextCompat.getDrawable(context, R.drawable.bolt_cozy_orchard)
-        ?.apply { setBounds(1, 1, 63, 35) } else null
-    private val orchardClip = if (cozyQuest) android.graphics.Path().apply {
-        addRoundRect(1f, 1f, 63f, 35f, 6f, 6f, android.graphics.Path.Direction.CW)
-    } else null
-    private val leafBolt = if (cozyQuest) ContextCompat.getDrawable(context, R.drawable.bolt_cozy_lightning)
-        ?.apply { setBounds(48, 25, 56, 33) } else null
-    private val density = context.resources.displayMetrics.density
+    private val prefs = Prefs(context)
     private val theme = context.resources.newTheme().apply {
         applyStyle(R.style.AppTheme, true)
-        val overlay = Prefs(context).overlayFor(candidate)
+        val overlay = prefs.overlayFor(candidate)
         if (overlay != 0) applyStyle(overlay, true)
     }
-    private val wallpaperColors = WallpaperThemeColors.forTheme(Prefs(context), candidate)
-    private val panel = wallpaperColors?.panel ?: color(R.attr.boltPanelColor)
-    private val panelEnd = wallpaperColors?.panelEnd ?: color(R.attr.boltPanelEndColor)
-    private val rim = wallpaperColors?.outline ?: color(R.attr.boltPanelOutlineColor)
-    private val row = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowColor)
-    private val rowEnd = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowEndColor)
-    private val rowRim = wallpaperColors?.accent ?: color(R.attr.boltSelectedRowOutlineColor)
-    private val rowText = color(R.attr.boltSelectedRowTextColor)
-    private val dock = wallpaperColors?.dock ?: color(R.attr.boltDockColor)
-    private val dockTop = color(R.attr.boltDockTopColor)
-    private val cursor = wallpaperColors?.accent ?: color(R.attr.boltSearchCursorColor)
-    private val accent = wallpaperColors?.accent ?: color(R.attr.boltThunderDockColor)
-    private val panelFill = gradient(panel, panelEnd, 0f, 0f, 64f, 0f)
-    private val rowFill = gradient(row, rowEnd, 5f, 0f, 59f, 0f)
-    private val dockFill = gradient(
-        dock, androidx.core.graphics.ColorUtils.compositeColors(dockTop, dock), 0f, 31f, 0f, 23f,
-    )
-    private val notebookMarker = androidx.core.content.ContextCompat.getColor(context, R.color.bolt_notebook_marker)
-    private val notebookRule = androidx.core.content.ContextCompat.getColor(context, R.color.bolt_notebook_rule)
+    private val wallpaper = WallpaperThemeColors.forTheme(prefs, candidate)
+    private val density = context.resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val panel = wallpaper?.panel ?: color(R.attr.boltPanelColor)
+    private val panelEnd = wallpaper?.panelEnd ?: color(R.attr.boltPanelEndColor, panel)
+    private val outline = wallpaper?.outline ?: color(R.attr.boltPanelOutlineColor)
+    private val row = wallpaper?.row ?: color(R.attr.boltRowColor)
+    private val rowEnd = wallpaper?.row ?: color(R.attr.boltRowBottomColor, row)
+    private val selected = wallpaper?.accent ?: color(R.attr.boltSelectedRowColor)
+    private val selectedEnd = wallpaper?.accent ?: color(R.attr.boltSelectedRowEndColor, selected)
+    private val selectedOutline = wallpaper?.accent ?: color(R.attr.boltSelectedRowOutlineColor)
+    private val dock = wallpaper?.dock ?: color(R.attr.boltDockColor)
+    private val dockTop = ColorUtils.compositeColors(color(R.attr.boltDockTopColor), dock)
+    private val cursor = wallpaper?.accent ?: color(R.attr.boltSearchCursorColor)
+    private val text = color(R.attr.boltResultTextColor)
+    private val selectedText = if (wallpaper != null) Color.BLACK else color(R.attr.boltSelectedRowTextColor)
+    private val panelRadius = dimension(R.attr.boltPanelCornerRadius, 13f)
+    private val selectedRadius = dimension(R.attr.boltSelectedRowCornerRadius, 9f)
+    private val panelFill = gradient(panel, panelEnd, 0f, 280f, horizontal = true)
+    private val rowFill = gradient(row, rowEnd, 9f, 44f)
+    private val selectionFill = gradient(selected, selectedEnd, 8f, 272f, horizontal = true)
+    private val dockFill = gradient(dockTop, dock, 105f, 144f)
+    private val paperRule = ContextCompat.getColor(context, R.color.bolt_notebook_rule)
+    private val paperNotebook = candidate == Prefs.LauncherTheme.PAPER_NOTEBOOK
+    private val orchard = if (candidate == Prefs.LauncherTheme.COZY_QUEST) {
+        ContextCompat.getDrawable(context, R.drawable.bolt_cozy_orchard)?.apply { setBounds(0, 0, 280, 152) }
+    } else null
+    private val panelClip = Path().apply {
+        addRoundRect(0f, 0f, 280f, 152f, panelRadius, panelRadius, Path.Direction.CW)
+    }
+    private val web = icon(
+        context,
+        when (candidate) {
+            Prefs.LauncherTheme.LIQUID_GLASS -> R.drawable.liquid_glass_web
+            Prefs.LauncherTheme.WINDOWS_XP -> R.drawable.xp_web
+            else -> R.drawable.dock_web
+        },
+        201, 116, 222, 137,
+    ).apply {
+        if (candidate != Prefs.LauncherTheme.LIQUID_GLASS && candidate != Prefs.LauncherTheme.WINDOWS_XP) {
+            this?.setTint(wallpaper?.accent ?: color(R.attr.boltResultActionColor))
+        }
+    }
+    private val thunder = icon(
+        context,
+        when (candidate) {
+            Prefs.LauncherTheme.COZY_QUEST -> R.drawable.bolt_cozy_lightning
+            Prefs.LauncherTheme.E_INK -> R.drawable.bolt_eink_lightning
+            Prefs.LauncherTheme.LIQUID_GLASS -> R.drawable.liquid_glass_bolt
+            Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> R.drawable.seahawks_logo
+            Prefs.LauncherTheme.WINDOWS_XP -> R.drawable.xp_lightning
+            else -> R.drawable.bolt_search_lightning
+        },
+        236, 113, 263, 140,
+    ).apply {
+        val tint = when (candidate) {
+            Prefs.LauncherTheme.DEFAULT, Prefs.LauncherTheme.WALLPAPER -> wallpaper?.accent ?: Color.WHITE
+            Prefs.LauncherTheme.E_INK, Prefs.LauncherTheme.PAPER_NOTEBOOK -> text
+            Prefs.LauncherTheme.WII_U -> color(R.attr.boltIconTileGlyphColor)
+            else -> null
+        }
+        if (tint != null) this?.setTint(tint)
+    }
+    private val normalLabel = previewLabel(context.getString(R.string.bolt_palette_preview_normal_result), 252f)
+    private val selectedLabel = previewLabel(
+        context.getString(R.string.bolt_theme_preview_selected_result), 252f, Typeface.DEFAULT_BOLD,
+    )
+    private val searchLabel = previewLabel(context.getString(R.string.bolt_palette_preview_search), 168f)
 
-    override fun getIntrinsicWidth() = (64 * density).roundToInt()
-    override fun getIntrinsicHeight() = (36 * density).roundToInt()
+    override fun getIntrinsicWidth() = (280 * density).roundToInt()
+    override fun getIntrinsicHeight() = (152 * density).roundToInt()
 
     override fun draw(canvas: Canvas) {
         if (bounds.isEmpty) return
         val save = canvas.save()
         canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
-        canvas.scale(bounds.width() / 64f, bounds.height() / 36f)
-        if (orchardClip != null) {
-            fill(canvas, 0f, 0f, 64f, 36f, 7f, rim)
-            canvas.clipPath(orchardClip)
-            orchard?.draw(canvas)
-            fill(canvas, 4f, 17f, 60f, 34f, 4f, panel)
-            fill(canvas, 6f, 19f, 58f, 25f, 2f, rowRim)
-            fill(canvas, 7f, 20f, 57f, 24f, 1f, row)
-            fill(canvas, 10f, 21f, 34f, 23f, 1f, rowText)
-            fill(canvas, 9f, 28f, 27f, 30f, 1f, cursor)
-            fill(canvas, 29f, 27f, 30f, 31f, 0.5f, cursor)
-            leafBolt?.draw(canvas)
-            canvas.restoreToCount(save)
-            return
-        }
-        fill(canvas, 0f, 0f, 64f, 36f, 8f, 0xFF152237.toInt())
-        fill(canvas, 1f, 1f, 63f, 35f, 7f, rim)
-        fill(canvas, 2f, 2f, 62f, 34f, 6f, panel, panelFill)
-        if (eInkBolt != null) {
-            drawEInk(canvas, eInkBolt)
-            canvas.restoreToCount(save)
-            return
+        canvas.scale(bounds.width() / 280f, bounds.height() / 152f)
+        canvas.clipPath(panelClip)
+        if (orchard == null) {
+            fill(canvas, 0f, 0f, 280f, 152f, panelRadius, 0xFF18212B.toInt())
+            fill(canvas, 0f, 0f, 280f, 152f, panelRadius, panel, panelFill)
+        } else {
+            orchard.draw(canvas)
+            fill(canvas, 4f, 5f, 276f, 147f, panelRadius, panel, panelFill)
         }
         if (paperNotebook) {
-            fill(canvas, 6f, 6f, 58f, 7f, 0f, notebookRule)
-            fill(canvas, 6f, 9f, 58f, 10f, 0f, notebookRule)
-            fill(canvas, 18f, 11f, 48f, 17f, 2f, notebookMarker)
-            fill(canvas, 6f, 22f, 58f, 32f, 5f, rim)
-        } else {
-            fill(canvas, 6f, 6f, 58f, 20f, 4f, rowRim)
-            fill(canvas, 7f, 7f, 57f, 19f, 3f, row, rowFill)
+            paint.color = paperRule
+            for (y in 16..96 step 10) canvas.drawLine(8f, y.toFloat(), 272f, y.toFloat(), paint)
         }
-        fill(canvas, 10f, 10f, 16f, 16f, 2f, rowText)
-        fill(canvas, 20f, 12f, 46f, 14f, 1f, rowText)
-        fill(canvas, 6f, 23f, 58f, 31f, 4f, dock, dockFill)
-        fill(canvas, 11f, 26f, 29f, 28f, 1f, if (paperNotebook) rowText else 0xFFD8E6F0.toInt())
-        fill(canvas, 30f, 25f, 31f, 29f, 0.5f, cursor)
-        fill(canvas, 50f, 25f, 54f, 29f, 2f, accent)
+        fill(canvas, 8f, 9f, 272f, 44f, 9f, row, rowFill)
+        fill(canvas, 8f, 50f, 272f, 89f, selectedRadius, selected, selectionFill)
+        outline(canvas, 8.5f, 50.5f, 271.5f, 88.5f, selectedRadius, selectedOutline)
+        label(canvas, normalLabel, 20f, 32f, text)
+        label(canvas, selectedLabel, 20f, 75f, selectedText, Typeface.DEFAULT_BOLD)
+
+        paint.color = outline
+        canvas.drawLine(12f, 98f, 268f, 98f, paint)
+        fill(canvas, 8f, 105f, 272f, 144f, 9f, dock, dockFill)
+        val cursorLeft = 24f + label(canvas, searchLabel, 20f, 131f, text)
+        fill(canvas, cursorLeft, 117f, cursorLeft + 1.5f, 134f, 0f, cursor)
+        web?.draw(canvas)
+        thunder?.draw(canvas)
+        outline(canvas, 0.5f, 0.5f, 279.5f, 151.5f, panelRadius, outline)
         canvas.restoreToCount(save)
     }
 
-    private fun drawEInk(canvas: Canvas, bolt: Drawable) {
-        fill(canvas, 8f, 6f, 25f, 8f, 0.5f, cursor)
-        fill(canvas, 8f, 11f, 33f, 13f, 1f, cursor)
-        fill(canvas, 8f, 15f, 56f, 16f, 0f, rim)
-        fill(canvas, 6f, 17f, 58f, 23f, 2f, row)
-        fill(canvas, 9f, 19f, 35f, 21f, 1f, rowText)
-        fill(canvas, 6f, 24f, 58f, 25f, 0f, rim)
-        fill(canvas, 9f, 28f, 29f, 30f, 1f, cursor)
-        fill(canvas, 31f, 27f, 32f, 31f, 0.5f, cursor)
-        bolt.draw(canvas)
+    private fun label(
+        canvas: Canvas, label: String, x: Float, baseline: Float, color: Int, typeface: Typeface = Typeface.DEFAULT,
+    ): Float {
+        paint.color = color
+        paint.typeface = typeface
+        paint.textSize = 15f
+        canvas.drawText(label, x, baseline, paint)
+        return paint.measureText(label)
+    }
+
+    private fun previewLabel(label: String, maxWidth: Float, typeface: Typeface = Typeface.DEFAULT): String {
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = typeface
+            textSize = 15f
+        }
+        return TextUtils.ellipsize(label, textPaint, maxWidth, TextUtils.TruncateAt.END).toString()
     }
 
     private fun fill(
@@ -128,13 +162,34 @@ internal class ThemePreviewDrawable(context: Context, candidate: Prefs.LauncherT
         paint.shader = null
     }
 
-    private fun color(attr: Int): Int {
-        val value = TypedValue()
-        return if (theme.resolveAttribute(attr, value, true)) value.data else Color.TRANSPARENT
+    private fun outline(canvas: Canvas, left: Float, top: Float, right: Float, bottom: Float, radius: Float, color: Int) {
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        fill(canvas, left, top, right, bottom, radius, color)
+        paint.style = Paint.Style.FILL
     }
 
-    private fun gradient(start: Int, end: Int, x1: Float, y1: Float, x2: Float, y2: Float): Shader? =
-        if (end == 0 || end == start) null else LinearGradient(x1, y1, x2, y2, start, end, Shader.TileMode.CLAMP)
+    private fun color(attr: Int, fallback: Int = Color.TRANSPARENT): Int {
+        val value = TypedValue()
+        return if (theme.resolveAttribute(attr, value, true) && value.data != 0) value.data else fallback
+    }
+
+    private fun dimension(attr: Int, fallback: Float): Float {
+        val value = TypedValue()
+        return if (theme.resolveAttribute(attr, value, true)) {
+            value.getDimension(theme.resources.displayMetrics) / density
+        } else fallback
+    }
+
+    private fun gradient(start: Int, end: Int, from: Float, to: Float, horizontal: Boolean = false): Shader? =
+        when {
+            end == start -> null
+            horizontal -> LinearGradient(from, 0f, to, 0f, start, end, Shader.TileMode.CLAMP)
+            else -> LinearGradient(0f, from, 0f, to, start, end, Shader.TileMode.CLAMP)
+        }
+
+    private fun icon(context: Context, resource: Int, left: Int, top: Int, right: Int, bottom: Int) =
+        ContextCompat.getDrawable(context, resource)?.mutate()?.apply { setBounds(left, top, right, bottom) }
 
     override fun setAlpha(alpha: Int) = Unit
     override fun setColorFilter(colorFilter: ColorFilter?) = Unit
