@@ -1913,7 +1913,7 @@ class AppDrawerFragment : BaseFragment() {
                 requireActivity().recreate()
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show().applyWallpaperBackground()
+            .show().applyWallpaperBackground().also { it.addPreviewListBottomInset() }
     }
 
     private fun chooseWallpaperImage(picker: ActivityResultLauncher<String>) {
@@ -2130,7 +2130,19 @@ class AppDrawerFragment : BaseFragment() {
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show().applyWallpaperBackground()
+            .show().applyWallpaperBackground().also { it.addPreviewListBottomInset() }
+    }
+
+    private fun AlertDialog.addPreviewListBottomInset() {
+        val list = listView
+        val bottomInset = (20 * resources.displayMetrics.density).toInt()
+        list.clipToPadding = false
+        list.setPadding(
+            list.paddingLeft,
+            list.paddingTop,
+            list.paddingRight,
+            list.paddingBottom + bottomInset,
+        )
     }
 
     private fun launchResult(
