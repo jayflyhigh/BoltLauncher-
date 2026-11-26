@@ -1,22 +1,22 @@
 <resources>
-    <string name="thunder_game_title">Thunder Blocks</string>
-    <string name="thunder_game_hold">Thunder mode. Hold for Thunder Blocks.</string>
-    <string name="thunder_game_next">Next</string>
-    <string name="thunder_game_pause">Pause</string>
-    <string name="thunder_game_resume">Resume</string>
-    <string name="thunder_game_restart">Restart</string>
-    <string name="thunder_game_exit">Exit</string>
-    <string name="thunder_game_confirm_exit">Exit this run?</string>
-    <string name="thunder_game_dock_drop">Drop</string>
-    <string name="thunder_game_controls_hint">Tap to rotate. Drag sideways to move. Swipe down to lower. Tap Drop or ⚡ to hard-drop.</string>
-    <string name="thunder_game_tetris">TETRIS!</string>
-    <string name="thunder_game_drop">Drop piece</string>
-    <string name="thunder_game_drop_icon">⚡↓</string>
-    <string name="thunder_game_music_on">Music on</string>
-    <string name="thunder_game_music_off">Music off</string>
-    <string name="thunder_game_sound_on">Sound on</string>
-    <string name="thunder_game_sound_off">Sound off</string>
-    <string name="thunder_game_stats">Level %1$d\nScore %2$d\nLines %3$d\nBest %4$d</string>
-    <string name="thunder_game_over">Game over</string>
-    <string name="thunder_game_paused">Paused</string>
+    <string name="thunder_game_title" translatable="false">Thunder Blocks</string>
+    <string name="thunder_game_hold" translatable="false">Thunder mode. Hold for Thunder Blocks.</string>
+    <string name="thunder_game_next" translatable="false">Next</string>
+    <string name="thunder_game_pause" translatable="false">Pause</string>
+    <string name="thunder_game_resume" translatable="false">Resume</string>
+    <string name="thunder_game_restart" translatable="false">Restart</string>
+    <string name="thunder_game_exit" translatable="false">Exit</string>
+    <string name="thunder_game_confirm_exit" translatable="false">Exit this run?</string>
+    <string name="thunder_game_dock_drop" translatable="false">Drop</string>
+    <string name="thunder_game_controls_hint" translatable="false">Tap to rotate. Drag sideways to move. Swipe down to lower. Tap Drop or ⚡ to hard-drop.</string>
+    <string name="thunder_game_tetris" translatable="false">TETRIS!</string>
+    <string name="thunder_game_drop" translatable="false">Drop piece</string>
+    <string name="thunder_game_drop_icon" translatable="false">⚡↓</string>
+    <string name="thunder_game_music_on" translatable="false">Music on</string>
+    <string name="thunder_game_music_off" translatable="false">Music off</string>
+    <string name="thunder_game_sound_on" translatable="false">Sound on</string>
+    <string name="thunder_game_sound_off" translatable="false">Sound off</string>
+    <string name="thunder_game_stats" translatable="false">Level %1$d\nScore %2$d\nLines %3$d\nBest %4$d</string>
+    <string name="thunder_game_over" translatable="false">Game over</string>
+    <string name="thunder_game_paused" translatable="false">Paused</string>
 </resources>
