@@ -15,7 +15,6 @@ import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
@@ -23,15 +22,12 @@ import android.telephony.PhoneNumberUtils
 import java.io.IOException
 import java.text.Collator
 import java.util.Locale
-import java.text.SimpleDateFormat
-import java.util.Date
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -170,19 +166,6 @@ class AppDrawerFragment : BaseFragment() {
     private val supportsDestinations get() = flag == Constants.FLAG_LAUNCH_APP && !thunderMode && searchRename == null
 
     private var thunderGame: ThunderGameView? = null
-    private var homeInfoPanel: TextView? = null
-    private var homeInfoExpanded = false
-    private var homeInfoProgress = 0f
-    private var homeInfoAnimator: ValueAnimator? = null
-    private var homeInfoPage = 0
-    private val homeInfoHandler = Handler(Looper.getMainLooper())
-    private val homeInfoTicker = object : Runnable {
-        override fun run() {
-            if (_binding == null) return
-            if (homeInfoExpanded && homeInfoPage == 0) updateHomeInfoText()
-            homeInfoHandler.postDelayed(this, 30_000L)
-        }
-    }
     private var pendingThunderRun: ThunderBlocks.State? = null
     private var expanded = false
     private var thunderMode = false
@@ -386,45 +369,16 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.canSwipeSearch = { isHomePage && !expanded && thunderGame == null }
         binding.root.onSwipeUp = { openSearch(thunder = false) }
         val threshold = 64f * resources.displayMetrics.density
-        val horizontalThreshold = 24f * resources.displayMetrics.density
         var notificationsOpened = false
-        var horizontalSwipeHandled = false
         val detector = android.view.GestureDetector(requireContext(),
             object : android.view.GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(event: android.view.MotionEvent): Boolean {
                     notificationsOpened = false
-                    horizontalSwipeHandled = false
                     return true
                 }
 
                 override fun onLongPress(event: android.view.MotionEvent) {
                     if (isHomePage && !expanded && thunderGame == null) showHomeSettings()
-                }
-
-                override fun onSingleTapUp(event: android.view.MotionEvent): Boolean {
-                    if (isHomePage && !expanded && thunderGame == null && homeInfoExpanded) {
-                        homeInfoPage = (homeInfoPage + 1) % 3
-                        updateHomeInfoText()
-                        return true
-                    }
-                    return false
-                }
-
-                override fun onFling(
-                    start: android.view.MotionEvent?,
-                    end: android.view.MotionEvent,
-                    velocityX: Float,
-                    velocityY: Float,
-                ): Boolean {
-                    if (start == null || !isHomePage || expanded || thunderGame != null || horizontalSwipeHandled) return false
-                    val dx = end.x - start.x
-                    val dy = end.y - start.y
-                    if (kotlin.math.abs(dx) > horizontalThreshold && kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
-                        horizontalSwipeHandled = true
-                        if (dx < 0) revealHomeInfo() else collapseHomeInfo()
-                        return true
-                    }
-                    return false
                 }
 
                 override fun onScroll(
@@ -436,12 +390,6 @@ class AppDrawerFragment : BaseFragment() {
                     if (start == null || notificationsOpened || !isHomePage || expanded) return false
                     val dy = current.y - start.y
                     val dx = current.x - start.x
-                    if (!horizontalSwipeHandled && kotlin.math.abs(dx) > horizontalThreshold &&
-                        kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
-                        horizontalSwipeHandled = true
-                        if (dx < 0) revealHomeInfo() else collapseHomeInfo()
-                        return true
-                    }
                     if (dy > threshold && dy > kotlin.math.abs(dx)) {
                         notificationsOpened = true
                         app.olauncher.helper.expandNotificationDrawer(requireContext())
@@ -453,94 +401,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.setOnTouchListener { _, event ->
             isHomePage && !expanded && thunderGame == null && detector.onTouchEvent(event)
         }
-        ensureHomeInfoPanel()
-        homeInfoHandler.removeCallbacks(homeInfoTicker)
-        homeInfoHandler.post(homeInfoTicker)
     }
-
-    private fun ensureHomeInfoPanel() {
-        if (homeInfoPanel != null || _binding == null) return
-        val panel = TextView(requireContext()).apply {
-            tag = "bolt_home_info_panel"
-            gravity = Gravity.CENTER
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
-            typeface = binding.search.typeface
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding((8 * resources.displayMetrics.density).toInt(), 0,
-                (8 * resources.displayMetrics.density).toInt(), 0)
-            setTextColor(binding.search.currentHintTextColor)
-            background = GradientDrawable().apply {
-                cornerRadius = 18 * resources.displayMetrics.density
-                setColor(requireContext().getColorFromAttr(R.attr.boltDockColor))
-                setStroke((1 * resources.displayMetrics.density).toInt(),
-                    requireContext().getColorFromAttr(R.attr.boltSearchCursorColor))
-            }
-            elevation = 4 * resources.displayMetrics.density
-            alpha = 0f
-            visibility = View.GONE
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
-        }
-        val width = (160 * resources.displayMetrics.density).toInt()
-        val height = binding.dock.layoutParams.height
-        val params = FrameLayout.LayoutParams(width, height, Gravity.BOTTOM or Gravity.END)
-        binding.searchPanel.addView(panel, params)
-        homeInfoPanel = panel
-    }
-
-    private fun updateHomeInfoText() {
-        val panel = homeInfoPanel ?: return
-        val context = panel.context
-        panel.text = when (homeInfoPage) {
-            1 -> {
-                val battery = context.getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
-                "${battery.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)}%"
-            }
-            2 -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date())
-            else -> SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
-        }
-    }
-
-    private fun revealHomeInfo() {
-        if (_binding == null || !isHomePage || expanded || thunderGame != null) return
-        ensureHomeInfoPanel()
-        val panel = homeInfoPanel ?: return
-        if (homeInfoExpanded) return
-        homeInfoExpanded = true
-        homeInfoPage = 0
-        updateHomeInfoText()
-        panel.visibility = View.VISIBLE
-        panel.animate().cancel()
-        panel.animate().alpha(1f).setDuration(180L).start()
-        animateHomeInfoReveal(1f, 240L)
-    }
-
-    private fun animateHomeInfoReveal(target: Float, duration: Long) {
-        homeInfoAnimator?.cancel()
-        val start = homeInfoProgress
-        homeInfoAnimator = ValueAnimator.ofFloat(start, target).apply {
-            this.duration = duration
-            interpolator = android.view.animation.DecelerateInterpolator()
-            addUpdateListener { animator ->
-                homeInfoProgress = animator.animatedValue as Float
-                binding.searchPanel.setHomeInfoRevealProgress(homeInfoProgress)
-            }
-            start()
-        }
-    }
-
-    private fun collapseHomeInfo() {
-        if (_binding == null || !homeInfoExpanded) return
-        homeInfoExpanded = false
-        animateHomeInfoReveal(0f, 220L)
-        homeInfoPanel?.animate()?.cancel()
-        // Keep the pill measured until the dock has fully expanded; hiding it early
-        // leaves a blank strip on the right side of the collapsed search bar.
-        homeInfoPanel?.animate()?.alpha(0f)?.setDuration(220L)?.withEndAction {
-            homeInfoPanel?.visibility = View.GONE
-        }?.start()
-    }
-
 
     private fun initSearch() {
         dockUsesDarkText = null
@@ -989,7 +850,6 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun openSearch(thunder: Boolean) {
-        collapseHomeInfo()
         expandSearch()
         setThunderMode(thunder)
         if (!thunder && flag == Constants.FLAG_LAUNCH_APP && !hasContactsPermission() && !askedForContacts) {
@@ -1008,7 +868,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateSearchHint() {
         val hint = getString(when {
             searchRename != null -> searchHints.rename
-            !expanded -> R.string.bolt_home_search_hint
+            !expanded -> searchHints.home
             flag == Constants.FLAG_HIDDEN_APPS -> R.string.hidden_apps
             flag != Constants.FLAG_LAUNCH_APP -> R.string.bolt_select_app
             thunderMode -> searchHints.thunder
@@ -1728,7 +1588,6 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun openThunderGame(state: ThunderBlocks.State? = null) {
-        collapseHomeInfo()
         binding.search.hideKeyboard()
         val game = ThunderGameView(requireContext(), state, ::closeThunderGame)
         thunderGame = game
@@ -2628,14 +2487,6 @@ class AppDrawerFragment : BaseFragment() {
         binding.recyclerView.adapter = null
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
         androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(binding.root, null)
-        homeInfoHandler.removeCallbacks(homeInfoTicker)
-        homeInfoAnimator?.cancel()
-        homeInfoAnimator = null
-        homeInfoProgress = 0f
-        homeInfoExpanded = false
-        binding.searchPanel.setHomeInfoRevealProgress(0f)
-        homeInfoPanel?.let { binding.searchPanel.removeView(it) }
-        homeInfoPanel = null
         _binding = null
         super.onDestroyView()
     }
