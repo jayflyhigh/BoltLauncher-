@@ -118,6 +118,14 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         dock.measure(exactWidth, MeasureSpec.makeMeasureSpec(
             minOf(dock.layoutParams.height, height), MeasureSpec.EXACTLY
         ))
+        // Optional home-screen info pill is laid over the right edge of the dock.
+        val homeInfo = (0 until childCount).asSequence().map { getChildAt(it) }
+            .firstOrNull { it.tag == "bolt_home_info_panel" }
+        if (homeInfo != null && homeInfo.visibility != View.GONE) {
+            val infoWidth = (112 * resources.displayMetrics.density + 0.5f).toInt()
+            homeInfo.measure(MeasureSpec.makeMeasureSpec(infoWidth, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(dock.measuredHeight, MeasureSpec.EXACTLY))
+        }
         var remaining = height - dock.measuredHeight
         statusInPanel = status.visibility == View.VISIBLE && statusIsResult
         val statusInset = if (statusInPanel) rowInset.coerceAtMost(width / 2) else 0
@@ -156,6 +164,12 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val dockTop = height - dock.measuredHeight
         dock.layout(0, dockTop, width, height)
+        val homeInfo = (0 until childCount).asSequence().map { getChildAt(it) }
+            .firstOrNull { it.tag == "bolt_home_info_panel" }
+        if (homeInfo != null && homeInfo.visibility != View.GONE && homeInfo.measuredWidth > 0) {
+            homeInfo.layout(width - homeInfo.measuredWidth, dockTop,
+                width, dockTop + dock.measuredHeight)
+        }
         if (dockTopColor != 0 && dock.measuredHeight != dockHighlightHeight) {
             dockHighlightHeight = dock.measuredHeight
             dockHighlight = if (dockHighlightHeight == 0) null else LinearGradient(
