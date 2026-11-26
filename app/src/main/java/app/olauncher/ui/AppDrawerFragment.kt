@@ -2617,6 +2617,15 @@ class AppDrawerFragment : BaseFragment() {
         binding.recyclerView.adapter = null
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
         androidx.core.view.ViewCompat.setWindowInsetsAnimationCallback(binding.root, null)
+        homeInfoHandler.removeCallbacks(homeInfoTicker)
+        homeInfoAnimator?.cancel()
+        homeInfoAnimator = null
+        homeInfoProgress = 0f
+        homeInfoExpanded = false
+        binding.dock.translationX = 0f
+        binding.searchPanel.setHomeInfoRevealProgress(0f)
+        homeInfoPanel?.let { binding.searchPanel.removeView(it) }
+        homeInfoPanel = null
         _binding = null
         super.onDestroyView()
     }
