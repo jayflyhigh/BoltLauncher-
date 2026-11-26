@@ -138,7 +138,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val homeInfo = (0 until childCount).asSequence().map { getChildAt(it) }
             .firstOrNull { it.tag == "bolt_home_info_panel" }
         if (homeInfo != null && homeInfo.visibility != View.GONE) {
-            val infoWidth = (112 * resources.displayMetrics.density + 0.5f).toInt()
+            val infoWidth = (160 * resources.displayMetrics.density + 0.5f).toInt()
             homeInfo.measure(MeasureSpec.makeMeasureSpec(infoWidth, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(dock.measuredHeight, MeasureSpec.EXACTLY))
         }
