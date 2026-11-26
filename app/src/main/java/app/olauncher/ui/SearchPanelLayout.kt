@@ -92,6 +92,18 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         }
 
     private var dockColor = wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)
+    private var homeInfoRevealProgress = 0f
+
+    fun setHomeInfoRevealProgress(progress: Float) {
+        val next = progress.coerceIn(0f, 1f)
+        if (homeInfoRevealProgress == next) return
+        homeInfoRevealProgress = next
+        invalidate()
+    }
+
+    private val homeInfoShift: Float
+        get() = 120f * resources.displayMetrics.density * homeInfoRevealProgress
+
     private var dividerAlpha = 255
 
     fun setDockAppearance(color: Int, thunderProgress: Float) {
@@ -242,13 +254,14 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             paint.shader = null
             drawGlassSheen(canvas, panelTop, dockTop, 200)
         }
+        val visibleDockRight = (width - homeInfoShift).coerceAtLeast(0f)
         paint.color = dockColor
-        canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
+        canvas.drawRect(0f, dockTop, visibleDockRight, height.toFloat(), paint)
         glassDockTint?.let { tint ->
             paint.color = Color.WHITE
             paint.alpha = dividerAlpha
             paint.shader = tint
-            canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
+            canvas.drawRect(0f, dockTop, visibleDockRight, height.toFloat(), paint)
             paint.shader = null
         }
         dockHighlight?.let { highlight ->
@@ -256,7 +269,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             canvas.translate(0f, dockTop)
             paint.shader = highlight
             paint.alpha = dividerAlpha
-            canvas.drawRect(0f, 0f, width.toFloat(), height - dockTop, paint)
+            canvas.drawRect(0f, 0f, visibleDockRight, height - dockTop, paint)
             paint.shader = null
             canvas.restoreToCount(highlightSave)
         }
@@ -267,7 +280,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
                 androidx.core.graphics.ColorUtils.blendARGB(dockEdge, Color.BLACK, 1f - dividerAlpha / 255f)
             } else dockEdge
             if (!paperNotebook && !eInk) paint.alpha = paint.alpha * dividerAlpha / 255
-            canvas.drawRect(rowInset.toFloat(), dockTop, (width - rowInset).toFloat(), dockTop + stroke, paint)
+            canvas.drawRect(rowInset.toFloat(), dockTop, (visibleDockRight - rowInset).coerceAtLeast(rowInset.toFloat()), dockTop + stroke, paint)
         }
         canvas.restoreToCount(save)
         super.dispatchDraw(canvas)
@@ -312,6 +325,9 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         }
         val save = canvas.save()
         canvas.clipPath(shape)
+        if (child === dock && homeInfoRevealProgress > 0f) {
+            canvas.clipRect(0f, dock.top.toFloat(), (width - homeInfoShift).coerceAtLeast(0f), dock.bottom.toFloat())
+        }
         val needsRedraw = super.drawChild(canvas, child, drawingTime)
         canvas.restoreToCount(save)
         return needsRedraw
