@@ -102,7 +102,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     }
 
     private val homeInfoShift: Float
-        get() = 120f * resources.displayMetrics.density * homeInfoRevealProgress
+        get() = 156f * resources.displayMetrics.density * homeInfoRevealProgress
 
     private var dividerAlpha = 255
 
@@ -127,7 +127,9 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
         val exactWidth = MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY)
-        dock.measure(exactWidth, MeasureSpec.makeMeasureSpec(
+        val visibleDockWidth = (width - homeInfoShift.toInt()).coerceAtLeast(0)
+        val dockWidthSpec = MeasureSpec.makeMeasureSpec(visibleDockWidth, MeasureSpec.EXACTLY)
+        dock.measure(dockWidthSpec, MeasureSpec.makeMeasureSpec(
             minOf(dock.layoutParams.height, height), MeasureSpec.EXACTLY
         ))
         // Optional home-screen info pill is laid over the right edge of the dock.
@@ -175,7 +177,8 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val dockTop = height - dock.measuredHeight
-        dock.layout(0, dockTop, width, height)
+        val visibleDockRight = (width - homeInfoShift.toInt()).coerceAtLeast(0)
+        dock.layout(0, dockTop, visibleDockRight, height)
         val homeInfo = (0 until childCount).asSequence().map { getChildAt(it) }
             .firstOrNull { it.tag == "bolt_home_info_panel" }
         if (homeInfo != null && homeInfo.visibility != View.GONE && homeInfo.measuredWidth > 0) {
