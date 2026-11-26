@@ -16,55 +16,55 @@
     <dimen name="bolt_search_text_inset">16dp</dimen>
     <dimen name="bolt_search_web_text_gap">8dp</dimen>
     <dimen name="bolt_search_button_width">52dp</dimen>
-    <string name="bolt_contact_selected">Contact selected</string>
-    <string name="bolt_move_mode_hint">Z ↑ · X ↓ · Enter to select</string>
-    <string name="bolt_enter_target">Opens with Enter</string>
-    <string name="bolt_typo_match">Did you mean?</string>
-    <string name="bolt_no_apps_found">No apps found</string>
-    <string name="bolt_no_matches">No matches</string>
+    <string name="bolt_contact_selected" translatable="false">Contact selected</string>
+    <string name="bolt_move_mode_hint" translatable="false">Z ↑ · X ↓ · Enter to select</string>
+    <string name="bolt_enter_target" translatable="false">Opens with Enter</string>
+    <string name="bolt_typo_match" translatable="false">Did you mean?</string>
+    <string name="bolt_no_apps_found" translatable="false">No apps found</string>
+    <string name="bolt_no_matches" translatable="false">No matches</string>
     <dimen name="bolt_search_result_height">50dp</dimen>
-    <string name="bolt_search_web">Search the web</string>
-    <string name="bolt_search_web_for">Search the web for “%1$s”</string>
-    <string name="bolt_play_store_action_unavailable">Play Store unavailable</string>
-    <string name="bolt_web_unavailable">No browser available</string>
-    <string name="bolt_whatsapp_unavailable">WhatsApp unavailable</string>
-    <string name="bolt_search_anything">Search Anything</string>
-    <string name="bolt_search">Search</string>
-    <string name="bolt_select_app">Select an app</string>
-    <string name="bolt_enable_thunder">Enable Thunder mode</string>
-    <string name="bolt_disable_thunder">Disable Thunder mode</string>
-    <string name="bolt_contacts_app_unavailable">No contacts app available</string>
-    <string name="bolt_action_call">Call</string>
-    <string name="bolt_action_message">Message</string>
-    <string name="bolt_action_whatsapp">WhatsApp message</string>
-    <string name="bolt_action_unavailable">No app available for this action</string>
+    <string name="bolt_search_web" translatable="false">Search the web</string>
+    <string name="bolt_search_web_for" translatable="false">Search the web for “%1$s”</string>
+    <string name="bolt_play_store_action_unavailable" translatable="false">Play Store unavailable</string>
+    <string name="bolt_web_unavailable" translatable="false">No browser available</string>
+    <string name="bolt_whatsapp_unavailable" translatable="false">WhatsApp unavailable</string>
+    <string name="bolt_search_anything" translatable="false">Search Anything</string>
+    <string name="bolt_search" translatable="false">Search</string>
+    <string name="bolt_select_app" translatable="false">Select an app</string>
+    <string name="bolt_enable_thunder" translatable="false">Enable Thunder mode</string>
+    <string name="bolt_disable_thunder" translatable="false">Disable Thunder mode</string>
+    <string name="bolt_contacts_app_unavailable" translatable="false">No contacts app available</string>
+    <string name="bolt_action_call" translatable="false">Call</string>
+    <string name="bolt_action_message" translatable="false">Message</string>
+    <string name="bolt_action_whatsapp" translatable="false">WhatsApp message</string>
+    <string name="bolt_action_unavailable" translatable="false">No app available for this action</string>
     <dimen name="bolt_contact_action_width">40dp</dimen>
     <dimen name="bolt_web_action_width">44dp</dimen>
     <dimen name="bolt_contact_action_divider_width">1dp</dimen>
-    <string name="bolt_apps_section">Apps</string>
-    <string name="bolt_contacts_section">Contacts</string>
-    <string name="bolt_search_section">Search</string>
-    <string name="bolt_search_in_app">Search in %1$s</string>
-    <string name="bolt_search_destinations">Search in apps</string>
-    <string name="bolt_search_destination_unavailable">Search destination unavailable</string>
-    <string name="bolt_add_alias">Add Alias</string>
-    <string name="bolt_activate_alias">Activate alias %1$s</string>
-    <string name="bolt_clear_alias">Clear alias %1$s</string>
-    <string name="bolt_hidden_destinations">Hidden search destinations</string>
-    <string name="bolt_launcher_settings">Launcher Settings</string>
-    <string name="bolt_system_settings">System Settings</string>
-    <string name="bolt_system_settings_unavailable">System settings are unavailable</string>
-    <string name="bolt_theme">Theme</string>
-    <string name="bolt_theme_default">Default</string>
-    <string name="bolt_frosted_glass">Frosted Glass</string>
-    <string name="bolt_liquid_glass">Liquid Glass</string>
-    <string name="bolt_smoked_glass">Smoked Glass</string>
-    <string name="bolt_windows_xp">Windows XP</string>
-    <string name="bolt_wii_u">Wii U</string>
-    <string name="bolt_seattle_seahawks">Seattle Seahawks</string>
-    <string name="bolt_power_menu">Power Menu</string>
-    <string name="bolt_power_menu_unavailable">Android’s power menu is unavailable.</string>
+    <string name="bolt_apps_section" translatable="false">Apps</string>
+    <string name="bolt_contacts_section" translatable="false">Contacts</string>
+    <string name="bolt_search_section" translatable="false">Search</string>
+    <string name="bolt_search_in_app" translatable="false">Search in %1$s</string>
+    <string name="bolt_search_destinations" translatable="false">Search in apps</string>
+    <string name="bolt_search_destination_unavailable" translatable="false">Search destination unavailable</string>
+    <string name="bolt_add_alias" translatable="false">Add Alias</string>
+    <string name="bolt_activate_alias" translatable="false">Activate alias %1$s</string>
+    <string name="bolt_clear_alias" translatable="false">Clear alias %1$s</string>
+    <string name="bolt_hidden_destinations" translatable="false">Hidden search destinations</string>
+    <string name="bolt_launcher_settings" translatable="false">Launcher Settings</string>
+    <string name="bolt_system_settings" translatable="false">System Settings</string>
+    <string name="bolt_system_settings_unavailable" translatable="false">System settings are unavailable</string>
+    <string name="bolt_theme" translatable="false">Theme</string>
+    <string name="bolt_theme_default" translatable="false">Default</string>
+    <string name="bolt_frosted_glass" translatable="false">Frosted Glass</string>
+    <string name="bolt_liquid_glass" translatable="false">Liquid Glass</string>
+    <string name="bolt_smoked_glass" translatable="false">Smoked Glass</string>
+    <string name="bolt_windows_xp" translatable="false">Windows XP</string>
+    <string name="bolt_wii_u" translatable="false">Wii U</string>
+    <string name="bolt_seattle_seahawks" translatable="false">Seattle Seahawks</string>
+    <string name="bolt_power_menu" translatable="false">Power Menu</string>
+    <string name="bolt_power_menu_unavailable" translatable="false">Android’s power menu is unavailable.</string>
     <dimen name="bolt_result_row_margin">2dp</dimen>
     <dimen name="bolt_result_dock_gap">3dp</dimen>
-    <string name="bolt_paper_notebook">Paper Notebook</string>
+    <string name="bolt_paper_notebook" translatable="false">Paper Notebook</string>
 </resources>
