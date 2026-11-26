@@ -289,7 +289,7 @@ internal class ThunderGameView(
                 contentDescription = "Screenshot preview for Tetris save slot $slot"
             }
             card.addView(image)
-            card.addView(label("Save slot $slot"))
+            card.addView(label().apply { text = "Save slot $slot" })
             cards.addView(card, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(4)
                 marginEnd = dp(4)
