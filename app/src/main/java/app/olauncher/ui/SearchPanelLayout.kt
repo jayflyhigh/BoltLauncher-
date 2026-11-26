@@ -92,20 +92,6 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         }
 
     private var dockColor = wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)
-    private var homeInfoRevealProgress = 0f
-
-    // Re-measure the dock as the pill takes space so its contents never slide off-screen.
-    fun setHomeInfoRevealProgress(progress: Float) {
-        val next = progress.coerceIn(0f, 1f)
-        if (homeInfoRevealProgress == next) return
-        homeInfoRevealProgress = next
-        requestLayout()
-        invalidate()
-    }
-
-    private val homeInfoShift: Float
-        get() = 164f * resources.displayMetrics.density * homeInfoRevealProgress
-
     private var dividerAlpha = 255
 
     fun setDockAppearance(color: Int, thunderProgress: Float) {
@@ -129,19 +115,9 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
         val exactWidth = MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY)
-        val visibleDockWidth = (width - homeInfoShift.toInt()).coerceAtLeast(0)
-        val dockWidthSpec = MeasureSpec.makeMeasureSpec(visibleDockWidth, MeasureSpec.EXACTLY)
-        dock.measure(dockWidthSpec, MeasureSpec.makeMeasureSpec(
+        dock.measure(exactWidth, MeasureSpec.makeMeasureSpec(
             minOf(dock.layoutParams.height, height), MeasureSpec.EXACTLY
         ))
-        // Optional home-screen info pill is laid over the right edge of the dock.
-        val homeInfo = (0 until childCount).asSequence().map { getChildAt(it) }
-            .firstOrNull { it.tag == "bolt_home_info_panel" }
-        if (homeInfo != null && homeInfo.visibility != View.GONE) {
-            val infoWidth = (160 * resources.displayMetrics.density + 0.5f).toInt()
-            homeInfo.measure(MeasureSpec.makeMeasureSpec(infoWidth, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(dock.measuredHeight, MeasureSpec.EXACTLY))
-        }
         var remaining = height - dock.measuredHeight
         statusInPanel = status.visibility == View.VISIBLE && statusIsResult
         val statusInset = if (statusInPanel) rowInset.coerceAtMost(width / 2) else 0
@@ -179,14 +155,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         val dockTop = height - dock.measuredHeight
-        val visibleDockRight = (width - homeInfoShift.toInt()).coerceAtLeast(0)
-        dock.layout(0, dockTop, visibleDockRight, height)
-        val homeInfo = (0 until childCount).asSequence().map { getChildAt(it) }
-            .firstOrNull { it.tag == "bolt_home_info_panel" }
-        if (homeInfo != null && homeInfo.visibility != View.GONE && homeInfo.measuredWidth > 0) {
-            homeInfo.layout(width - homeInfo.measuredWidth, dockTop,
-                width, dockTop + dock.measuredHeight)
-        }
+        dock.layout(0, dockTop, width, height)
         if (dockTopColor != 0 && dock.measuredHeight != dockHighlightHeight) {
             dockHighlightHeight = dock.measuredHeight
             dockHighlight = if (dockHighlightHeight == 0) null else LinearGradient(
@@ -259,14 +228,13 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             paint.shader = null
             drawGlassSheen(canvas, panelTop, dockTop, 200)
         }
-        val visibleDockRight = (width - homeInfoShift).coerceAtLeast(0f)
         paint.color = dockColor
-        canvas.drawRect(0f, dockTop, visibleDockRight, height.toFloat(), paint)
+        canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
         glassDockTint?.let { tint ->
             paint.color = Color.WHITE
             paint.alpha = dividerAlpha
             paint.shader = tint
-            canvas.drawRect(0f, dockTop, visibleDockRight, height.toFloat(), paint)
+            canvas.drawRect(0f, dockTop, width.toFloat(), height.toFloat(), paint)
             paint.shader = null
         }
         dockHighlight?.let { highlight ->
@@ -274,7 +242,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             canvas.translate(0f, dockTop)
             paint.shader = highlight
             paint.alpha = dividerAlpha
-            canvas.drawRect(0f, 0f, visibleDockRight, height - dockTop, paint)
+            canvas.drawRect(0f, 0f, width.toFloat(), height - dockTop, paint)
             paint.shader = null
             canvas.restoreToCount(highlightSave)
         }
@@ -285,7 +253,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
                 androidx.core.graphics.ColorUtils.blendARGB(dockEdge, Color.BLACK, 1f - dividerAlpha / 255f)
             } else dockEdge
             if (!paperNotebook && !eInk) paint.alpha = paint.alpha * dividerAlpha / 255
-            canvas.drawRect(rowInset.toFloat(), dockTop, (visibleDockRight - rowInset).coerceAtLeast(rowInset.toFloat()), dockTop + stroke, paint)
+            canvas.drawRect(rowInset.toFloat(), dockTop, (width - rowInset).toFloat(), dockTop + stroke, paint)
         }
         canvas.restoreToCount(save)
         super.dispatchDraw(canvas)
@@ -293,11 +261,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         paint.color = outline
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = stroke
-        if (homeInfoRevealProgress > 0f) {
-            val dockBounds = RectF(0f, dockTop + stroke / 2f,
-                visibleDockRight.coerceAtLeast(radius), height.toFloat() - stroke / 2f)
-            canvas.drawRoundRect(dockBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
-        } else if (glassEdge == null) {
+        if (glassEdge == null) {
             canvas.drawRoundRect(edgeBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
         } else {
             // Draw in panel-local coordinates so the bright rim tracks its top edge.
@@ -317,11 +281,6 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         if (opacity == 0) return
         val save = canvas.save()
         canvas.translate(0f, top)
-        // The dock sheen must stop at the dock's animated edge; otherwise it
-        // paints a stray tinted strip behind the separate info pill.
-        if (top == dock.top.toFloat() && bottom == height.toFloat() && homeInfoRevealProgress > 0f) {
-            canvas.clipRect(0f, 0f, (width - homeInfoShift).coerceAtLeast(0f), bottom - top)
-        }
         paint.shader = sheen
         paint.alpha = opacity
         canvas.drawRect(0f, 0f, width.toFloat(), bottom - top, paint)
@@ -339,9 +298,6 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         }
         val save = canvas.save()
         canvas.clipPath(shape)
-        if (child === dock && homeInfoRevealProgress > 0f) {
-            canvas.clipRect(0f, dock.top.toFloat(), (width - homeInfoShift).coerceAtLeast(0f), dock.bottom.toFloat())
-        }
         val needsRedraw = super.drawChild(canvas, child, drawingTime)
         canvas.restoreToCount(save)
         return needsRedraw
