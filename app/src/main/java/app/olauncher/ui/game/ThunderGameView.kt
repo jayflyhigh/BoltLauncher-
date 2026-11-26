@@ -264,7 +264,7 @@ internal class ThunderGameView(
                     if (restored == null) {
                         android.widget.Toast.makeText(context, "Save slot $slot is damaged", android.widget.Toast.LENGTH_SHORT).show()
                     } else {
-                        game = ThunderBlocks(restored)
+                        game = ThunderBlocks(state = restored)
                         paused = true
                         lockClock = null
                         board.resetStrike()
