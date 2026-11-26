@@ -1008,7 +1008,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun updateSearchHint() {
         val hint = getString(when {
             searchRename != null -> searchHints.rename
-            !expanded -> searchHints.home
+            !expanded -> R.string.bolt_home_search_hint
             flag == Constants.FLAG_HIDDEN_APPS -> R.string.hidden_apps
             flag != Constants.FLAG_LAUNCH_APP -> R.string.bolt_select_app
             thunderMode -> searchHints.thunder
