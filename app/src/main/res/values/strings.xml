@@ -120,7 +120,7 @@
     \n\nThe service only sees taps inside Olauncher, and only uses them to lock your screen. It does not look at other apps or anything you type.
     \n\nNo data is collected, stored or shared. Nothing leaves your device.
     \n\nTap Accept, then turn on Olauncher in your device\'s Accessibility settings.</string>
-    <string name="bolt_accessibility_disclosure">Bolt Launcher uses Android’s accessibility service to open the system power menu and support the optional double tap to lock gesture. It processes taps inside Bolt Launcher for screen locking and opens the power menu when you select Power Menu. It does not look at other apps or anything you type.\n\nNo data is collected, stored or shared.\n\nTap Accept, then turn on Bolt Launcher in your device’s Accessibility settings.</string>
+    <string name="bolt_accessibility_disclosure" translatable="false">Bolt Launcher uses Android’s accessibility service to open the system power menu and support the optional double tap to lock gesture. It processes taps inside Bolt Launcher for screen locking and opens the power menu when you select Power Menu. It does not look at other apps or anything you type.\n\nNo data is collected, stored or shared.\n\nTap Accept, then turn on Bolt Launcher in your device’s Accessibility settings.</string>
     <string name="accept">Accept</string>
     <string name="permission">Permission</string>
     <string name="double_tap_lock">Double tap to lock</string>
@@ -183,9 +183,9 @@
     <string name="invalid_shortcut">Invalid shortcut</string>
     <string name="shortcut_not_found">Shortcut not found</string>
     <string name="unable_to_open_shortcut">Unable to open shortcut</string>
-    <string name="bolt_play_store">Play Store</string>
-    <string name="bolt_app_info">App info</string>
-    <string name="bolt_play_store_unavailable">Unable to open the Play Store listing for %1$s</string>
-    <string name="bolt_uninstall_unavailable">Uninstall is unavailable for this app</string>
-    <string name="bolt_new_app_name">New app name</string>
+    <string name="bolt_play_store" translatable="false">Play Store</string>
+    <string name="bolt_app_info" translatable="false">App info</string>
+    <string name="bolt_play_store_unavailable" translatable="false">Unable to open the Play Store listing for %1$s</string>
+    <string name="bolt_uninstall_unavailable" translatable="false">Uninstall is unavailable for this app</string>
+    <string name="bolt_new_app_name" translatable="false">New app name</string>
 </resources>
