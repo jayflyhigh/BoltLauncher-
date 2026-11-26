@@ -962,6 +962,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun openSearch(thunder: Boolean) {
+        collapseHomeInfo()
         expandSearch()
         setThunderMode(thunder)
         if (!thunder && flag == Constants.FLAG_LAUNCH_APP && !hasContactsPermission() && !askedForContacts) {
@@ -1700,6 +1701,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun openThunderGame(state: ThunderBlocks.State? = null) {
+        collapseHomeInfo()
         binding.search.hideKeyboard()
         val game = ThunderGameView(requireContext(), state, ::closeThunderGame)
         thunderGame = game
