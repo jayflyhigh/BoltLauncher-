@@ -35,10 +35,12 @@ import android.view.ViewGroup
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.os.BundleCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -1722,7 +1724,7 @@ class AppDrawerFragment : BaseFragment() {
             val tint = ColorStateList.valueOf(builder.context.getColorFromAttr(tintAttr))
             val iconTint = wallpaperColors?.let { ColorStateList.valueOf(it.accent) } ?: tint
             listOf(menu.appearance, menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.scanWallpaper, menu.powerMenu).forEach {
-                it.supportCompoundDrawablesTintList = iconTint
+                tintCompoundDrawables(it, iconTint)
             }
         }
         menu.appearance.setOnClickListener {
@@ -1773,6 +1775,18 @@ class AppDrawerFragment : BaseFragment() {
     private fun canCustomizeWallpaper(): Boolean =
         prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT || prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
 
+    private fun tintCompoundDrawables(view: TextView, tint: ColorStateList) {
+        val drawables = view.compoundDrawablesRelative
+        val tinted = drawables.map { drawable ->
+            drawable?.mutate()?.let { DrawableCompat.wrap(it).also { wrapped ->
+                DrawableCompat.setTintList(wrapped, tint)
+            } }
+        }
+        view.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            tinted[0], tinted[1], tinted[2], tinted[3],
+        )
+    }
+
     private fun showWallpaperScanOptions() {
         val builder = AlertDialog.Builder(requireContext())
         val menu = DialogWallpaperScanBinding.inflate(LayoutInflater.from(builder.context))
@@ -1781,7 +1795,7 @@ class AppDrawerFragment : BaseFragment() {
             wallpaperColors?.accent ?: builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor),
         )
         listOf(menu.matchWallpaper, menu.matchImage, menu.applyPalette, menu.reset).forEach {
-            it.supportCompoundDrawablesTintList = tint
+            tintCompoundDrawables(it, tint)
         }
         menu.matchWallpaper.setOnClickListener {
             dialog.dismiss()
