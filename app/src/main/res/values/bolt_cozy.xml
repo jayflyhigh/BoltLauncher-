@@ -7,17 +7,17 @@
     <color name="bolt_cozy_chip">#315648</color>
     <color name="bolt_cozy_whatsapp">#157443</color>
 
-    <string name="bolt_cozy_home_hint">Find something…</string>
-    <string name="bolt_cozy_search_hint">Find apps or people…</string>
-    <string name="bolt_cozy_destination_hint">Search in an app…</string>
-    <string name="bolt_cozy_thunder_hint">Quick launch…</string>
-    <string name="bolt_cozy_rename_hint">Give it a new name</string>
-    <string name="bolt_cozy_contacts_section">People</string>
-    <string name="bolt_cozy_destinations_section">Search in apps</string>
-    <string name="bolt_cozy_launcher_settings">Launcher settings</string>
-    <string name="bolt_cozy_system_settings">Phone settings</string>
-    <string name="bolt_cozy_theme_menu">Themes</string>
-    <string name="bolt_cozy_power_menu">Power options</string>
+    <string name="bolt_cozy_home_hint" translatable="false">Find something…</string>
+    <string name="bolt_cozy_search_hint" translatable="false">Find apps or people…</string>
+    <string name="bolt_cozy_destination_hint" translatable="false">Search in an app…</string>
+    <string name="bolt_cozy_thunder_hint" translatable="false">Quick launch…</string>
+    <string name="bolt_cozy_rename_hint" translatable="false">Give it a new name</string>
+    <string name="bolt_cozy_contacts_section" translatable="false">People</string>
+    <string name="bolt_cozy_destinations_section" translatable="false">Search in apps</string>
+    <string name="bolt_cozy_launcher_settings" translatable="false">Launcher settings</string>
+    <string name="bolt_cozy_system_settings" translatable="false">Phone settings</string>
+    <string name="bolt_cozy_theme_menu" translatable="false">Themes</string>
+    <string name="bolt_cozy_power_menu" translatable="false">Power options</string>
 
     <style name="CozyQuestOverlay">
         <item name="mainFontFamily">sans-serif</item>
