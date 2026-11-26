@@ -104,7 +104,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     }
 
     private val homeInfoShift: Float
-        get() = 156f * resources.displayMetrics.density * homeInfoRevealProgress
+        get() = 164f * resources.displayMetrics.density * homeInfoRevealProgress
 
     private var dividerAlpha = 255
 
@@ -317,6 +317,11 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         if (opacity == 0) return
         val save = canvas.save()
         canvas.translate(0f, top)
+        // The dock sheen must stop at the dock's animated edge; otherwise it
+        // paints a stray tinted strip behind the separate info pill.
+        if (top == dock.top.toFloat() && bottom == height.toFloat() && homeInfoRevealProgress > 0f) {
+            canvas.clipRect(0f, 0f, (width - homeInfoShift).coerceAtLeast(0f), bottom - top)
+        }
         paint.shader = sheen
         paint.alpha = opacity
         canvas.drawRect(0f, 0f, width.toFloat(), bottom - top, paint)
