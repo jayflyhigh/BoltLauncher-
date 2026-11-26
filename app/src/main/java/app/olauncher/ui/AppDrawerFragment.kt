@@ -172,6 +172,8 @@ class AppDrawerFragment : BaseFragment() {
     private var thunderGame: ThunderGameView? = null
     private var homeInfoPanel: TextView? = null
     private var homeInfoExpanded = false
+    private var homeInfoProgress = 0f
+    private var homeInfoAnimator: ValueAnimator? = null
     private var homeInfoPage = 0
     private val homeInfoHandler = Handler(Looper.getMainLooper())
     private val homeInfoTicker = object : Runnable {
@@ -499,17 +501,29 @@ class AppDrawerFragment : BaseFragment() {
         panel.visibility = View.VISIBLE
         panel.animate().cancel()
         panel.animate().alpha(1f).setDuration(180L).start()
-        binding.dock.animate().cancel()
-        binding.dock.animate().translationX(-112f * resources.displayMetrics.density - (8 * resources.displayMetrics.density))
-            .setDuration(240L).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+        animateHomeInfoReveal(1f, 240L)
+    }
+
+    private fun animateHomeInfoReveal(target: Float, duration: Long) {
+        homeInfoAnimator?.cancel()
+        val start = homeInfoProgress
+        homeInfoAnimator = ValueAnimator.ofFloat(start, target).apply {
+            this.duration = duration
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { animator ->
+                homeInfoProgress = animator.animatedValue as Float
+                val shift = 120f * resources.displayMetrics.density * homeInfoProgress
+                binding.dock.translationX = -shift
+                binding.searchPanel.setHomeInfoRevealProgress(homeInfoProgress)
+            }
+            start()
+        }
     }
 
     private fun collapseHomeInfo() {
         if (_binding == null || !homeInfoExpanded) return
         homeInfoExpanded = false
-        binding.dock.animate().cancel()
-        binding.dock.animate().translationX(0f).setDuration(220L)
-            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+        animateHomeInfoReveal(0f, 220L)
         homeInfoPanel?.animate()?.cancel()
         homeInfoPanel?.animate()?.alpha(0f)?.setDuration(140L)?.withEndAction {
             homeInfoPanel?.visibility = View.GONE
