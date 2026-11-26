@@ -386,12 +386,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.canSwipeSearch = { isHomePage && !expanded && thunderGame == null }
         binding.root.onSwipeUp = { openSearch(thunder = false) }
         val threshold = 64f * resources.displayMetrics.density
-        val horizontalThreshold = 72f * resources.displayMetrics.density
+        val horizontalThreshold = 24f * resources.displayMetrics.density
         var notificationsOpened = false
+        var horizontalSwipeHandled = false
         val detector = android.view.GestureDetector(requireContext(),
             object : android.view.GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(event: android.view.MotionEvent): Boolean {
                     notificationsOpened = false
+                    horizontalSwipeHandled = false
                     return true
                 }
 
@@ -414,10 +416,11 @@ class AppDrawerFragment : BaseFragment() {
                     velocityX: Float,
                     velocityY: Float,
                 ): Boolean {
-                    if (start == null || !isHomePage || expanded || thunderGame != null) return false
+                    if (start == null || !isHomePage || expanded || thunderGame != null || horizontalSwipeHandled) return false
                     val dx = end.x - start.x
                     val dy = end.y - start.y
                     if (kotlin.math.abs(dx) > horizontalThreshold && kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                        horizontalSwipeHandled = true
                         if (dx < 0) revealHomeInfo() else collapseHomeInfo()
                         return true
                     }
@@ -433,6 +436,12 @@ class AppDrawerFragment : BaseFragment() {
                     if (start == null || notificationsOpened || !isHomePage || expanded) return false
                     val dy = current.y - start.y
                     val dx = current.x - start.x
+                    if (!horizontalSwipeHandled && kotlin.math.abs(dx) > horizontalThreshold &&
+                        kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                        horizontalSwipeHandled = true
+                        if (dx < 0) revealHomeInfo() else collapseHomeInfo()
+                        return true
+                    }
                     if (dy > threshold && dy > kotlin.math.abs(dx)) {
                         notificationsOpened = true
                         app.olauncher.helper.expandNotificationDrawer(requireContext())
@@ -454,11 +463,13 @@ class AppDrawerFragment : BaseFragment() {
         val panel = TextView(requireContext()).apply {
             tag = "bolt_home_info_panel"
             gravity = Gravity.CENTER
-            textSize = 14f
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
+            typeface = binding.search.typeface
             maxLines = 1
-            setPadding((10 * resources.displayMetrics.density).toInt(), 0,
-                (10 * resources.displayMetrics.density).toInt(), 0)
-            setTextColor(requireContext().getColorFromAttr(R.attr.boltResultTextColor))
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding((8 * resources.displayMetrics.density).toInt(), 0,
+                (8 * resources.displayMetrics.density).toInt(), 0)
+            setTextColor(binding.search.currentHintTextColor)
             background = GradientDrawable().apply {
                 cornerRadius = 18 * resources.displayMetrics.density
                 setColor(requireContext().getColorFromAttr(R.attr.boltDockColor))
@@ -470,7 +481,7 @@ class AppDrawerFragment : BaseFragment() {
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
-        val width = (112 * resources.displayMetrics.density).toInt()
+        val width = (148 * resources.displayMetrics.density).toInt()
         val height = binding.dock.layoutParams.height
         val params = FrameLayout.LayoutParams(width, height, Gravity.BOTTOM or Gravity.END)
         binding.searchPanel.addView(panel, params)
@@ -512,8 +523,6 @@ class AppDrawerFragment : BaseFragment() {
             interpolator = android.view.animation.DecelerateInterpolator()
             addUpdateListener { animator ->
                 homeInfoProgress = animator.animatedValue as Float
-                val shift = 120f * resources.displayMetrics.density * homeInfoProgress
-                binding.dock.translationX = -shift
                 binding.searchPanel.setHomeInfoRevealProgress(homeInfoProgress)
             }
             start()
@@ -2622,7 +2631,6 @@ class AppDrawerFragment : BaseFragment() {
         homeInfoAnimator = null
         homeInfoProgress = 0f
         homeInfoExpanded = false
-        binding.dock.translationX = 0f
         binding.searchPanel.setHomeInfoRevealProgress(0f)
         homeInfoPanel?.let { binding.searchPanel.removeView(it) }
         homeInfoPanel = null
