@@ -449,6 +449,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun ensureHomeInfoPanel() {
         if (homeInfoPanel != null || _binding == null) return
         val panel = TextView(requireContext()).apply {
+            tag = "bolt_home_info_panel"
             gravity = Gravity.CENTER
             textSize = 14f
             maxLines = 1
