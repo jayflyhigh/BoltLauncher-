@@ -1,80 +1,80 @@
 <resources>
-    <string name="bolt_hint_default_home">Search anything…</string>
-    <string name="bolt_hint_default_regular">Find apps or contacts…</string>
-    <string name="bolt_hint_default_destination">Search in apps…</string>
-    <string name="bolt_hint_default_thunder">Quick launch…</string>
-    <string name="bolt_hint_default_rename">New app name</string>
-    <string name="bolt_hint_frost_home">Look through the frost…</string>
-    <string name="bolt_hint_frost_regular">Find apps through the frost…</string>
-    <string name="bolt_hint_frost_destination">Search within the frost…</string>
-    <string name="bolt_hint_frost_thunder">Flash launch…</string>
-    <string name="bolt_hint_frost_rename">Etch a new name</string>
-    <string name="bolt_hint_liquid_home">Look through the glass…</string>
-    <string name="bolt_hint_liquid_regular">Find apps through the glass…</string>
-    <string name="bolt_hint_liquid_destination">Search inside apps…</string>
-    <string name="bolt_hint_liquid_thunder">Quick launch…</string>
-    <string name="bolt_hint_liquid_rename">Give it a new name</string>
-    <string name="bolt_hint_eink_home">Look it up…</string>
-    <string name="bolt_hint_eink_regular">Look up apps or people…</string>
-    <string name="bolt_hint_eink_destination">Look inside an app…</string>
-    <string name="bolt_hint_eink_thunder">Quick open…</string>
-    <string name="bolt_hint_eink_rename">Set a new name</string>
-    <string name="bolt_hint_notebook_home">Jot down a search…</string>
-    <string name="bolt_hint_notebook_regular">Check your apps or contacts…</string>
-    <string name="bolt_hint_notebook_destination">Look up in apps…</string>
-    <string name="bolt_hint_notebook_thunder">Open in a flash…</string>
-    <string name="bolt_hint_notebook_rename">Write a new name</string>
-    <string name="bolt_hint_smoke_home">Search through the haze…</string>
-    <string name="bolt_hint_smoke_regular">Find apps through the haze…</string>
-    <string name="bolt_hint_smoke_destination">Look inside an app…</string>
-    <string name="bolt_hint_smoke_thunder">Launch through the haze…</string>
-    <string name="bolt_hint_smoke_rename">Set a new name</string>
-    <string name="bolt_hint_xp_home">Start a search…</string>
-    <string name="bolt_hint_xp_regular">Find programs or contacts…</string>
-    <string name="bolt_hint_xp_destination">Search in a program…</string>
-    <string name="bolt_hint_xp_thunder">Run a program…</string>
-    <string name="bolt_hint_xp_rename">Rename this program</string>
-    <string name="bolt_hint_wii_home">Find a channel…</string>
-    <string name="bolt_hint_wii_regular">Find channels or contacts…</string>
-    <string name="bolt_hint_wii_destination">Search inside a channel…</string>
-    <string name="bolt_hint_wii_thunder">Launch a channel…</string>
-    <string name="bolt_hint_wii_rename">Rename this channel</string>
-    <string name="bolt_hint_hawks_home">Huddle up and search…</string>
-    <string name="bolt_hint_hawks_regular">Find apps or teammates…</string>
-    <string name="bolt_hint_hawks_destination">Search the playbook…</string>
-    <string name="bolt_hint_hawks_thunder">Quick snap…</string>
-    <string name="bolt_hint_hawks_rename">Call a new name</string>
-    <string name="bolt_home_menu_appearance">Appearance</string>
-    <string name="bolt_home_menu_back">Back</string>
-    <string name="bolt_home_menu_title">Home Menu</string>
-    <string name="bolt_set_wallpaper">Set Wallpaper</string>
-    <string name="bolt_set_wallpaper_description">Drag the image to position it, and zoom in to frame it before setting your home wallpaper.</string>
-    <string name="bolt_set_wallpaper_applied">Home wallpaper set</string>
-    <string name="bolt_set_wallpaper_failed">Couldn’t set the home wallpaper</string>
-    <string name="bolt_set_wallpaper_unavailable">This device doesn’t allow Bolt to set the wallpaper</string>
-    <string name="bolt_scan_wallpaper">Scan Wallpaper</string>
-    <string name="bolt_wallpaper_theme">Wallpaper Theme</string>
-    <string name="bolt_apply_wallpaper_palette">Apply Color Palette</string>
-    <string name="bolt_palette_preview_normal_result">Search result</string>
-    <string name="bolt_theme_preview_selected_result">Selected result</string>
-    <string name="bolt_palette_preview_selected_result">Best match</string>
-    <string name="bolt_palette_preview_search">Search</string>
-    <string name="bolt_wallpaper_palette_number">Palette %1$d</string>
-    <string name="bolt_wallpaper_palette_unavailable">Couldn’t read colors from this wallpaper.</string>
-    <string name="bolt_wallpaper_palette_changed">Your wallpaper changed. Open Apply Color Palette again.</string>
-    <string name="bolt_wallpaper_match_unavailable">Home wallpaper colors aren’t available on this device. Try matching colors from an image.</string>
-    <string name="bolt_scan_current_wallpaper">Match colors from the wallpaper</string>
-    <string name="bolt_scan_wallpaper_image">Match colors from any image</string>
-    <string name="bolt_wallpaper_colors_unavailable">Couldn’t read the home wallpaper colors. Try scanning again or choose the wallpaper image.</string>
-    <string name="bolt_wallpaper_colors_applied">Wallpaper colors applied</string>
-    <string name="bolt_wallpaper_rescan_needed">Home wallpaper colors need a rescan. Bolt is keeping your last colors.</string>
-    <string name="bolt_wallpaper_image_unreadable">Couldn’t sample this image. Choose another JPG or PNG, or adjust the crop to include visible colors.</string>
-    <string name="bolt_wallpaper_picker_unavailable">No image picker is available. Enable a Files or Photos app and try again.</string>
-    <string name="bolt_wallpaper_crop_title">Preview wallpaper crop</string>
-    <string name="bolt_wallpaper_crop_description">Drag the image or adjust the zoom to choose which part Bolt uses for its colors.</string>
-    <string name="bolt_wallpaper_crop_zoom">Zoom</string>
-    <string name="bolt_wallpaper_crop_horizontal">Horizontal position</string>
-    <string name="bolt_wallpaper_crop_vertical">Vertical position</string>
-    <string name="bolt_wallpaper_crop_apply">Apply colors</string>
-    <string name="bolt_reset_wallpaper_colors">Reset</string>
+    <string name="bolt_hint_default_home" translatable="false">Search anything…</string>
+    <string name="bolt_hint_default_regular" translatable="false">Find apps or contacts…</string>
+    <string name="bolt_hint_default_destination" translatable="false">Search in apps…</string>
+    <string name="bolt_hint_default_thunder" translatable="false">Quick launch…</string>
+    <string name="bolt_hint_default_rename" translatable="false">New app name</string>
+    <string name="bolt_hint_frost_home" translatable="false">Look through the frost…</string>
+    <string name="bolt_hint_frost_regular" translatable="false">Find apps through the frost…</string>
+    <string name="bolt_hint_frost_destination" translatable="false">Search within the frost…</string>
+    <string name="bolt_hint_frost_thunder" translatable="false">Flash launch…</string>
+    <string name="bolt_hint_frost_rename" translatable="false">Etch a new name</string>
+    <string name="bolt_hint_liquid_home" translatable="false">Look through the glass…</string>
+    <string name="bolt_hint_liquid_regular" translatable="false">Find apps through the glass…</string>
+    <string name="bolt_hint_liquid_destination" translatable="false">Search inside apps…</string>
+    <string name="bolt_hint_liquid_thunder" translatable="false">Quick launch…</string>
+    <string name="bolt_hint_liquid_rename" translatable="false">Give it a new name</string>
+    <string name="bolt_hint_eink_home" translatable="false">Look it up…</string>
+    <string name="bolt_hint_eink_regular" translatable="false">Look up apps or people…</string>
+    <string name="bolt_hint_eink_destination" translatable="false">Look inside an app…</string>
+    <string name="bolt_hint_eink_thunder" translatable="false">Quick open…</string>
+    <string name="bolt_hint_eink_rename" translatable="false">Set a new name</string>
+    <string name="bolt_hint_notebook_home" translatable="false">Jot down a search…</string>
+    <string name="bolt_hint_notebook_regular" translatable="false">Check your apps or contacts…</string>
+    <string name="bolt_hint_notebook_destination" translatable="false">Look up in apps…</string>
+    <string name="bolt_hint_notebook_thunder" translatable="false">Open in a flash…</string>
+    <string name="bolt_hint_notebook_rename" translatable="false">Write a new name</string>
+    <string name="bolt_hint_smoke_home" translatable="false">Search through the haze…</string>
+    <string name="bolt_hint_smoke_regular" translatable="false">Find apps through the haze…</string>
+    <string name="bolt_hint_smoke_destination" translatable="false">Look inside an app…</string>
+    <string name="bolt_hint_smoke_thunder" translatable="false">Launch through the haze…</string>
+    <string name="bolt_hint_smoke_rename" translatable="false">Set a new name</string>
+    <string name="bolt_hint_xp_home" translatable="false">Start a search…</string>
+    <string name="bolt_hint_xp_regular" translatable="false">Find programs or contacts…</string>
+    <string name="bolt_hint_xp_destination" translatable="false">Search in a program…</string>
+    <string name="bolt_hint_xp_thunder" translatable="false">Run a program…</string>
+    <string name="bolt_hint_xp_rename" translatable="false">Rename this program</string>
+    <string name="bolt_hint_wii_home" translatable="false">Find a channel…</string>
+    <string name="bolt_hint_wii_regular" translatable="false">Find channels or contacts…</string>
+    <string name="bolt_hint_wii_destination" translatable="false">Search inside a channel…</string>
+    <string name="bolt_hint_wii_thunder" translatable="false">Launch a channel…</string>
+    <string name="bolt_hint_wii_rename" translatable="false">Rename this channel</string>
+    <string name="bolt_hint_hawks_home" translatable="false">Huddle up and search…</string>
+    <string name="bolt_hint_hawks_regular" translatable="false">Find apps or teammates…</string>
+    <string name="bolt_hint_hawks_destination" translatable="false">Search the playbook…</string>
+    <string name="bolt_hint_hawks_thunder" translatable="false">Quick snap…</string>
+    <string name="bolt_hint_hawks_rename" translatable="false">Call a new name</string>
+    <string name="bolt_home_menu_appearance" translatable="false">Appearance</string>
+    <string name="bolt_home_menu_back" translatable="false">Back</string>
+    <string name="bolt_home_menu_title" translatable="false">Home Menu</string>
+    <string name="bolt_set_wallpaper" translatable="false">Set Wallpaper</string>
+    <string name="bolt_set_wallpaper_description" translatable="false">Drag the image to position it, and zoom in to frame it before setting your home wallpaper.</string>
+    <string name="bolt_set_wallpaper_applied" translatable="false">Home wallpaper set</string>
+    <string name="bolt_set_wallpaper_failed" translatable="false">Couldn’t set the home wallpaper</string>
+    <string name="bolt_set_wallpaper_unavailable" translatable="false">This device doesn’t allow Bolt to set the wallpaper</string>
+    <string name="bolt_scan_wallpaper" translatable="false">Scan Wallpaper</string>
+    <string name="bolt_wallpaper_theme" translatable="false">Wallpaper Theme</string>
+    <string name="bolt_apply_wallpaper_palette" translatable="false">Apply Color Palette</string>
+    <string name="bolt_palette_preview_normal_result" translatable="false">Search result</string>
+    <string name="bolt_theme_preview_selected_result" translatable="false">Selected result</string>
+    <string name="bolt_palette_preview_selected_result" translatable="false">Best match</string>
+    <string name="bolt_palette_preview_search" translatable="false">Search</string>
+    <string name="bolt_wallpaper_palette_number" translatable="false">Palette %1$d</string>
+    <string name="bolt_wallpaper_palette_unavailable" translatable="false">Couldn’t read colors from this wallpaper.</string>
+    <string name="bolt_wallpaper_palette_changed" translatable="false">Your wallpaper changed. Open Apply Color Palette again.</string>
+    <string name="bolt_wallpaper_match_unavailable" translatable="false">Home wallpaper colors aren’t available on this device. Try matching colors from an image.</string>
+    <string name="bolt_scan_current_wallpaper" translatable="false">Match colors from the wallpaper</string>
+    <string name="bolt_scan_wallpaper_image" translatable="false">Match colors from any image</string>
+    <string name="bolt_wallpaper_colors_unavailable" translatable="false">Couldn’t read the home wallpaper colors. Try scanning again or choose the wallpaper image.</string>
+    <string name="bolt_wallpaper_colors_applied" translatable="false">Wallpaper colors applied</string>
+    <string name="bolt_wallpaper_rescan_needed" translatable="false">Home wallpaper colors need a rescan. Bolt is keeping your last colors.</string>
+    <string name="bolt_wallpaper_image_unreadable" translatable="false">Couldn’t sample this image. Choose another JPG or PNG, or adjust the crop to include visible colors.</string>
+    <string name="bolt_wallpaper_picker_unavailable" translatable="false">No image picker is available. Enable a Files or Photos app and try again.</string>
+    <string name="bolt_wallpaper_crop_title" translatable="false">Preview wallpaper crop</string>
+    <string name="bolt_wallpaper_crop_description" translatable="false">Drag the image or adjust the zoom to choose which part Bolt uses for its colors.</string>
+    <string name="bolt_wallpaper_crop_zoom" translatable="false">Zoom</string>
+    <string name="bolt_wallpaper_crop_horizontal" translatable="false">Horizontal position</string>
+    <string name="bolt_wallpaper_crop_vertical" translatable="false">Vertical position</string>
+    <string name="bolt_wallpaper_crop_apply" translatable="false">Apply colors</string>
+    <string name="bolt_reset_wallpaper_colors" translatable="false">Reset</string>
 </resources>
