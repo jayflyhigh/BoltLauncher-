@@ -94,6 +94,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     private var dockColor = wallpaperColors?.dock ?: context.getColorFromAttr(R.attr.boltDockColor)
     private var homeInfoRevealProgress = 0f
 
+    // Re-measure the dock as the pill takes space so its contents never slide off-screen.
     fun setHomeInfoRevealProgress(progress: Float) {
         val next = progress.coerceIn(0f, 1f)
         if (homeInfoRevealProgress == next) return
