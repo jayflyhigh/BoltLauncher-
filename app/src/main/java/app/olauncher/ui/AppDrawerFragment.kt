@@ -481,7 +481,7 @@ class AppDrawerFragment : BaseFragment() {
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
-        val width = (148 * resources.displayMetrics.density).toInt()
+        val width = (160 * resources.displayMetrics.density).toInt()
         val height = binding.dock.layoutParams.height
         val params = FrameLayout.LayoutParams(width, height, Gravity.BOTTOM or Gravity.END)
         binding.searchPanel.addView(panel, params)
@@ -534,7 +534,9 @@ class AppDrawerFragment : BaseFragment() {
         homeInfoExpanded = false
         animateHomeInfoReveal(0f, 220L)
         homeInfoPanel?.animate()?.cancel()
-        homeInfoPanel?.animate()?.alpha(0f)?.setDuration(140L)?.withEndAction {
+        // Keep the pill measured until the dock has fully expanded; hiding it early
+        // leaves a blank strip on the right side of the collapsed search bar.
+        homeInfoPanel?.animate()?.alpha(0f)?.setDuration(220L)?.withEndAction {
             homeInfoPanel?.visibility = View.GONE
         }?.start()
     }
