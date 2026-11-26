@@ -288,7 +288,11 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         paint.color = outline
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = stroke
-        if (glassEdge == null) {
+        if (homeInfoRevealProgress > 0f) {
+            val dockBounds = RectF(0f, dockTop + stroke / 2f,
+                visibleDockRight.coerceAtLeast(radius), height.toFloat() - stroke / 2f)
+            canvas.drawRoundRect(dockBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
+        } else if (glassEdge == null) {
             canvas.drawRoundRect(edgeBounds, radius - stroke / 2f, radius - stroke / 2f, paint)
         } else {
             // Draw in panel-local coordinates so the bright rim tracks its top edge.
