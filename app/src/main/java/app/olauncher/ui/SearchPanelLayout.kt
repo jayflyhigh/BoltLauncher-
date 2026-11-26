@@ -98,6 +98,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         val next = progress.coerceIn(0f, 1f)
         if (homeInfoRevealProgress == next) return
         homeInfoRevealProgress = next
+        requestLayout()
         invalidate()
     }
 
