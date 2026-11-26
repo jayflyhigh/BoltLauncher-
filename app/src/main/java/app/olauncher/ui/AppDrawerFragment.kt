@@ -499,7 +499,7 @@ class AppDrawerFragment : BaseFragment() {
         panel.animate().cancel()
         panel.animate().alpha(1f).setDuration(180L).start()
         binding.dock.animate().cancel()
-        binding.dock.animate().translationX(-panel.width.toFloat() - (8 * resources.displayMetrics.density))
+        binding.dock.animate().translationX(-112f * resources.displayMetrics.density - (8 * resources.displayMetrics.density))
             .setDuration(240L).setInterpolator(android.view.animation.DecelerateInterpolator()).start()
     }
 
