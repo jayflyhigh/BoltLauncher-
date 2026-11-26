@@ -446,13 +446,19 @@ internal class ThunderGameView(
         }
         val delta = if (direction == Drag.HORIZONTAL) dx else dy
         val changedDirection = direction != drag
-        // Start horizontal movement with a short, predictable finger travel.
-        // Subsequent cells use a lower threshold so continuous drags feel responsive.
-        val threshold = if (direction == Drag.HORIZONTAL) max(dp(7).toFloat(), cell * 0.28f) else cell
-        val steps = (abs(delta) / threshold).toInt().coerceAtLeast(if (changedDirection) 1 else 0)
+        // A small initial travel makes the first horizontal move feel immediate;
+        // continued movement repeats at a little under half a cell per step.
+        val initialThreshold = max(dp(5).toFloat(), minOf(touchSlop.toFloat(), cell * 0.20f))
+        val repeatThreshold = if (direction == Drag.HORIZONTAL) max(dp(10).toFloat(), cell * 0.48f) else cell
+        val steps = if (changedDirection) {
+            if (abs(delta) < initialThreshold) 0
+            else 1 + ((abs(delta) - initialThreshold) / repeatThreshold).toInt()
+        } else (abs(delta) / repeatThreshold).toInt()
         if (steps == 0) return
         drag = direction
-        val consumed = minOf(steps * cell, abs(delta))
+        val consumedDistance = if (changedDirection) initialThreshold + (steps - 1) * repeatThreshold
+            else steps * repeatThreshold
+        val consumed = minOf(consumedDistance, abs(delta))
         if (direction == Drag.HORIZONTAL) {
             anchorX += if (delta > 0) consumed else -consumed
             anchorY = y
