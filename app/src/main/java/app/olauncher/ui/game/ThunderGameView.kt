@@ -1,6 +1,9 @@
 package app.olauncher.ui.game
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -11,11 +14,17 @@ import android.media.MediaPlayer
 import android.media.SoundPool
 import android.os.Build
 import android.os.SystemClock
+import android.util.Base64
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -138,6 +147,9 @@ internal class ThunderGameView(
         rail.addView(stats)
         rail.addView(label(R.string.thunder_game_next))
         rail.addView(preview, LayoutParams(LayoutParams.MATCH_PARENT, dp(64)))
+        rail.addView(buttonText("Save slot 1") { saveStateSlot(1) })
+        rail.addView(buttonText("Save slot 2") { saveStateSlot(2) })
+        rail.addView(buttonText("Load saved game") { showSavedStates() })
         listOf(pauseButton, musicButton, soundButton, button(R.string.thunder_game_exit, exit)).forEach {
             rail.addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         }
@@ -186,6 +198,109 @@ internal class ThunderGameView(
         releaseMusic()
         sounds.release()
         super.onDetachedFromWindow()
+    }
+
+    private fun buttonText(caption: String, action: () -> Unit) = Button(context).apply {
+        text = caption
+        isAllCaps = false
+        setOnClickListener { action() }
+    }
+
+    private fun stateKey(slot: Int) = "save_slot_${slot}_state"
+    private fun imageKey(slot: Int) = "save_slot_${slot}_preview"
+
+    private fun encodeSave(state: ThunderBlocks.State): String {
+        val bytes = ByteArrayOutputStream().use { stream ->
+            ObjectOutputStream(stream).use { it.writeObject(state) }
+            stream.toByteArray()
+        }
+        return Base64.encodeToString(bytes, Base64.NO_WRAP)
+    }
+
+    private fun decodeSave(value: String): ThunderBlocks.State? = try {
+        val bytes = Base64.decode(value, Base64.DEFAULT)
+        ObjectInputStream(ByteArrayInputStream(bytes)).use { it.readObject() as? ThunderBlocks.State }
+    } catch (_: Exception) { null }
+
+    private fun saveStateSlot(slot: Int) {
+        if (!paused) pauseGame()
+        val width = board.width.coerceAtLeast(1)
+        val height = board.height.coerceAtLeast(1)
+        val shot = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        board.draw(Canvas(shot))
+        val previewBytes = ByteArrayOutputStream().use { stream ->
+            shot.compress(Bitmap.CompressFormat.PNG, 90, stream)
+            stream.toByteArray()
+        }
+        shot.recycle()
+        settings.edit()
+            .putString(stateKey(slot), encodeSave(snapshot()))
+            .putString(imageKey(slot), Base64.encodeToString(previewBytes, Base64.NO_WRAP))
+            .apply()
+        android.widget.Toast.makeText(context, "Game saved in slot $slot", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showSavedStates() {
+        val available = (1..2).filter { settings.contains(stateKey(it)) }
+        if (available.isEmpty()) {
+            android.widget.Toast.makeText(context, "No saved games yet", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cards = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+        var dialog: AlertDialog? = null
+        available.forEach { slot ->
+            val card = LinearLayout(context).apply {
+                orientation = VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(6), dp(6), dp(6), dp(6))
+                background = surface()
+                setOnClickListener {
+                    val encoded = settings.getString(stateKey(slot), null)
+                    val restored = encoded?.let(::decodeSave)
+                    if (restored == null) {
+                        android.widget.Toast.makeText(context, "Save slot $slot is damaged", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        game = ThunderBlocks(state = restored)
+                        paused = true
+                        lockClock = null
+                        board.resetStrike()
+                        bindGame()
+                        updateMusic()
+                        scheduleTick()
+                        updateControls()
+                    }
+                    dialog?.dismiss()
+                }
+            }
+            val image = ImageView(context).apply {
+                val encoded = settings.getString(imageKey(slot), null)
+                if (encoded != null) {
+                    try {
+                        val bytes = Base64.decode(encoded, Base64.DEFAULT)
+                        setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
+                    } catch (_: Exception) { }
+                }
+                layoutParams = LayoutParams(dp(112), dp(156))
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Screenshot preview for Tetris save slot $slot"
+            }
+            card.addView(image)
+            card.addView(label().apply { text = "Save slot $slot" })
+            cards.addView(card, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(4)
+                marginEnd = dp(4)
+            })
+        }
+        dialog = AlertDialog.Builder(context)
+            .setTitle("Load saved game")
+            .setView(cards)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog?.show()
     }
 
     fun snapshot(): ThunderBlocks.State =
@@ -331,10 +446,19 @@ internal class ThunderGameView(
         }
         val delta = if (direction == Drag.HORIZONTAL) dx else dy
         val changedDirection = direction != drag
-        val steps = (abs(delta) / cell).toInt().coerceAtLeast(if (changedDirection) 1 else 0)
+        // A small initial travel makes the first horizontal move feel immediate;
+        // continued movement repeats at a little under half a cell per step.
+        val initialThreshold = max(dp(5).toFloat(), minOf(touchSlop.toFloat(), cell * 0.20f))
+        val repeatThreshold = if (direction == Drag.HORIZONTAL) max(dp(10).toFloat(), cell * 0.48f) else cell
+        val steps = if (changedDirection) {
+            if (abs(delta) < initialThreshold) 0
+            else 1 + ((abs(delta) - initialThreshold) / repeatThreshold).toInt()
+        } else (abs(delta) / repeatThreshold).toInt()
         if (steps == 0) return
         drag = direction
-        val consumed = minOf(steps * cell, abs(delta))
+        val consumedDistance = if (changedDirection) initialThreshold + (steps - 1) * repeatThreshold
+            else steps * repeatThreshold
+        val consumed = minOf(consumedDistance, abs(delta))
         if (direction == Drag.HORIZONTAL) {
             anchorX += if (delta > 0) consumed else -consumed
             anchorY = y
