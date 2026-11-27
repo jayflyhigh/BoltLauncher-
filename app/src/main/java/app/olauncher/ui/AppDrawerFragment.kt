@@ -239,7 +239,6 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var searchHints: SearchHints
     private var wallpaperColors: WallpaperThemeColors? = null
     private var wallpaperColorsActive = false
-    private var generatedWallpaperActive = false
     private var cozyQuest = false
     private var dockGraphite = Color.BLACK
     private var windowsXpTheme = false
@@ -406,10 +405,9 @@ class AppDrawerFragment : BaseFragment() {
     private fun initSearch() {
         dockUsesDarkText = null
         searchHints = SearchHints.forTheme(prefs.launcherTheme)
-        wallpaperColorsActive = (prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT && prefs.wallpaperPalette != null) ||
-            prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
+        wallpaperColorsActive = prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT &&
+            (prefs.wallpaperPalette != null || prefs.generatedWallpaperTheme != null)
         wallpaperColors = WallpaperThemeColors.from(requireContext())
-        generatedWallpaperActive = prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
         dockIdleColor = wallpaperColors?.dock ?: requireContext().getColorFromAttr(R.attr.boltDockColor)
         thunderDockColor = wallpaperColors?.accent ?: requireContext().getColorFromAttr(R.attr.boltThunderDockColor)
         wallpaperColors?.let { colors ->
@@ -1773,7 +1771,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun canCustomizeWallpaper(): Boolean =
-        prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT || prefs.launcherTheme == Prefs.LauncherTheme.WALLPAPER
+        prefs.launcherTheme == Prefs.LauncherTheme.DEFAULT
 
     private fun tintCompoundDrawables(view: TextView, tint: ColorStateList) {
         val drawables = view.compoundDrawablesRelative
@@ -1857,7 +1855,7 @@ class AppDrawerFragment : BaseFragment() {
                     requireContext().showToast(getString(R.string.bolt_wallpaper_palette_changed))
                 else -> showWallpaperPalettePicker(options, wallpaperId)
             }
-            if (!generatedWallpaperActive && prefs.followsHomeWallpaper) watchHomeWallpaper()
+            if (prefs.followsHomeWallpaper) watchHomeWallpaper()
         }
     }
 
@@ -2043,7 +2041,7 @@ class AppDrawerFragment : BaseFragment() {
             scanningHomeExplicitly = false
             if (!canCustomizeWallpaper()) return@launch
             if (sample == null) {
-                val needsRescan = !generatedWallpaperActive && prefs.followsHomeWallpaper
+                val needsRescan = prefs.followsHomeWallpaper
                 if (needsRescan && isResumed) watchHomeWallpaper()
                 val alreadyMarked = prefs.wallpaperNeedsRescan
                 if (needsRescan && !alreadyMarked) prefs.wallpaperNeedsRescan = true
@@ -2057,14 +2055,13 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun applyWallpaperSample(sample: WallpaperPalette.Sample, followHome: Boolean, announce: Boolean) {
-        val changed = generatedWallpaperActive || prefs.wallpaperSample != sample
+        val changed = prefs.generatedWallpaperTheme != null || prefs.wallpaperSample != sample
         val sourceChanged = followHome != prefs.followsHomeWallpaper
         if (changed || sourceChanged || prefs.wallpaperNeedsRescan) {
             prefs.saveWallpaperSample(sample, followHome)
         }
         if (announce) requireContext().showToast(getString(R.string.bolt_wallpaper_colors_applied))
         if (changed) {
-            if (generatedWallpaperActive) prefs.launcherTheme = Prefs.LauncherTheme.DEFAULT
             requireActivity().recreate()
         } else if (followHome && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && isResumed) {
             watchHomeWallpaper()
@@ -2097,7 +2094,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun showThemePicker() {
         val collator = Collator.getInstance(resources.configuration.locales[0])
         val options = Prefs.LauncherTheme.entries
-            .filter { it != Prefs.LauncherTheme.WALLPAPER || prefs.generatedWallpaperTheme != null }
+            .filter { it != Prefs.LauncherTheme.WALLPAPER }
             .map { it to getString(it.label) }
             .sortedWith(compareBy<Pair<Prefs.LauncherTheme, String>> { it.first != Prefs.LauncherTheme.DEFAULT }
                 .thenBy(collator) { it.second })

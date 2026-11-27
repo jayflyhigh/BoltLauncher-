@@ -17,6 +17,7 @@
         <item name="boltResultTextColor">@color/bolt_notebook_graphite</item>
         <item name="boltResultActionColor">@color/bolt_notebook_graphite</item>
         <item name="boltSearchCursorColor">@color/bolt_notebook_graphite</item>
+        <item name="boltThunderCursorColor">@color/bolt_notebook_graphite</item>
         <item name="boltPanelOutlineColor">@color/bolt_notebook_graphite</item>
         <item name="boltThunderMatchTextColor">@color/bolt_notebook_graphite</item>
         <item name="android:textColorSecondary">@color/bolt_notebook_secondary</item>

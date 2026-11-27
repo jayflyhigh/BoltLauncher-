@@ -33,6 +33,7 @@
     </style>
 
     <style name="FrostedGlassOverlay">
+        <item name="boltThunderCursorColor">#172B45</item>
         <item name="boltSearchCursorColor">#B7DFFF</item>
         <item name="boltGlassReflectionColor">#389AC5FA</item>
         <item name="boltSearchSectionColor">#DBEBFF</item>
@@ -61,6 +62,7 @@
     </style>
 
     <style name="LiquidGlassOverlay">
+        <item name="boltThunderCursorColor">#17385C</item>
         <item name="android:textColorPrimary">#F5FAFF</item>
         <item name="android:textColorSecondary">#DAEDFC</item>
         <item name="colorAccent">#A5DEFF</item>
@@ -116,6 +118,7 @@
     </style>
 
     <style name="SmokedGlassOverlay">
+        <item name="boltThunderCursorColor">#252321</item>
         <item name="boltSearchCursorColor">#FFF8E8</item>
         <item name="boltSelectedTypoHintColor">#FFF8E8</item>
         <item name="boltDockColor">#E818191C</item>
@@ -178,6 +181,7 @@
     </style>
 
     <style name="WiiUOverlay">
+        <item name="boltThunderCursorColor">#004965</item>
         <item name="android:textColorPrimary">#20384B</item>
         <item name="android:textColorSecondary">#395B6D</item>
         <item name="colorAccent">#006A89</item>
@@ -233,6 +237,7 @@
     </style>
 
     <style name="SeattleSeahawksOverlay">
+        <item name="boltThunderCursorColor">#001532</item>
         <item name="colorAccent">#69BE28</item>
         <item name="primaryColor">#FFFFFF</item>
         <item name="primaryColorTrans50">#99FFFFFF</item>

@@ -217,7 +217,14 @@ class Prefs(context: Context) {
         get() {
             val saved = prefs.getString("LAUNCHER_THEME", null)
             if (saved != null) {
-                return LauncherTheme.entries.firstOrNull { it.key == saved } ?: LauncherTheme.DEFAULT
+                val restored = LauncherTheme.entries.firstOrNull { it.key == saved } ?: LauncherTheme.DEFAULT
+                // Wallpaper scans customize Default; migrate older generated-wallpaper
+                // theme selections without losing their saved palette data.
+                if (restored == LauncherTheme.WALLPAPER) {
+                    prefs.edit { putString("LAUNCHER_THEME", LauncherTheme.DEFAULT.key) }
+                    return LauncherTheme.DEFAULT
+                }
+                return restored
             }
             val migrated = if (prefs.getBoolean("FROSTED_GLASS", false)) {
                 LauncherTheme.FROSTED_GLASS
@@ -270,7 +277,11 @@ class Prefs(context: Context) {
             putInt("WALLPAPER_THEME_BASE", theme.sample.base)
             putInt("WALLPAPER_THEME_ACCENT", theme.sample.accent)
             putInt("WALLPAPER_THEME_SUPPORTING", theme.supporting)
-            putString("LAUNCHER_THEME", LauncherTheme.WALLPAPER.key)
+            // A generated palette is an override of Default, never a separate theme.
+            remove("WALLPAPER_PALETTE")
+            remove("WALLPAPER_COLOR")
+            remove("WALLPAPER_ACCENT")
+            putString("LAUNCHER_THEME", LauncherTheme.DEFAULT.key)
         }
     }
 
@@ -299,7 +310,9 @@ class Prefs(context: Context) {
 
     @StyleRes
     internal fun overlayFor(theme: LauncherTheme): Int = when (theme) {
-        LauncherTheme.DEFAULT -> wallpaperPalette?.overlay ?: 0
+        LauncherTheme.DEFAULT -> generatedWallpaperTheme?.let {
+            WallpaperPalette.forColor(it.sample.base).overlay
+        } ?: wallpaperPalette?.overlay ?: 0
         LauncherTheme.WALLPAPER -> generatedWallpaperTheme?.let { WallpaperPalette.forColor(it.sample.base).overlay } ?: 0
         else -> theme.overlay
     }
@@ -320,7 +333,13 @@ class Prefs(context: Context) {
                 remove("WALLPAPER_COLOR")
                 remove("WALLPAPER_ACCENT")
                 remove("WALLPAPER_FOLLOWS_HOME")
+                remove("WALLPAPER_THEME_BASE")
+                remove("WALLPAPER_THEME_ACCENT")
+                remove("WALLPAPER_THEME_SUPPORTING")
             } else {
+                remove("WALLPAPER_THEME_BASE")
+                remove("WALLPAPER_THEME_ACCENT")
+                remove("WALLPAPER_THEME_SUPPORTING")
                 putInt("WALLPAPER_COLOR", sample.base)
                 putInt("WALLPAPER_ACCENT", sample.accent)
                 putBoolean("WALLPAPER_FOLLOWS_HOME", followHome)
