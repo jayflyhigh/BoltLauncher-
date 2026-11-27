@@ -12,8 +12,6 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.graphics.ColorUtils
-import app.olauncher.R
-import app.olauncher.helper.getColorFromAttr
 
 /**
  * Search input with a theme-aware, permanently visible caret rendered by Bolt.
@@ -29,7 +27,6 @@ class BoltSearchInput @JvmOverloads constructor(
         color = Color.WHITE
         style = Paint.Style.FILL
     }
-    private val cursorClip = Rect()
     private var appliedCursorColor: Int? = null
 
     init {
@@ -104,17 +101,17 @@ class BoltSearchInput @JvmOverloads constructor(
         previouslyFocusedRect: Rect?
     ) {
         super.onFocusChanged(focused, direction, previouslyFocusedRect)
-        restartCursorBlink()
+        refreshCaret()
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
-        restartCursorBlink()
+        refreshCaret()
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        restartCursorBlink()
+        refreshCaret()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -140,13 +137,11 @@ class BoltSearchInput @JvmOverloads constructor(
         val originY = baseline - textLayout.getLineBaseline(0)
         val top = (originY + textLayout.getLineTop(line)).toFloat()
         val bottom = (originY + textLayout.getLineBottom(line)).toFloat()
-        {
-            val save = canvas.save()
-            canvas.clipRect(clipLeft, extendedPaddingTop.toFloat(), clipRight,
-                (height - extendedPaddingBottom).toFloat())
-            canvas.drawRect(x, top, x + cursorWidth, bottom, cursorPaint)
-            canvas.restoreToCount(save)
-        }
+        val save = canvas.save()
+        canvas.clipRect(clipLeft, extendedPaddingTop.toFloat(), clipRight,
+            (height - extendedPaddingBottom).toFloat())
+        canvas.drawRect(x, top, x + cursorWidth, bottom, cursorPaint)
+        canvas.restoreToCount(save)
 
     }
 }
