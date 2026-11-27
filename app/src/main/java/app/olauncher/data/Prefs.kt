@@ -281,6 +281,10 @@ class Prefs(context: Context) {
             remove("WALLPAPER_PALETTE")
             remove("WALLPAPER_COLOR")
             remove("WALLPAPER_ACCENT")
+            // A manually chosen palette must replace wallpaper-follow mode.
+            // Otherwise the wallpaper listener can silently restore scanned colors.
+            remove("WALLPAPER_FOLLOWS_HOME")
+            remove("WALLPAPER_NEEDS_RESCAN")
             putString("LAUNCHER_THEME", LauncherTheme.DEFAULT.key)
         }
     }
