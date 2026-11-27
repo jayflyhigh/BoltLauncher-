@@ -1906,6 +1906,10 @@ class AppDrawerFragment : BaseFragment() {
                     requireContext().showToast(getString(R.string.bolt_wallpaper_palette_changed))
                     return@setAdapter
                 }
+                // Commit the selected palette as a manual Default override.
+                // Cancel pending scans before they can replace the chosen colors.
+                wallpaperScan?.cancel()
+                scanningHomeExplicitly = false
                 stopWatchingWallpaper()
                 prefs.applyGeneratedWallpaperTheme(options[index].first)
                 requireActivity().recreate()
@@ -2006,7 +2010,8 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun refreshHomeWallpaper() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1 || choosingWallpaperImage || scanningHomeExplicitly ||
-            prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT || !prefs.followsHomeWallpaper
+            prefs.launcherTheme != Prefs.LauncherTheme.DEFAULT ||
+            prefs.generatedWallpaperTheme != null || !prefs.followsHomeWallpaper
         ) return
         watchHomeWallpaper()
         scanHomeWallpaper(explicit = false)
