@@ -97,7 +97,9 @@ internal class WallpaperThemeColors(
         }
 
         fun forTheme(prefs: Prefs, theme: Prefs.LauncherTheme): WallpaperThemeColors? = when (theme) {
-            Prefs.LauncherTheme.DEFAULT -> prefs.wallpaperSample?.let { WallpaperThemeColors(it) }
+            Prefs.LauncherTheme.DEFAULT -> prefs.generatedWallpaperTheme?.let {
+                WallpaperThemeColors(it.sample, it.supporting)
+            } ?: prefs.wallpaperSample?.let { WallpaperThemeColors(it) }
             Prefs.LauncherTheme.WALLPAPER -> prefs.generatedWallpaperTheme?.let {
                 WallpaperThemeColors(it.sample, it.supporting)
             }
