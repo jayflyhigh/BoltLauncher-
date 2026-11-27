@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.KeyEvent
@@ -38,8 +40,10 @@ class BoltSearchInput @JvmOverloads constructor(
     private var appliedCursorColor: Int? = null
 
     init {
-        // Hide the platform caret; Bolt draws the same caret on every API level.
-        isCursorVisible = false
+        // Prefer Android's native EditText caret: it owns focus, selection, IME,
+        // scrolling and blink scheduling, so the cursor cannot disappear when the
+        // search mode or theme changes. Keep the custom renderer only for API 24–28.
+        isCursorVisible = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
         applyCursorColor(resolveCursorColor(thunder = false, dockColor = Color.TRANSPARENT))
     }
 
@@ -99,6 +103,17 @@ class BoltSearchInput @JvmOverloads constructor(
         if (appliedCursorColor == color) return
         appliedCursorColor = color
         cursorPaint.color = color
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val cursorHeight = (textSize * 1.2f).toInt().coerceAtLeast(1)
+            textCursorDrawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setSize(cursorWidth.toInt().coerceAtLeast(1), cursorHeight)
+                setColor(color)
+            }
+            isCursorVisible = true
+        } else {
+            isCursorVisible = false
+        }
         restartCursorBlink()
     }
 
@@ -133,6 +148,10 @@ class BoltSearchInput @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+
+        // Android 10+ draws and blinks the native caret. The custom fallback is
+        // needed only on older Android versions where the runtime setter is absent.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return
 
         // No caret while the field is unfocused, selection is active, or window hidden.
         if (!isFocused || !hasWindowFocus() || selectionStart < 0 || selectionStart != selectionEnd
