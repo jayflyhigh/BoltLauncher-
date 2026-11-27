@@ -135,8 +135,7 @@ class BoltSearchInput @JvmOverloads constructor(
         super.onDraw(canvas)
 
         // No caret while the field is unfocused, selection is active, or window hidden.
-        if (!isFocused || !hasWindowFocus() || !isCursorVisible.not() ||
-            selectionStart < 0 || selectionStart != selectionEnd
+        if (!isFocused || !hasWindowFocus() || selectionStart < 0 || selectionStart != selectionEnd
         ) return
 
         val textLayout = layout ?: return
