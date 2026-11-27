@@ -1,8 +1,11 @@
 package app.olauncher.ui
 
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
-import android.os.Build
+import android.graphics.Paint
+import android.graphics.Rect
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -13,21 +16,30 @@ import androidx.core.graphics.ColorUtils
 import app.olauncher.R
 import app.olauncher.helper.getColorFromAttr
 
-class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
-    AppCompatEditText(context, attrs) {
-    private val useLegacyCursor = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
-    private val cursorWidth = 2f * resources.displayMetrics.density
-    private var blinkStart = 0L
-    private val cursorPaint = android.graphics.Paint().apply {
+/**
+ * Search input with a theme-aware caret rendered by Bolt itself.
+ *
+ * Drawing the caret in the view (instead of relying on TextView's private native
+ * cursor drawable) keeps it visible and blinking consistently across Android
+ * versions, themes, regular search, Thunder mode, and Search in Apps mode.
+ */
+class BoltSearchInput @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null
+) : AppCompatEditText(context, attrs) {
+
+    private val cursorWidth = (2f * resources.displayMetrics.density).coerceAtLeast(1f)
+    private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        style = android.graphics.Paint.Style.FILL
+        style = Paint.Style.FILL
     }
+    private val cursorClip = Rect()
+    private var blinkStart = SystemClock.uptimeMillis()
     private var appliedCursorColor: Int? = null
 
     init {
-        // Android owns the blinking caret on API 29+; older versions use the
-        // lightweight invalidation-driven caret drawn below.
-        isCursorVisible = !useLegacyCursor
+        // Hide the platform caret; Bolt draws the same caret on every API level.
+        isCursorVisible = false
         applyCursorColor(resolveCursorColor(thunder = false, dockColor = Color.TRANSPARENT))
     }
 
@@ -53,13 +65,11 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
                 (beforeLength > 0 && afterLength == 0 && consumeEmptyBackspace()) ||
                     super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
 
-            override fun finishComposingText(): Boolean {
-                return super.finishComposingText().also { if (it) onImeCommit?.invoke() }
-            }
+            override fun finishComposingText(): Boolean =
+                super.finishComposingText().also { if (it) onImeCommit?.invoke() }
 
-            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
-                return super.commitText(text, newCursorPosition).also { if (it) onImeCommit?.invoke() }
-            }
+            override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean =
+                super.commitText(text, newCursorPosition).also { if (it) onImeCommit?.invoke() }
         }
     }
 
@@ -67,7 +77,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
         applyCursorColor(resolveCursorColor(thunder, dockColor))
     }
 
-    /** Resolve theme colors when applied so palette/theme changes cannot leave a stale caret. */
+    /** Resolve theme colors at runtime so theme and wallpaper changes update the caret. */
     private fun resolveCursorColor(thunder: Boolean, dockColor: Int): Int {
         val preferred = if (thunder) {
             context.getColorFromAttr(R.attr.boltThunderCursorColor)
@@ -75,7 +85,7 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
             WallpaperThemeColors.from(context)?.accent
                 ?: context.getColorFromAttr(R.attr.boltSearchCursorColor)
         }
-        val opaqueDock = dockColor or Color.BLACK
+        val opaqueDock = ColorUtils.setAlphaComponent(dockColor, 255)
         return if (ColorUtils.calculateContrast(preferred, opaqueDock) >= 3.0) {
             preferred
         } else if (ColorUtils.calculateLuminance(opaqueDock) > 0.179) {
@@ -89,51 +99,75 @@ class BoltSearchInput @JvmOverloads constructor(context: Context, attrs: Attribu
         if (appliedCursorColor == color) return
         appliedCursorColor = color
         cursorPaint.color = color
-        blinkStart = android.os.SystemClock.uptimeMillis()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            textCursorDrawable = androidx.appcompat.content.res.AppCompatResources
-                .getDrawable(context, R.drawable.bolt_cursor_yellow)?.mutate()?.apply { setTint(color) }
-        }
+        restartCursorBlink()
+    }
+
+    private fun restartCursorBlink() {
+        blinkStart = SystemClock.uptimeMillis()
         invalidate()
     }
 
     override fun onSelectionChanged(start: Int, end: Int) {
         super.onSelectionChanged(start, end)
-        blinkStart = android.os.SystemClock.uptimeMillis()
-        invalidate()
+        restartCursorBlink()
     }
 
-    override fun onFocusChanged(focused: Boolean, direction: Int, previous: android.graphics.Rect?) {
-        super.onFocusChanged(focused, direction, previous)
-        blinkStart = android.os.SystemClock.uptimeMillis()
-        invalidate()
+    override fun onFocusChanged(
+        focused: Boolean,
+        direction: Int,
+        previouslyFocusedRect: Rect?
+    ) {
+        super.onFocusChanged(focused, direction, previouslyFocusedRect)
+        restartCursorBlink()
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
-        blinkStart = android.os.SystemClock.uptimeMillis()
-        invalidate()
+        restartCursorBlink()
     }
 
-    override fun onDraw(canvas: android.graphics.Canvas) {
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        restartCursorBlink()
+    }
+
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (!useLegacyCursor || !isFocused || !hasWindowFocus() || selectionStart < 0 ||
-            selectionStart != selectionEnd) return
+
+        // No caret while the field is unfocused, selection is active, or window hidden.
+        if (!isFocused || !hasWindowFocus() || !isCursorVisible.not() ||
+            selectionStart < 0 || selectionStart != selectionEnd
+        ) return
+
         val textLayout = layout ?: return
-        val elapsed = android.os.SystemClock.uptimeMillis() - blinkStart
-        if ((elapsed / 500L) % 2L == 0L) {
-            val offset = selectionStart.coerceAtMost(textLayout.text.length)
-            val line = textLayout.getLineForOffset(offset)
-            val left = (scrollX + compoundPaddingLeft).toFloat()
-            val right = (scrollX + width - compoundPaddingRight).toFloat()
-            if (right - left < cursorWidth) return
-            val x = (compoundPaddingLeft + textLayout.getPrimaryHorizontal(offset))
-                .coerceIn(left, right - cursorWidth)
-            val originY = baseline - textLayout.getLineBaseline(0)
-            val top = (originY + textLayout.getLineTop(line)).toFloat()
-            val bottom = (originY + textLayout.getLineBottom(line)).toFloat()
-            canvas.drawRect(x, top, x + cursorWidth, bottom, cursorPaint)
+        val offset = selectionStart.coerceIn(0, textLayout.text.length)
+        val line = textLayout.getLineForOffset(offset)
+
+        // Layout horizontal coordinates are relative to the text origin. TextView
+        // scrolls the text independently, so account for scrollX before clipping.
+        val x = compoundPaddingLeft + textLayout.getPrimaryHorizontal(offset) - scrollX
+        val clipLeft = compoundPaddingLeft.toFloat()
+        val clipRight = (width - compoundPaddingRight).toFloat()
+        if (x + cursorWidth <= clipLeft || x >= clipRight) {
+            postInvalidateDelayed(500L)
+            return
         }
+
+        val originY = baseline - textLayout.getLineBaseline(0)
+        val top = (originY + textLayout.getLineTop(line)).toFloat()
+        val bottom = (originY + textLayout.getLineBottom(line)).toFloat()
+        val elapsed = (SystemClock.uptimeMillis() - blinkStart).coerceAtLeast(0L)
+        val visible = (elapsed / 500L) % 2L == 0L
+
+        if (visible) {
+            val save = canvas.save()
+            canvas.clipRect(clipLeft, extendedPaddingTop.toFloat(), clipRight,
+                (height - extendedPaddingBottom).toFloat())
+            canvas.drawRect(x, top, x + cursorWidth, bottom, cursorPaint)
+            canvas.restoreToCount(save)
+        }
+
+        // Keep the caret animation alive even when the text itself is unchanged.
         postInvalidateDelayed(500L - elapsed % 500L)
     }
 }
