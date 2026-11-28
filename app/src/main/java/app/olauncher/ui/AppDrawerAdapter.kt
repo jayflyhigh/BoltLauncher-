@@ -30,6 +30,7 @@ import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -43,6 +44,7 @@ import app.olauncher.databinding.AdapterPrivateSpaceHeaderBinding
 import app.olauncher.helper.AppLabelMatcher
 import app.olauncher.helper.ThunderAppLabelMatcher
 import app.olauncher.helper.thunderMatchRanges
+import app.olauncher.helper.thunderNextLetters
 import app.olauncher.helper.normalizeForSearch
 import app.olauncher.helper.SearchTypoMatcher
 import app.olauncher.helper.appSearchRank
@@ -126,7 +128,7 @@ class AppDrawerAdapter(
     private var displayedItems: List<AppModel> = emptyList()
     val currentList: List<AppModel> get() = displayedItems
     val firstLaunchableResult: AppModel?
-        get() = currentList.firstOrNull { it !is AppModel.PrivateSpaceHeader && it.appPackage.isNotEmpty() }
+        get() = currentList.firstOrNull { it.canLaunchFromSearch() }
 
     var enterHighlightedResult: AppModel? = null
         set(value) {
@@ -156,6 +158,7 @@ class AppDrawerAdapter(
         if (app != actionApp) {
             closeSearchActions()
             actionApp = app
+            showThunderHints(false)
             notifyItemChanged(actionPosition, SEARCH_STYLE)
         }
         return true
@@ -169,11 +172,23 @@ class AppDrawerAdapter(
 
     private fun getItem(position: Int) = displayedItems[position]
     override fun getItemCount() = displayedItems.size
+    private var nextLetters: Map<AppModel, Char> = emptyMap()
+    private var showNextLetters = false
+
+    fun showThunderHints(show: Boolean) {
+        if (showNextLetters == show) return
+        showNextLetters = show
+        currentList.forEachIndexed { index, app ->
+            if (app in nextLetters) notifyItemChanged(index, SEARCH_STYLE)
+        }
+    }
+
     private var filterGeneration = 0L
     private var filterJob: Job? = null
 
     /** Invalidate work even when a mode change keeps exactly the same query. */
     fun cancelFiltering() {
+        showThunderHints(false)
         filterGeneration++
         filterJob?.cancel()
         committedQuery = null
@@ -246,12 +261,31 @@ class AppDrawerAdapter(
                     if ((app in previousTypoMatches) != (app in fuzzy)) notifyItemChanged(index, SEARCH_STYLE)
                 }
             }
+            nextLetters = emptyMap()
             resultsChanged(query)
+            if (!thunder || items.size < 2 || trimmed.isEmpty()) return@launch
+            val hints = withContext(Dispatchers.Default) {
+                thunderNextLetters(
+                    query, apps.filterNot { it is AppModel.PrivateSpaceHeader }, items.toSet(),
+                    AppModel::appLabel, AppModel::originalLabel,
+                    { labelIndex.value.getValue(it).normalized },
+                    { it.canLaunchFromSearch() },
+                    { ensureActive() },
+                )
+            }
+            if (generation != filterGeneration) return@launch
+            nextLetters = hints
+            if (showNextLetters) {
+                items.forEachIndexed { index, app ->
+                    if (app in hints) notifyItemChanged(index, SEARCH_STYLE)
+                }
+            }
         }
     }
 
     fun setThunderMode(enabled: Boolean) {
         if (thunderMode == enabled) return
+        showThunderHints(false)
         thunderMode = enabled
         notifyItemRangeChanged(0, itemCount, SEARCH_STYLE)
     }
@@ -310,6 +344,7 @@ class AppDrawerAdapter(
             holder.bindSearchStyle(app, thunderMode, displayedQuery, highlighted, animateHighlight = true)
             holder.bindSearchActions(app, app == actionApp)
             holder.bindTypoHint(showTypoHints && app in typoMatches && app != actionApp)
+            holder.bindThunderHint(nextLetters[app].takeIf { showNextLetters && actionApp == null })
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -350,6 +385,7 @@ class AppDrawerAdapter(
                         appModel == actionApp
                     )
                     holder.bindTypoHint(showTypoHints && appModel in typoMatches && appModel != actionApp)
+                    holder.bindThunderHint(nextLetters[appModel].takeIf { showNextLetters && actionApp == null })
                 }
             }
         } catch (e: Exception) {
@@ -550,6 +586,23 @@ class AppDrawerAdapter(
         fun cancelIconLoad() {
             iconJob?.cancel()
             iconJob = null
+        }
+
+        fun bindThunderHint(letter: Char?) = with(binding) {
+            thunderNextLetter.isVisible = letter != null
+            if (letter != null) {
+                thunderNextLetter.text = root.context.getString(R.string.bolt_thunder_next_letter, letter.toString())
+            }
+            appTitle.trailingHintWidth = if (letter == null) 0 else
+                thunderNextLetter.paint.measureText(thunderNextLetter.text.toString()).roundToInt()
+            if (letter != null) {
+                root.doOnLayout {
+                    if (thunderNextLetter.isVisible) {
+                        thunderNextLetter.translationY = (appTitle.top + appTitle.baseline -
+                            thunderNextLetter.top - thunderNextLetter.baseline).toFloat()
+                    }
+                }
+            }
         }
 
         fun bindTypoHint(show: Boolean) = binding.updateTypoHint(show)
@@ -839,3 +892,5 @@ class AppDrawerAdapter(
         }
     }
 }
+
+private fun AppModel.canLaunchFromSearch(): Boolean = this !is AppModel.PrivateSpaceHeader && appPackage.isNotEmpty()

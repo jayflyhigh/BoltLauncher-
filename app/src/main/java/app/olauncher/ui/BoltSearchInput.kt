@@ -36,6 +36,7 @@ class BoltSearchInput @JvmOverloads constructor(
         applyCursorColor(resolveCursorColor(Color.BLACK))
     }
 
+    var onEditingStateChanged: (() -> Unit)? = null
     var onImeCommit: (() -> Unit)? = null
     var onEmptyBackspace: (() -> Boolean)? = null
 
@@ -57,6 +58,15 @@ class BoltSearchInput @JvmOverloads constructor(
             override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean =
                 (beforeLength > 0 && afterLength == 0 && consumeEmptyBackspace()) ||
                     super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+
+            override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean =
+                super.setComposingText(text, newCursorPosition).also { onEditingStateChanged?.invoke() }
+
+            override fun setComposingRegion(start: Int, end: Int): Boolean =
+                super.setComposingRegion(start, end).also { onEditingStateChanged?.invoke() }
+
+            override fun endBatchEdit(): Boolean =
+                super.endBatchEdit().also { onEditingStateChanged?.invoke() }
 
             override fun finishComposingText(): Boolean =
                 super.finishComposingText().also { if (it) onImeCommit?.invoke() }
@@ -93,6 +103,7 @@ class BoltSearchInput @JvmOverloads constructor(
     override fun onSelectionChanged(start: Int, end: Int) {
         super.onSelectionChanged(start, end)
         refreshCaret()
+        onEditingStateChanged?.invoke()
     }
 
     override fun onFocusChanged(
@@ -102,6 +113,7 @@ class BoltSearchInput @JvmOverloads constructor(
     ) {
         super.onFocusChanged(focused, direction, previouslyFocusedRect)
         refreshCaret()
+        onEditingStateChanged?.invoke()
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
