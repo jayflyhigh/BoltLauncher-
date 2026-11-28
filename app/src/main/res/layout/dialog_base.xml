@@ -21,7 +21,7 @@
             android:layout_gravity="start|center_vertical"
             android:layout_marginEnd="48dp"
             android:includeFontPadding="false"
-            android:textColor="?attr/primaryColor"
+            android:textColor="?attr/boltHomeMenuTextColor"
             tools:text="@string/app_name" />
 
         <ImageView
@@ -35,6 +35,7 @@
             android:focusable="true"
             android:paddingHorizontal="8dp"
             android:paddingVertical="6dp"
+            android:tint="?attr/boltHomeMenuTextColor"
             android:src="@drawable/ic_close" />
     </FrameLayout>
 
@@ -59,7 +60,7 @@
                 android:includeFontPadding="false"
                 android:lineSpacingExtra="2dp"
                 android:paddingEnd="8dp"
-                android:textColor="?attr/primaryColor"
+                android:textColor="?attr/boltHomeMenuTextColor"
                 android:visibility="gone"
                 tools:ignore="RtlSymmetry"
                 tools:text="@string/rate_us_message"
@@ -84,6 +85,7 @@
         <TextView
             android:id="@+id/tvNeutral"
             style="@style/TextSmall"
+            android:textColor="?attr/boltHomeMenuTextColor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:focusable="true"
@@ -103,6 +105,7 @@
         <TextView
             android:id="@+id/tvAction"
             style="@style/TextSmallBold"
+            android:textColor="?attr/boltHomeMenuTextColor"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackground"

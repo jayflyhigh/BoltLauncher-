@@ -37,6 +37,7 @@
         <item name="boltSearchCursorColor">#B7DFFF</item>
         <item name="boltGlassReflectionColor">#389AC5FA</item>
         <item name="boltSearchSectionColor">#DBEBFF</item>
+        <item name="boltResultSecondaryColor">#DBEBFF</item>
         <item name="boltRowBottomColor">#17233961</item>
         <item name="boltRowOutlineColor">#4BB5D3F3</item>
         <item name="boltSettingsCardBottomColor">@color/bolt_glass_settings_card_bottom</item>
@@ -104,7 +105,7 @@
         <item name="boltSearchSectionColor">#D4EDFF</item>
 
         <item name="boltDialogDimsBackdrop">false</item>
-        <item name="boltDialogTopColor">#E0306499</item>
+        <item name="boltDialogTopColor">#ED306499</item>
         <item name="boltDialogBottomColor">#DD14395D</item>
         <item name="boltDialogOutlineColor">#AAB9E5FF</item>
         <item name="boltPopupTopColor">?attr/boltDialogTopColor</item>
