@@ -28,7 +28,14 @@ internal enum class WallpaperPalette(@StyleRes val overlay: Int) {
 
     data class Sample(val base: Int, val accent: Int)
 
-    data class GeneratedTheme(val sample: Sample, val supporting: Int)
+    data class GeneratedTheme(val sample: Sample, val supporting: Int) {
+        fun inverted(): GeneratedTheme = GeneratedTheme(
+            sample = Sample(invertRgb(sample.base), invertRgb(sample.accent)),
+            supporting = invertRgb(supporting),
+        )
+
+        private fun invertRgb(color: Int): Int = color xor 0x00FFFFFF
+    }
 
     companion object {
         private const val MIN_COLORFUL_CHROMA = 26
