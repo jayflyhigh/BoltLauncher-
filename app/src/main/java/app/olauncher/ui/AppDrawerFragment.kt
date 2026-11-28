@@ -224,6 +224,7 @@ class AppDrawerFragment : BaseFragment() {
     private var restoreSearchKeyboard = false
     private val searchWindowFocusListener = android.view.ViewTreeObserver.OnWindowFocusChangeListener { focused ->
         if (focused) showRestoredSearchKeyboard()
+        updateThunderHints()
     }
 
     private data class SearchAppLaunch(val at: Long, val keyboardWasVisible: Boolean) {
@@ -586,7 +587,9 @@ class AppDrawerFragment : BaseFragment() {
             positionBolt(boltProgress)
         }
         applySearchColors()
+        binding.search.onEditingStateChanged = ::updateThunderHints
         binding.search.onImeCommit = {
+            updateThunderHints()
             // Let the IME finish its edit before checking the composing span.
             autoLaunch?.takeUnless { thunderCommitted }?.let { task ->
                 val delay = thunderEditAt?.let {
@@ -1047,6 +1050,7 @@ class AppDrawerFragment : BaseFragment() {
         }
         updateSearchStatus()
         scheduleAutoLaunch(query)
+        updateThunderHints()
     }
 
     private fun hasContactsPermission(): Boolean =
@@ -1575,22 +1579,37 @@ class AppDrawerFragment : BaseFragment() {
         thunderLaunchAnimator?.start()
     }
 
+    private fun canThunderAutoLaunch(query: String): Boolean =
+        thunderMode && expanded && searchRename == null && query.isNotBlank() &&
+            adapter.actionPosition == RecyclerView.NO_POSITION
+
+    private fun updateThunderHints() {
+        val view = _binding ?: return
+        val input = view.search
+        val text = input.text ?: return
+        val query = adapter.committedQuery
+        adapter.showThunderHints(
+            query != null && canThunderAutoLaunch(query) && autoLaunch == null && !thunderCommitted &&
+                adapter.itemCount > 1 && input.isFocused && view.root.hasWindowFocus() &&
+                viewLifecycleOwner.lifecycle.currentState == Lifecycle.State.RESUMED &&
+                input.selectionStart == text.length && input.selectionEnd == text.length &&
+                BaseInputConnection.getComposingSpanStart(text) < 0 && query.contentEquals(text),
+        )
+    }
+
     private fun scheduleAutoLaunch(query: String) {
         if (thunderCommitted) return
         val editedAt = thunderEditAt ?: return
         autoLaunch?.let(binding.root::removeCallbacks)
         autoLaunch = null
         clearThunderLaunchAnimation()
-        if (!thunderMode || !expanded || searchRename != null ||
-            adapter.actionPosition != RecyclerView.NO_POSITION || query.isBlank() || adapter.itemCount != 1 ||
-            adapter.firstLaunchableResult == null) return
+        if (!canThunderAutoLaunch(query) || adapter.itemCount != 1) return
         val result = adapter.firstLaunchableResult ?: return
         val committedAt = SystemClock.uptimeMillis()
         val launchDeadline = editedAt + THUNDER_QUIET_MS
         fun isLaunchCurrent(): Boolean {
             val view = _binding ?: return false
-            return thunderMode && expanded && searchRename == null &&
-                adapter.actionPosition == RecyclerView.NO_POSITION && adapter.committedQuery == query &&
+            return canThunderAutoLaunch(query) && adapter.committedQuery == query &&
                 view.search.text.toString() == query && view.root.hasWindowFocus() &&
                 adapter.itemCount == 1 && adapter.firstLaunchableResult == result &&
                 viewLifecycleOwner.lifecycle.currentState == Lifecycle.State.RESUMED
@@ -1653,8 +1672,11 @@ class AppDrawerFragment : BaseFragment() {
         return true
     }
 
-    private fun dismissSearchEdit(): Boolean =
-        finishSearchRename() || adapter.closeSearchActions()
+    private fun dismissSearchEdit(): Boolean {
+        val dismissed = finishSearchRename() || adapter.closeSearchActions()
+        if (dismissed) updateThunderHints()
+        return dismissed
+    }
 
     private fun saveAppLabel(app: AppModel, label: String) {
         val identifier = when (app) {
@@ -1679,6 +1701,7 @@ class AppDrawerFragment : BaseFragment() {
         val holder = tile?.let(results::getChildViewHolder)
         if (holder?.bindingAdapter === adapter && holder.bindingAdapterPosition == position) return false
         adapter.closeSearchActions()
+        updateThunderHints()
         // A tap on another app dismisses the strip before that app can be opened.
         return holder?.bindingAdapter === adapter
     }
@@ -2559,6 +2582,7 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onResume() {
         super.onResume()
+        updateThunderHints()
         refreshHomeWallpaper()
         inAppSearch.reload()
         activeAlias?.let { active ->
@@ -2594,6 +2618,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     override fun onPause() {
+        adapter.showThunderHints(false)
         stopWatchingWallpaper()
         if (!choosingWallpaperImage && !scanningHomeExplicitly) wallpaperScan?.cancel()
         keychainArcade?.pauseGame()
@@ -2637,6 +2662,7 @@ class AppDrawerFragment : BaseFragment() {
         cancelAutoLaunch()
         binding.root.removeCallbacks(clearFeedback)
         searchFeedback = null
+        binding.search.onEditingStateChanged = null
         binding.search.onImeCommit = null
         binding.search.onEmptyBackspace = null
         stopLoadingContacts()

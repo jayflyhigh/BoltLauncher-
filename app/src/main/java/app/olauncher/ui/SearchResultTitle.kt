@@ -33,6 +33,24 @@ class SearchResultTitle(context: Context, attrs: AttributeSet?) : AppCompatTextV
             if (notebook) invalidate()
         }
 
+    var trailingHintWidth = 0
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+        }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        if (trailingHintWidth == 0) return
+        // Reserve horizontal room for the hint without changing the row's original height.
+        val width = (measuredWidth - trailingHintWidth).coerceAtLeast(0)
+        super.onMeasure(
+            MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(measuredHeight, MeasureSpec.EXACTLY),
+        )
+    }
+
     override fun onDraw(canvas: Canvas) {
         val lines = layout
         val coverage = if (markerSelected) 1f else markerSweep

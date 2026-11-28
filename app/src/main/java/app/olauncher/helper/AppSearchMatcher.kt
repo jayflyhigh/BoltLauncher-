@@ -117,3 +117,44 @@ internal class SearchTypoMatcher(query: String) {
         }
     }
 }
+
+/** Find one deterministic letter per visible candidate using the entire searchable app list. */
+internal fun <T> thunderNextLetters(
+    query: String,
+    apps: List<T>,
+    current: Set<T>,
+    label: (T) -> String,
+    originalLabel: (T) -> String,
+    normalized: (String) -> String,
+    launchable: (T) -> Boolean,
+    checkCancelled: () -> Unit = {},
+): Map<T, Char> {
+    if (query.isBlank() || current.size < 2) return emptyMap()
+    val letters = sortedSetOf<Char>()
+    for (app in current) {
+        for (name in listOf(label(app), originalLabel(app))) {
+            for (letter in name + normalized(name)) {
+                if (letter.isLetter()) letters.add(letter.lowercaseChar())
+            }
+        }
+    }
+    val hints = mutableMapOf<T, Char>()
+    for (letter in letters) {
+        checkCancelled()
+        val matcher = ThunderAppLabelMatcher(query + letter)
+        var sole: T? = null
+        for (app in apps) {
+            val name = label(app)
+            val original = originalLabel(app)
+            if (!matcher.matches(name, normalized(name)) &&
+                (original == name || !matcher.matches(original, normalized(original)))) continue
+            if (sole != null) {
+                sole = null
+                break
+            }
+            sole = app
+        }
+        if (sole != null && sole in current && launchable(sole)) hints.putIfAbsent(sole, letter)
+    }
+    return hints
+}

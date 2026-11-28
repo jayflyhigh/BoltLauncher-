@@ -193,4 +193,5 @@
     <string name="bolt_calculator_close">Close calculator</string>
     <string name="bolt_calculator_clear">Clear calculation</string>
     <string name="bolt_calculator_delete">Delete last character</string>
+    <string name="bolt_thunder_next_letter">Type %1$s</string>
 </resources>
