@@ -246,7 +246,7 @@ internal class KeychainArcadeView(
             wrapper.addView(label(control.symbol, 15f).apply {
                 setTextColor(Color.WHITE)
                 background = rounded(blue, radius).apply {
-                    colors = intArrayOf(0xFF14ACEC.toInt(), 0xFF006A9F.toInt())
+                    colors = intArrayOf(0xFF0077AB.toInt(), 0xFF006A9F.toInt())
                     orientation = GradientDrawable.Orientation.TOP_BOTTOM
                     setStroke(dp(1), 0xFF005C89.toInt())
                 }

@@ -7,6 +7,7 @@ import android.os.UserManager
 import android.content.pm.LauncherApps
 import android.os.UserHandle
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.util.LruCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,13 +19,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.Filter
 import android.widget.Filterable
+import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
@@ -46,6 +50,7 @@ import app.olauncher.helper.normalizeDisplayedName
 import app.olauncher.helper.hideKeyboard
 import app.olauncher.helper.isSystemApp
 import app.olauncher.helper.showKeyboard
+import kotlin.math.roundToInt
 
 class AppDrawerAdapter(
     private val flag: Int,
@@ -416,7 +421,14 @@ class AppDrawerAdapter(
         private val allowsTwoLineNames = paperNotebook || eInk || cozyQuest
 
         init {
-            if (cozyQuest) binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
+            if (cozyQuest) {
+                binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
+                // Match the app icon's centerline even when a two-line row changes height.
+                (binding.searchAppActions.layoutParams as android.widget.FrameLayout.LayoutParams).apply {
+                    height = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                }
+            }
             if (allowsTwoLineNames) {
                 binding.root.minimumHeight = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
                 binding.root.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -444,16 +456,28 @@ class AppDrawerAdapter(
             }
         }
 
+        private fun AppCompatImageButton.setCozyActionIcon(@DrawableRes icon: Int) {
+            val glyph = AppCompatResources.getDrawable(context, icon) ?: return
+            val density = resources.displayMetrics.density
+            val size = (32 * density).roundToInt()
+            val padding = (2 * density).roundToInt()
+            setPadding(padding, 0, padding, 0)
+            setImageDrawable(LayerDrawable(arrayOf(glyph)).apply {
+                setLayerSize(0, size, size)
+                setLayerGravity(0, Gravity.CENTER)
+            })
+        }
+
         private fun configureActionIcons() {
             val context = binding.root.context
             with(binding) {
                 when (theme) {
                     Prefs.LauncherTheme.COZY_QUEST -> {
-                        searchRename.setImageResource(R.drawable.bolt_cozy_rename)
-                        searchPlayStore.setImageResource(R.drawable.bolt_cozy_store)
-                        searchAddAlias.setImageResource(R.drawable.bolt_cozy_alias)
-                        searchAppInfo.setImageResource(R.drawable.bolt_cozy_info)
-                        searchUninstall.setImageResource(R.drawable.bolt_cozy_delete)
+                        searchRename.setCozyActionIcon(R.drawable.bolt_cozy_rename)
+                        searchPlayStore.setCozyActionIcon(R.drawable.bolt_cozy_store)
+                        searchAddAlias.setCozyActionIcon(R.drawable.bolt_cozy_alias)
+                        searchAppInfo.setCozyActionIcon(R.drawable.bolt_cozy_info)
+                        searchUninstall.setCozyActionIcon(R.drawable.bolt_cozy_delete)
                     }
                     Prefs.LauncherTheme.WINDOWS_XP -> {
                         searchRename.setXpIcon(R.drawable.xp_rename)
@@ -464,11 +488,11 @@ class AppDrawerAdapter(
                     }
                     Prefs.LauncherTheme.LIQUID_GLASS, Prefs.LauncherTheme.WII_U,
                     Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> {
-                        searchRename.setThemeTileIcon(R.drawable.ic_rename)
-                        searchPlayStore.setThemeTileIcon(R.drawable.bolt_play_store_icon)
-                        searchAddAlias.setThemeTileIcon(R.drawable.bolt_add_alias_icon)
-                        searchAppInfo.setThemeTileIcon(R.drawable.ic_info)
-                        searchUninstall.setThemeTileIcon(R.drawable.ic_delete)
+                        searchRename.setAppActionTileIcon(R.drawable.ic_rename)
+                        searchPlayStore.setAppActionTileIcon(R.drawable.bolt_play_store_icon)
+                        searchAddAlias.setAppActionTileIcon(R.drawable.bolt_add_alias_icon)
+                        searchAppInfo.setAppActionTileIcon(R.drawable.ic_info)
+                        searchUninstall.setAppActionTileIcon(R.drawable.ic_delete)
                     }
                     else -> {
                         searchPlayStore.setImageResource(R.drawable.bolt_google_play_icon)
@@ -576,7 +600,7 @@ class AppDrawerAdapter(
                         Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.appPackage, null))
                             .resolveActivity(context.packageManager) != null
                     searchAppActions.isVisible = true
-                    LauncherMotion.reveal(searchAppActions, riseDp = 4f)
+                    LauncherMotion.reveal(searchAppActions, riseDp = if (cozyQuest) 0f else 4f)
                 }
             } else if (searchAppActions.isVisible) {
                 LauncherMotion.reset(searchAppActions)

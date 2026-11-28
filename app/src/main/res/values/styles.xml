@@ -45,7 +45,7 @@
 
         <item name="mainFontFamily">sans-serif-medium</item>
 
-        <item name="boltSettingsSurfaceColor">?attr/primaryShadeDarkColor</item>
+        <item name="boltSettingsSurfaceColor">#D9FFFFFF</item>
         <item name="boltSettingsCardColor">?attr/primaryShadeDarkColor</item>
         <item name="boltSettingsCardOutlineColor">?attr/primaryColorTrans50</item>
         <item name="boltHomeMenuTextColor">@color/bolt_search_label</item>
