@@ -153,7 +153,6 @@ class AppDrawerFragment : BaseFragment() {
 
     private lateinit var inAppSearch: InAppSearch
     private lateinit var destinationAdapter: SearchDestinationAdapter
-    private lateinit var destinationSection: SearchSectionAdapter
     private lateinit var appResults: ConcatAdapter
     private lateinit var contactResults: ConcatAdapter
     private lateinit var normalResults: ConcatAdapter
@@ -621,7 +620,6 @@ class AppDrawerFragment : BaseFragment() {
                 movedHighlight = null
                 if (query.isBlank()) exitMoveMode()
             }
-            val queryVisibilityChanged = previousSearchText.isBlank() != query.isBlank()
             previousSearchText = query
             adapter.closeSearchActions()
             cancelAutoLaunch()
@@ -637,7 +635,6 @@ class AppDrawerFragment : BaseFragment() {
             if (hadContactShortcuts || binding.dockWeb.isVisible != (destinationsOnly || canOpenWebSearch(query))) {
                 updateDockButtons(query, waitingForResults = true)
             }
-            if (queryVisibilityChanged) refreshDestinations()
             if (!destinationsOnly) {
                 adapter.filterApps(query)
                 filterContacts(query)
@@ -678,8 +675,7 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun refreshDestinations() {
         updateSearchHint()
-        val show = supportsDestinations && expanded && !thunderMode &&
-            (destinationsOnly || currentResultsQuery().isNotBlank())
+        val show = supportsDestinations && expanded && destinationsOnly
         val targets = if (show) {
             activeAlias?.let(::listOf) ?: inAppSearch.targets.filterNot { it.hidden }
                 .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, InAppSearch.Target::appLabel))
@@ -699,9 +695,8 @@ class AppDrawerFragment : BaseFragment() {
         // RecyclerView lays out search results from bottom to top.
         if (targets != displayedDestinations) {
             displayedDestinations = targets
-            destinationAdapter.submitList(targets.asReversed())
+            destinationAdapter.submitList(targets.takeIf { it.isNotEmpty() }?.asReversed())
         }
-        destinationSection.show(show)
     }
 
     private fun activateAlias(target: InAppSearch.Target, focus: Boolean = true) {
@@ -2274,12 +2269,11 @@ class AppDrawerFragment : BaseFragment() {
         appsSection = SearchSectionAdapter(getString(R.string.bolt_apps_section))
         val cozySections = prefs.launcherTheme == Prefs.LauncherTheme.COZY_QUEST
         contactsSection = SearchSectionAdapter(getString(if (cozySections) R.string.bolt_cozy_contacts_section else R.string.bolt_contacts_section))
-        destinationSection = SearchSectionAdapter(getString(if (cozySections) R.string.bolt_cozy_destinations_section else R.string.bolt_search_section))
         destinationAdapter = SearchDestinationAdapter(::selectDestination, { activateAlias(it) }, { editAlias(it) })
         appResults = ConcatAdapter(adapter, appsSection)
         contactResults = ConcatAdapter(contactsAdapter, contactsSection)
         normalResults = ConcatAdapter(appResults, contactResults)
-        searchResults = ConcatAdapter(normalResults, destinationAdapter, destinationSection)
+        searchResults = ConcatAdapter(normalResults, destinationAdapter)
         binding.recyclerView.adapter = searchResults
         binding.recyclerView.itemAnimator = null
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
