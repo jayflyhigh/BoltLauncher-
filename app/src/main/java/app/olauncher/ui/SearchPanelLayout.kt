@@ -20,6 +20,7 @@ import app.olauncher.R
 /** Bottom-aligns the measured content and animates the outline without relaying out rows. */
 class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(context, attrs) {
     private lateinit var results: DockResultsView
+    private lateinit var calculator: View
     private lateinit var rename: View
     private lateinit var status: View
     private lateinit var moveModeHint: View
@@ -105,6 +106,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     override fun onFinishInflate() {
         super.onFinishInflate()
         results = findViewById(R.id.recyclerView)
+        calculator = findViewById(R.id.calculatorPad)
         rename = findViewById(R.id.appRename)
         status = findViewById(R.id.searchStatus)
         moveModeHint = findViewById(R.id.moveModeHint)
@@ -129,12 +131,13 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         if (statusInPanel) remaining -= minOf(rowInset, remaining)
         remaining -= measureContent(rename, exactWidth, remaining)
         remaining -= measureContent(moveModeHint, exactWidth, remaining)
-        val resultsSpace = if ((results.adapter?.itemCount ?: 0) > 0) {
+        val resultsSpace = if (calculator.visibility == View.VISIBLE || (results.adapter?.itemCount ?: 0) > 0) {
             (remaining - rowInset).coerceAtLeast(0)
         } else {
             0
         }
-        resultsHeight = measureContent(results, exactWidth, resultsSpace)
+        val content = if (calculator.visibility == View.VISIBLE) calculator else results
+        resultsHeight = measureContent(content, exactWidth, resultsSpace)
         setMeasuredDimension(width, height)
     }
 
@@ -176,7 +179,8 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             status.layout(inset, statusTop, width - inset, statusBottom)
             edge = (statusTop - rowInset).coerceAtLeast(0)
         }
-        results.layout(0, edge - resultsHeight, width, edge)
+        val content = if (calculator.visibility == View.VISIBLE) calculator else results
+        content.layout(0, edge - resultsHeight, width, edge)
         edge -= resultsHeight
         if (resultsHeight > 0) edge -= rowInset
         updateHeight((height - edge).toFloat())
@@ -299,7 +303,7 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
     }
 
     override fun drawChild(canvas: Canvas, child: View, drawingTime: Long): Boolean {
-        if (child !== results && child !== dock && !(child === status && statusInPanel)) {
+        if (child !== results && child !== calculator && child !== dock && !(child === status && statusInPanel)) {
             return super.drawChild(canvas, child, drawingTime)
         }
         val save = canvas.save()

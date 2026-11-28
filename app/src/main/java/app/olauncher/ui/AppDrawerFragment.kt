@@ -77,6 +77,7 @@ import app.olauncher.helper.ContactLoadResult
 import app.olauncher.helper.contactWinsBestMatch
 import app.olauncher.helper.InAppSearch
 import app.olauncher.helper.MyAccessibilityService
+import app.olauncher.helper.SearchCalculator
 import app.olauncher.helper.deletePinnedShortcut
 import app.olauncher.helper.getColorFromAttr
 import app.olauncher.helper.hideKeyboard
@@ -158,6 +159,10 @@ class AppDrawerFragment : BaseFragment() {
     private lateinit var contactResults: ConcatAdapter
     private lateinit var normalResults: ConcatAdapter
     private val contactsFirst get() = normalResults.adapters.firstOrNull() === contactResults
+    private lateinit var calculatorResult: CalculatorResultAdapter
+    private var calculatorQuery: String? = null
+    private var calculatorOpen = false
+    private var calculatorHadKeyboard = false
     private lateinit var searchResults: ConcatAdapter
     private var displayedDestinations = emptyList<InAppSearch.Target>()
     private var homeDestinations = false
@@ -277,6 +282,8 @@ class AppDrawerFragment : BaseFragment() {
         displayedQuery = null
         homeDestinations = false
         activeAlias = null
+        calculatorOpen = false
+        calculatorHadKeyboard = false
         displayedDestinations = emptyList()
         inAppSearch = InAppSearch(requireContext().applicationContext)
         initAdapter()
@@ -284,7 +291,7 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
         binding.root.onBackBeforeIme = {
             cancelAutoLaunch()
-            handleArcadeBack() || exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection()
+            handleArcadeBack() || closeCalculator() || exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection()
         }
         binding.root.onTap = { x, y -> keychainArcade == null && dismissSearchActionsOutside(x, y) }
         initObservers()
@@ -304,7 +311,7 @@ class AppDrawerFragment : BaseFragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (handleArcadeBack()) return
+                    if (handleArcadeBack() || closeCalculator()) return
                     if (exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection() || collapseSearch()) return
                     if (!isHomePage) closeDrawer()
                 }
@@ -521,7 +528,10 @@ class AppDrawerFragment : BaseFragment() {
                 }
             } else null
         }
-        binding.search.setOnClickListener { if (!expanded) openSearch(thunder = false) }
+        binding.search.setOnClickListener {
+            if (calculatorOpen) closeCalculator(restoreKeyboard = true)
+            else if (!expanded) openSearch(thunder = false)
+        }
         binding.searchStatus.setOnClickListener {
             val query = currentResultsQuery()
             if (offersWebFallback(query)) openWebSearch(query)
@@ -560,8 +570,14 @@ class AppDrawerFragment : BaseFragment() {
         binding.search.onEmptyBackspace = ::clearActiveAlias
         binding.dockWeb.setOnClickListener {
             val query = currentResultsQuery()
-            val zip = weatherZipCode(query)
-            openWebSearch(query, searchTerms = zip?.let { "$it weather" } ?: query.trim())
+            when {
+                calculatorOpen -> closeCalculator()
+                canOpenCalculator(query) -> openCalculator()
+                else -> {
+                    val zip = weatherZipCode(query)
+                    openWebSearch(query, searchTerms = zip?.let { "$it weather" } ?: query.trim())
+                }
+            }
         }
         binding.contactCall.setOnClickListener { runContactAction(Intent.ACTION_DIAL, "tel") }
         binding.contactMessage.setOnClickListener { runContactAction(Intent.ACTION_SENDTO, "smsto") }
@@ -642,7 +658,7 @@ class AppDrawerFragment : BaseFragment() {
             binding.root.removeCallbacks(clearFeedback)
             clearFeedback.run()
             updateWebIcon(query)
-            if (hadContactShortcuts || binding.dockWeb.isVisible != (destinationsOnly || canOpenWebSearch(query))) {
+            if (hadContactShortcuts || binding.dockWeb.isVisible != showsDockAction(query)) {
                 updateDockButtons(query, waitingForResults = true)
             }
             if (!destinationsOnly) {
@@ -697,7 +713,7 @@ class AppDrawerFragment : BaseFragment() {
             }
             layoutManager.reverseLayout = true
         } else if (normalResults !in searchResults.adapters) {
-            searchResults.addAdapter(0, normalResults)
+            searchResults.addAdapter(1, normalResults)
             layoutManager.reverseLayout = thunderMode || currentResultsQuery().isNotBlank()
             scrolledFromBestMatch = false
             layoutManager.scrollToPositionWithOffset(0, 0)
@@ -822,7 +838,7 @@ class AppDrawerFragment : BaseFragment() {
         contactsAdapter.clearSelection()
         dismissedShortcutsQuery = null
         updateResultHighlight(query)
-        revealHighlight(position)
+        revealHighlight(position + calculatorResult.itemCount)
     }
 
     private fun revealHighlight(position: Int) {
@@ -883,12 +899,14 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun updateSearchVisibility() {
         updateSearchHint()
-        binding.search.isFocusableInTouchMode = expanded
-        binding.search.isFocusable = expanded
-        binding.search.isLongClickable = expanded
-        if (!expanded) binding.search.clearFocus()
-        binding.recyclerView.visibility = if (expanded) View.VISIBLE else View.INVISIBLE
-        binding.recyclerView.updateRowMotion(expanded)
+        val searchAvailable = expanded && !calculatorOpen
+        binding.search.isFocusableInTouchMode = searchAvailable
+        binding.search.isFocusable = searchAvailable
+        binding.search.isLongClickable = searchAvailable
+        if (!searchAvailable) binding.search.clearFocus()
+        binding.recyclerView.visibility = if (searchAvailable) View.VISIBLE else View.INVISIBLE
+        binding.calculatorPad.isVisible = calculatorOpen
+        binding.recyclerView.updateRowMotion(searchAvailable)
         updateDockButtons()
         updateSearchStatus()
         refreshDestinations()
@@ -1156,15 +1174,34 @@ class AppDrawerFragment : BaseFragment() {
             query.isNotBlank()
 
     private fun offersWebFallback(query: String): Boolean =
-        !destinationsOnly && canOpenWebSearch(query) && searchFeedback == null && hasEmptySearchResults(query)
+        !destinationsOnly && canOpenWebSearch(query) && calculatorResult.answer == null &&
+            searchFeedback == null && hasEmptySearchResults(query)
 
     private fun clearThunderEmpty() {
         binding.root.removeCallbacks(showThunderEmpty)
         thunderEmptyQuery = null
     }
 
+    private fun updateCalculatorResult(query: String) {
+        val eligibleQuery = query.takeIf { activeAlias == null && canOpenWebSearch(it) }
+        if (calculatorQuery == eligibleQuery) return
+        calculatorQuery = eligibleQuery
+        calculatorResult.answer = eligibleQuery?.let { SearchCalculator.evaluate(it) }
+        if (calculatorResult.answer != null) {
+            layoutManager.reverseLayout = true
+            scrolledFromBestMatch = false
+            layoutManager.scrollToPositionWithOffset(0, 0)
+        }
+    }
+
     private fun updateSearchStatus() {
+        if (calculatorOpen) {
+            binding.searchStatus.isVisible = false
+            binding.searchPanel.statusIsResult = false
+            return
+        }
         val query = currentResultsQuery()
+        updateCalculatorResult(query)
         val showTypoHints = expanded && !thunderMode && searchRename == null && query.isNotBlank() &&
             adapter.committedQuery == query && !adapter.hasDirectMatches &&
             (flag != Constants.FLAG_LAUNCH_APP || !hasContactsPermission() ||
@@ -1206,18 +1243,65 @@ class AppDrawerFragment : BaseFragment() {
 
     private fun weatherZipCode(query: String): String? =
         query.trim().takeIf { zip ->
-            homeDestinations && canOpenWebSearch(query) && zip.length == 5 &&
-                zip.all { it in '0'..'9' }
+            (homeDestinations || !destinationsOnly) && canOpenWebSearch(query) &&
+                zip.length == 5 && zip.all { it in '0'..'9' }
         }
+
+    private fun canOpenCalculator(query: String): Boolean =
+        expanded && supportsDestinations && activeAlias == null && query.isBlank()
+
+    private fun showsDockAction(query: String): Boolean =
+        calculatorOpen || canOpenCalculator(query) || canOpenWebSearch(query) || (expanded && destinationsOnly)
+
+    private fun openCalculator() {
+        calculatorHadKeyboard = imeWasVisible
+        exitMoveMode()
+        calculatorOpen = true
+        binding.calculatorPad.reset()
+        binding.search.hideKeyboard()
+        updateSearchVisibility()
+    }
+
+    private fun closeCalculator(restoreKeyboard: Boolean = calculatorHadKeyboard): Boolean {
+        if (!calculatorOpen) return false
+        calculatorOpen = false
+        calculatorHadKeyboard = false
+        updateSearchVisibility()
+        if (restoreKeyboard) binding.search.showKeyboard()
+        return true
+    }
 
     private fun updateWebIcon(query: String) {
         val weather = weatherZipCode(query) != null
-        val description = getString(if (weather) R.string.bolt_search_weather else R.string.bolt_search_web)
+        val calculator = calculatorOpen || canOpenCalculator(query)
+        val description = getString(when {
+            calculatorOpen -> R.string.bolt_calculator_close
+            calculator -> R.string.bolt_calculator_open
+            weather -> R.string.bolt_search_weather
+            else -> R.string.bolt_search_web
+        })
         val web = binding.dockWeb
         if (web.contentDescription == description) return
         web.contentDescription = description
         val icon = when {
-            weather -> R.drawable.dock_weather
+            calculator -> when (prefs.launcherTheme) {
+                Prefs.LauncherTheme.FROSTED_GLASS -> R.drawable.bolt_frosted_calculator
+                Prefs.LauncherTheme.SMOKED_GLASS -> R.drawable.bolt_smoked_calculator
+                Prefs.LauncherTheme.WINDOWS_XP -> R.drawable.xp_calculator
+                Prefs.LauncherTheme.COZY_QUEST -> R.drawable.bolt_cozy_calculator
+                Prefs.LauncherTheme.E_INK -> R.drawable.bolt_eink_calculator
+                Prefs.LauncherTheme.PAPER_NOTEBOOK -> R.drawable.bolt_notebook_calculator
+                else -> R.drawable.dock_calculator
+            }
+            weather -> when (prefs.launcherTheme) {
+                Prefs.LauncherTheme.FROSTED_GLASS -> R.drawable.bolt_frosted_weather
+                Prefs.LauncherTheme.SMOKED_GLASS -> R.drawable.bolt_smoked_weather
+                Prefs.LauncherTheme.WINDOWS_XP -> R.drawable.xp_weather
+                Prefs.LauncherTheme.COZY_QUEST -> R.drawable.bolt_cozy_weather
+                Prefs.LauncherTheme.E_INK -> R.drawable.bolt_eink_weather
+                Prefs.LauncherTheme.PAPER_NOTEBOOK -> R.drawable.bolt_notebook_weather
+                else -> R.drawable.dock_weather
+            }
             liquidGlass -> R.drawable.liquid_glass_web
             windowsXpTheme -> R.drawable.xp_web
             cozyQuest -> R.drawable.bolt_cozy_web
@@ -1300,7 +1384,7 @@ class AppDrawerFragment : BaseFragment() {
         waitingForResults: Boolean = false,
     ) {
         val contact = shortcutContact(query)
-        val showWeb = canOpenWebSearch(query) || (expanded && destinationsOnly)
+        val showWeb = showsDockAction(query)
         // Keep the dock width steady between results, but disable actions on the previous match.
         val keepSlot = waitingForResults && shortcutsRequested && !destinationsOnly && canOpenWebSearch(query)
         val showShortcuts = contact != null || keepSlot
@@ -1593,7 +1677,7 @@ class AppDrawerFragment : BaseFragment() {
         val tile = if (localX >= 0 && localX < results.width && localY >= 0 && localY < results.height)
             results.findChildViewUnder(localX, localY) else null
         val holder = tile?.let(results::getChildViewHolder)
-        if (holder?.absoluteAdapterPosition == position) return false
+        if (holder?.bindingAdapter === adapter && holder.bindingAdapterPosition == position) return false
         adapter.closeSearchActions()
         // A tap on another app dismisses the strip before that app can be opened.
         return holder?.bindingAdapter === adapter
@@ -1646,6 +1730,7 @@ class AppDrawerFragment : BaseFragment() {
     fun collapseSearch(): Boolean {
         if (handleArcadeBack()) return true
         if (_binding == null || !expanded || !isHomePage) return false
+        if (closeCalculator()) return true
         if (exitMoveMode()) return true
         cancelAutoLaunch()
         val insets = androidx.core.view.ViewCompat.getRootWindowInsets(binding.root)
@@ -1667,6 +1752,8 @@ class AppDrawerFragment : BaseFragment() {
         searchAppLaunch = null
         searchActionReturn = null
         restoreSearchKeyboard = false
+        calculatorOpen = false
+        calculatorHadKeyboard = false
         dismissSearchEdit()
         exitMoveMode()
         homeDestinations = false
@@ -2351,7 +2438,9 @@ class AppDrawerFragment : BaseFragment() {
         appResults = ConcatAdapter(adapter, appsSection)
         contactResults = ConcatAdapter(contactsAdapter, contactsSection)
         normalResults = ConcatAdapter(appResults, contactResults)
-        searchResults = ConcatAdapter(normalResults, destinationAdapter)
+        calculatorQuery = null
+        calculatorResult = CalculatorResultAdapter { wallpaperColors }
+        searchResults = ConcatAdapter(calculatorResult, normalResults, destinationAdapter)
         binding.recyclerView.adapter = searchResults
         binding.recyclerView.itemAnimator = null
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
@@ -2463,7 +2552,7 @@ class AppDrawerFragment : BaseFragment() {
             else contactsAdapter.clearContacts()
         }
         binding.recyclerView.updateRowMotion(expanded)
-        if (expanded && searchAppLaunch == null && searchActionReturn == null) {
+        if (expanded && !calculatorOpen && searchAppLaunch == null && searchActionReturn == null) {
             binding.search.showKeyboard(prefs.autoShowKeyboard)
         }
     }
@@ -2498,7 +2587,7 @@ class AppDrawerFragment : BaseFragment() {
     private fun showRestoredSearchKeyboard() {
         if (!restoreSearchKeyboard || _binding == null || !binding.search.hasWindowFocus()) return
         restoreSearchKeyboard = false
-        if (!expanded) return
+        if (!expanded || calculatorOpen) return
         binding.search.requestFocus()
         androidx.core.view.WindowCompat.getInsetsController(requireActivity().window, binding.search)
             .show(androidx.core.view.WindowInsetsCompat.Type.ime())

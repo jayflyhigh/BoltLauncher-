@@ -188,4 +188,9 @@
     <string name="bolt_play_store_unavailable" translatable="false">Unable to open the Play Store listing for %1$s</string>
     <string name="bolt_uninstall_unavailable" translatable="false">Uninstall is unavailable for this app</string>
     <string name="bolt_new_app_name" translatable="false">New app name</string>
+    <string name="bolt_calculator_result" translatable="false">= %1$s</string>
+    <string name="bolt_calculator_open">Open calculator</string>
+    <string name="bolt_calculator_close">Close calculator</string>
+    <string name="bolt_calculator_clear">Clear calculation</string>
+    <string name="bolt_calculator_delete">Delete last character</string>
 </resources>
