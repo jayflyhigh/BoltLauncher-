@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@color/bolt_eink_ink" android:fillType="evenOdd"
+        android:pathData="M4,2 H20 V22 H4 Z M6.5,4.5 H17.5 V9.5 H6.5 Z M6.5,12 H9 V14.5 H6.5 Z M10.75,12 H13.25 V14.5 H10.75 Z M15,12 H17.5 V19.25 H15 Z M6.5,16.75 H9 V19.25 H6.5 Z M10.75,16.75 H13.25 V19.25 H10.75 Z" />
+</vector>

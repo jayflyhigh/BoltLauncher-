@@ -21,6 +21,12 @@
             android:paddingBottom="@dimen/bolt_result_dock_gap"
             android:visibility="invisible" />
 
+        <app.olauncher.ui.CalculatorPad
+            android:id="@+id/calculatorPad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/appRename"
             style="@style/TextSmall"

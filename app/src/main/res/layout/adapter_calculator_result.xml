@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/bolt_search_result_height"
+    android:layout_marginVertical="@dimen/bolt_result_row_margin"
+    android:background="@drawable/bolt_search_best_match"
+    android:ellipsize="end"
+    android:gravity="start|center_vertical"
+    android:maxLines="1"
+    android:paddingHorizontal="16dp"
+    android:textDirection="ltr"
+    android:textSize="16sp" />
