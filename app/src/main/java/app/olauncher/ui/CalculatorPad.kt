@@ -44,11 +44,11 @@ class CalculatorPad(context: Context, attrs: AttributeSet?) : ScrollView(context
         }
         answerLabel.accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
         val rows = listOf(
-            listOf("AC", "(", ")", "⌫"),
-            listOf("7", "8", "9", "÷"),
-            listOf("4", "5", "6", "×"),
-            listOf("1", "2", "3", "−"),
-            listOf("0", ".", "=", "+"),
+            listOf("AC", "( )", "%", "÷"),
+            listOf("7", "8", "9", "×"),
+            listOf("4", "5", "6", "−"),
+            listOf("1", "2", "3", "+"),
+            listOf("0", ".", "⌫", "="),
         )
         for (labels in rows) {
             val row = LinearLayout(context)
@@ -59,6 +59,8 @@ class CalculatorPad(context: Context, attrs: AttributeSet?) : ScrollView(context
                     contentDescription = when (label) {
                         "AC" -> context.getString(R.string.bolt_calculator_clear)
                         "⌫" -> context.getString(R.string.bolt_calculator_delete)
+                        "( )" -> context.getString(R.string.bolt_calculator_parentheses)
+                        "%" -> context.getString(R.string.bolt_calculator_percent)
                         else -> null
                     }
                     textSize = 18f
@@ -96,20 +98,49 @@ class CalculatorPad(context: Context, attrs: AttributeSet?) : ScrollView(context
                 submitted = false
                 expression = expression.dropLast(1)
             }
-            "=" -> submitted = answer != null
+            "=" -> answer?.let {
+                expression = it
+                submitted = true
+            }
+            "( )" -> addParenthesis()
+            "%" -> if (expression.lastOrNull()?.let { it.isDigit() || it == '.' || it == ')' } == true &&
+                expression.length < 160) {
+                expression += "%"
+                submitted = false
+            }
             else -> {
                 if (submitted) {
-                    expression = if (key in listOf("+", "−", "×", "÷")) answer.orEmpty() else ""
+                    if (!isOperator(key.single())) expression = ""
                     submitted = false
                 }
+                if (expression.endsWith('%') && !isOperator(key.single())) return
                 if (expression.length < 160) expression += key
             }
         }
         refresh()
     }
 
+    private fun addParenthesis() {
+        if (submitted) {
+            expression = ""
+            submitted = false
+        }
+        val afterOperand = expression.lastOrNull()?.let {
+            it.isDigit() || it == '.' || it == ')' || it == '%'
+        } == true
+        val hasOpenGroup = expression.count { it == '(' } > expression.count { it == ')' }
+        val addition = when {
+            !afterOperand -> "("
+            hasOpenGroup -> ")"
+            else -> "×("
+        }
+        if (expression.length + addition.length <= 160) expression += addition
+    }
+
+    private fun isOperator(key: Char): Boolean = key in "+−-×÷"
+
     private fun refresh() {
-        answer = SearchCalculator.evaluate(expression)
+        answer = if (submitted) null else SearchCalculator.evaluate(expression)
         expressionLabel.text = expression.ifEmpty { "0" }
         answerLabel.text = answer?.let { context.getString(R.string.bolt_calculator_result, it) }.orEmpty()
     }
