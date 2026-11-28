@@ -13,7 +13,6 @@
     <string name="bolt_cozy_thunder_hint" translatable="false">Quick launch…</string>
     <string name="bolt_cozy_rename_hint" translatable="false">Give it a new name</string>
     <string name="bolt_cozy_contacts_section" translatable="false">People</string>
-    <string name="bolt_cozy_destinations_section" translatable="false">Search in apps</string>
     <string name="bolt_cozy_launcher_settings" translatable="false">Launcher settings</string>
     <string name="bolt_cozy_system_settings" translatable="false">Phone settings</string>
     <string name="bolt_cozy_theme_menu" translatable="false">Themes</string>

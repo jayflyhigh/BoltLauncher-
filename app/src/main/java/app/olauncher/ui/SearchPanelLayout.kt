@@ -19,7 +19,7 @@ import app.olauncher.R
 
 /** Bottom-aligns the measured content and animates the outline without relaying out rows. */
 class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(context, attrs) {
-    private lateinit var results: View
+    private lateinit var results: DockResultsView
     private lateinit var rename: View
     private lateinit var status: View
     private lateinit var moveModeHint: View
@@ -129,7 +129,12 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
         if (statusInPanel) remaining -= minOf(rowInset, remaining)
         remaining -= measureContent(rename, exactWidth, remaining)
         remaining -= measureContent(moveModeHint, exactWidth, remaining)
-        resultsHeight = measureContent(results, exactWidth, (remaining - rowInset).coerceAtLeast(0))
+        val resultsSpace = if ((results.adapter?.itemCount ?: 0) > 0) {
+            (remaining - rowInset).coerceAtLeast(0)
+        } else {
+            0
+        }
+        resultsHeight = measureContent(results, exactWidth, resultsSpace)
         setMeasuredDimension(width, height)
     }
 
@@ -171,7 +176,8 @@ class SearchPanelLayout(context: Context, attrs: AttributeSet?) : FrameLayout(co
             status.layout(inset, statusTop, width - inset, statusBottom)
             edge = (statusTop - rowInset).coerceAtLeast(0)
         }
-        edge = layoutAbove(results, edge)
+        results.layout(0, edge - resultsHeight, width, edge)
+        edge -= resultsHeight
         if (resultsHeight > 0) edge -= rowInset
         updateHeight((height - edge).toFloat())
         if (!statusInPanel) edge = layoutAbove(status, edge)

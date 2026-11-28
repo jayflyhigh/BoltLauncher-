@@ -43,7 +43,6 @@
     <dimen name="bolt_contact_action_divider_width">1dp</dimen>
     <string name="bolt_apps_section" translatable="false">Apps</string>
     <string name="bolt_contacts_section" translatable="false">Contacts</string>
-    <string name="bolt_search_section" translatable="false">Search</string>
     <string name="bolt_search_in_app" translatable="false">Search in %1$s</string>
     <string name="bolt_search_destinations" translatable="false">Search in apps</string>
     <string name="bolt_search_destination_unavailable" translatable="false">Search destination unavailable</string>
