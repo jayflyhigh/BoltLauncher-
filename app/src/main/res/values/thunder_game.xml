@@ -14,7 +14,7 @@
     <string name="thunder_game_stats" translatable="false">Level %1$d\nScore %2$d\nLines %3$d\nBest %4$d</string>
     <string name="thunder_game_over" translatable="false">Game over</string>
     <string name="thunder_game_paused" translatable="false">Paused</string>
-    <string name="arcade_picker_title">Pick your Handheld</string>
+    <string name="arcade_picker_title">Handhelds</string>
     <string name="arcade_start">Start or pause</string>
     <string name="arcade_down">Soft drop</string>
     <string name="arcade_left">Left</string>

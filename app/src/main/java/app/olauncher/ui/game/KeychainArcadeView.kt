@@ -18,6 +18,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import app.olauncher.R
+import app.olauncher.helper.getColorFromAttr
+import app.olauncher.ui.WallpaperThemeColors
+import androidx.core.graphics.ColorUtils
 import kotlin.math.roundToInt
 
 internal class KeychainArcadeView(
@@ -50,13 +53,36 @@ internal class KeychainArcadeView(
     private val compact = resources.configuration.let { it.screenHeightDp < 480 || it.screenWidthDp < 320 }
     private val screen = FrameLayout(context)
     private var game: ThunderGameView? = null
+    private val pickerPalette = WallpaperThemeColors.from(context)
+    private val pickerText = context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
+    private val pickerTop = pickerPalette?.panel ?: context.getColorFromAttr(R.attr.boltDialogTopColor)
+    private val pickerBottom = pickerPalette?.panelEnd ?: pickerPalette?.panel
+        ?: context.getColorFromAttr(R.attr.boltDialogBottomColor)
+    private val pickerOutline = pickerPalette?.outline ?: context.getColorFromAttr(R.attr.boltDialogOutlineColor)
+    private val pickerSelected = pickerPalette?.accent ?: context.getColorFromAttr(R.attr.boltSelectedRowColor)
+    private val pickerSelectedEnd = pickerPalette?.accent ?: context.getColorFromAttr(R.attr.boltSelectedRowEndColor)
+    private val pickerSelectedText = if (pickerPalette != null) Color.BLACK
+        else context.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+    private val pickerTypeface = context.obtainStyledAttributes(intArrayOf(R.attr.mainFontFamily)).let { style ->
+        try {
+            Typeface.create(style.getString(0), Typeface.NORMAL)
+        } finally {
+            style.recycle()
+        }
+    }
+    private val pickerCorner = context.obtainStyledAttributes(intArrayOf(R.attr.boltPanelCornerRadius)).let { style ->
+        try {
+            style.getDimension(0, dp(18).toFloat())
+        } finally {
+            style.recycle()
+        }
+    }
     private val menu = buildMenu()
     private val shell = buildShell()
 
     init {
         isClickable = true
         isFocusableInTouchMode = true
-        setBackgroundColor(0xAE080D13.toInt())
         addView(menu, LayoutParams(-1, -2, Gravity.CENTER).apply {
             setMargins(dp(16), dp(12), dp(16), dp(12))
         })
@@ -74,14 +100,13 @@ internal class KeychainArcadeView(
             )
         }
     }.apply {
-        background = rounded(0xFF18252F.toInt(), 24)
+        background = pickerSurface(pickerTop, pickerBottom, pickerCorner)
         val catalog = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(14))
             addView(label(context.getString(R.string.arcade_picker_title), 17f).apply {
-                setTextColor(Color.WHITE)
-                typeface = Typeface.create("sans-serif-black", Typeface.BOLD_ITALIC)
-                letterSpacing = 0.12f
+                setTextColor(pickerText)
+                typeface = Typeface.create(pickerTypeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(-1, dp(40)))
             for (rowIndex in 0..2) {
                 val row = LinearLayout(context)
@@ -94,7 +119,14 @@ internal class KeychainArcadeView(
                 }
                 addView(row)
             }
-            addView(key(context.getString(R.string.arcade_exit), R.string.arcade_exit, action = exit),
+            val exitButton = key(context.getString(R.string.arcade_exit), R.string.arcade_exit, action = exit).apply {
+                setTextColor(pickerText)
+                typeface = pickerTypeface
+                textSize = 14f
+                isAllCaps = false
+                background = pickerButton(pickerSurface(pickerTop, pickerBottom, pickerCorner), pickerText)
+            }
+            addView(exitButton,
                 LinearLayout.LayoutParams(-1, dp(48)).apply {
                     setMargins(dp(4), dp(8), dp(4), 0)
                 })
@@ -105,7 +137,11 @@ internal class KeychainArcadeView(
     private fun handheldTile(playable: Boolean) = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        background = if (playable) keyBackground(caseColor, 14) else rounded(0xFF22333E.toInt(), 14)
+        background = if (playable) {
+            pickerButton(pickerSurface(pickerSelected, pickerSelectedEnd, pickerCorner), pickerSelectedText)
+        } else {
+            pickerSurface(pickerPalette?.row ?: pickerTop, pickerBottom, pickerCorner)
+        }
         val thumbnail = object : View(context) {
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -140,7 +176,8 @@ internal class KeychainArcadeView(
         addView(thumbnail, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(8) })
         val name = context.getString(if (playable) R.string.thunder_game_title else R.string.arcade_empty_slot)
         addView(label(name, 12f).apply {
-            if (!playable) setTextColor(0xFFBFCDD4.toInt())
+            setTextColor(if (playable) pickerSelectedText else pickerText)
+            typeface = pickerTypeface
             importantForAccessibility = if (playable) IMPORTANT_FOR_ACCESSIBILITY_NO else IMPORTANT_FOR_ACCESSIBILITY_YES
         }, LinearLayout.LayoutParams(-1, dp(30)))
         if (playable) {
@@ -149,6 +186,18 @@ internal class KeychainArcadeView(
             setOnClickListener { launchGame() }
         }
     }
+
+    private fun pickerSurface(top: Int, bottom: Int, radius: Float) =
+        GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(top, bottom)).apply {
+            cornerRadius = radius
+            setStroke(dp(1).coerceAtLeast(1), pickerOutline)
+        }
+
+    private fun pickerButton(surface: GradientDrawable, textColor: Int) = RippleDrawable(
+        ColorStateList.valueOf(ColorUtils.setAlphaComponent(textColor, 40)),
+        surface,
+        null,
+    )
 
     private fun buildShell() = object : LinearLayout(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -271,6 +320,7 @@ internal class KeychainArcadeView(
         val cartridgeView = ThunderGameView(context, state, ::showMenu)
         game = cartridgeView
         menu.visibility = GONE
+        setBackgroundColor(0xAE080D13.toInt())
         shell.visibility = VISIBLE
         screen.addView(cartridgeView, LayoutParams(-1, -1))
         requestFocus()
@@ -280,6 +330,7 @@ internal class KeychainArcadeView(
         game = null
         screen.removeAllViews()
         shell.visibility = GONE
+        setBackgroundColor(ColorUtils.setAlphaComponent(ColorUtils.blendARGB(pickerBottom, Color.BLACK, 0.7f), 174))
         menu.visibility = VISIBLE
         requestFocus()
     }
