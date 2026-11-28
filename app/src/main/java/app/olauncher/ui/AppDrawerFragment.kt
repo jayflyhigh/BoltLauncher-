@@ -28,6 +28,7 @@ import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -1862,11 +1863,45 @@ class AppDrawerFragment : BaseFragment() {
         val builder = AlertDialog.Builder(requireContext())
         val density = resources.displayMetrics.density
         val textColor = builder.context.getColorFromAttr(R.attr.boltHomeMenuTextColor)
-        val rowTextColors = options.map { (palette, _) ->
-            val themedContext = android.view.ContextThemeWrapper(builder.context, WallpaperPalette.forColor(palette.sample.base).overlay)
-            themedContext.getColorFromAttr(R.attr.boltResultTextColor) to
-                themedContext.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+        val invertedOptions by lazy {
+            options.map { (palette, _) ->
+                val inverted = palette.inverted()
+                inverted to WallpaperThemeColors(inverted.sample, inverted.supporting)
+            }
         }
+        var displayedOptions = options
+        val title = android.widget.LinearLayout(builder.context).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            val inset = (16 * density).toInt()
+            setPaddingRelative(inset, inset, inset, inset)
+        }
+        title.addView(TextView(builder.context).apply {
+            setText(R.string.bolt_apply_wallpaper_palette)
+            setTextColor(textColor)
+            textSize = 20f
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isAccessibilityHeading = true
+        }, android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val invertColors = androidx.appcompat.widget.SwitchCompat(builder.context).apply {
+            setText(R.string.bolt_invert_colors)
+            setTextColor(textColor)
+            minHeight = (48 * density).toInt()
+            switchPadding = (8 * density).toInt()
+        }
+        title.addView(invertColors, android.widget.LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { marginStart = (8 * density).toInt() })
+
+        fun previewTextColors(palettes: List<Pair<WallpaperPalette.GeneratedTheme, WallpaperThemeColors>>) =
+            palettes.map { (palette, _) ->
+                val themedContext = android.view.ContextThemeWrapper(
+                    builder.context, WallpaperPalette.forColor(palette.sample.base).overlay,
+                )
+                themedContext.getColorFromAttr(R.attr.boltResultTextColor) to
+                    themedContext.getColorFromAttr(R.attr.boltSelectedRowTextColor)
+            }
+
+        var rowTextColors = previewTextColors(displayedOptions)
         val names = options.indices.map { getString(R.string.bolt_wallpaper_palette_number, it + 1) }
         val rows = object : android.widget.ArrayAdapter<String>(builder.context, 0, names) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -1889,11 +1924,17 @@ class AppDrawerFragment : BaseFragment() {
                     }
                 (row.getChildAt(0) as android.widget.TextView).text = names[position]
                 val (resultText, selectedText) = rowTextColors[position]
-                (row.getChildAt(1) as WallpaperPalettePreview).bind(options[position].second, resultText, selectedText)
+                (row.getChildAt(1) as WallpaperPalettePreview).bind(displayedOptions[position].second, resultText, selectedText)
                 return row
             }
         }
-        builder.setTitle(R.string.bolt_apply_wallpaper_palette)
+        invertColors.setOnCheckedChangeListener { _, checked ->
+            displayedOptions = if (checked) invertedOptions else options
+            rowTextColors = previewTextColors(displayedOptions)
+            rows.notifyDataSetChanged()
+        }
+
+        builder.setCustomTitle(title)
             .setAdapter(rows) { dialog, index ->
                 dialog.dismiss()
                 val manager = WallpaperManager.getInstance(requireContext())
@@ -1906,7 +1947,7 @@ class AppDrawerFragment : BaseFragment() {
                 wallpaperScan?.cancel()
                 scanningHomeExplicitly = false
                 stopWatchingWallpaper()
-                prefs.applyGeneratedWallpaperTheme(options[index].first)
+                prefs.applyGeneratedWallpaperTheme(displayedOptions[index].first)
                 requireActivity().recreate()
             }
             .setNegativeButton(android.R.string.cancel, null)

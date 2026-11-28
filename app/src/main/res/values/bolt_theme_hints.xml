@@ -55,6 +55,7 @@
     <string name="bolt_scan_wallpaper" translatable="false">Scan Wallpaper</string>
     <string name="bolt_wallpaper_theme" translatable="false">Wallpaper Theme</string>
     <string name="bolt_apply_wallpaper_palette" translatable="false">Apply Color Palette</string>
+    <string name="bolt_invert_colors" translatable="false">Invert Colors</string>
     <string name="bolt_palette_preview_normal_result" translatable="false">Search result</string>
     <string name="bolt_theme_preview_selected_result" translatable="false">Selected result</string>
     <string name="bolt_palette_preview_selected_result" translatable="false">Best match</string>
