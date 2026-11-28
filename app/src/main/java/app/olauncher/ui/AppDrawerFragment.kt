@@ -17,6 +17,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.telephony.PhoneNumberUtils
 import java.io.IOException
@@ -36,6 +38,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
@@ -414,6 +417,25 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
+    private fun Drawable.fitLauncherIcon(width: Int, height: Int): Drawable {
+        if (width <= 0 || height <= 0 || intrinsicWidth <= 0 || intrinsicHeight <= 0 ||
+            (width == intrinsicWidth && height == intrinsicHeight)) return this
+        val scale = minOf(width.toFloat() / intrinsicWidth, height.toFloat() / intrinsicHeight)
+        val iconWidth = (intrinsicWidth * scale + 0.5f).toInt().coerceAtLeast(1)
+        val iconHeight = (intrinsicHeight * scale + 0.5f).toInt().coerceAtLeast(1)
+        return LayerDrawable(arrayOf(this)).apply {
+            setLayerSize(0, iconWidth, iconHeight)
+            setLayerGravity(0, Gravity.CENTER)
+        }
+    }
+
+    private fun ImageView.fitDockIcon(defaultIcon: Int) {
+        val reference = ContextCompat.getDrawable(context, defaultIcon) ?: return
+        val icon = drawable ?: return
+        val fitted = icon.fitLauncherIcon(reference.intrinsicWidth, reference.intrinsicHeight)
+        if (fitted !== icon) setImageDrawable(fitted)
+    }
+
     private fun initSearch() {
         dockUsesDarkText = null
         searchHints = SearchHints.forTheme(prefs.launcherTheme)
@@ -436,6 +458,19 @@ class AppDrawerFragment : BaseFragment() {
         usesThemeTileIcons = when (prefs.launcherTheme) {
             Prefs.LauncherTheme.WII_U, Prefs.LauncherTheme.SEATTLE_SEAHAWKS -> true
             else -> false
+        }
+        val dockIcons = with(binding) {
+            listOf(
+                dockBolt to R.drawable.bolt_search_lightning,
+                dockSearchDestinations to R.drawable.dock_search,
+                dockWeb to R.drawable.dock_web,
+                contactCall to R.drawable.contact_call,
+                contactMessage to R.drawable.contact_message,
+                contactWhatsapp to R.drawable.contact_whatsapp,
+            )
+        }
+        val defaultPaddings = dockIcons.map { (button, _) ->
+            Rect(button.paddingStart, button.paddingTop, button.paddingEnd, button.paddingBottom)
         }
         if (liquidGlass) {
             binding.dockBolt.setImageResource(R.drawable.liquid_glass_bolt)
@@ -492,8 +527,6 @@ class AppDrawerFragment : BaseFragment() {
                     dockWeb to R.drawable.bolt_cozy_web,
                     dockSearchDestinations to R.drawable.bolt_cozy_search,
                 )) {
-                    val inset = (3 * resources.displayMetrics.density).toInt()
-                    button.setPaddingRelative(inset, 0, inset, 0)
                     button.imageTintList = null
                     button.setImageResource(icon)
                 }
@@ -502,9 +535,6 @@ class AppDrawerFragment : BaseFragment() {
             }
         } else if (eInk) {
             binding.dockBolt.setImageResource(R.drawable.bolt_eink_lightning)
-            binding.dockWeb.updateLayoutParams<android.widget.LinearLayout.LayoutParams> {
-                width = resources.getDimensionPixelSize(R.dimen.bolt_contact_action_width)
-            }
             binding.dockWebDivider.setBackgroundColor(
                 ContextCompat.getColor(requireContext(), R.color.bolt_eink_rule),
             )
@@ -513,6 +543,11 @@ class AppDrawerFragment : BaseFragment() {
             }
         } else if (paperNotebook) {
             binding.dockWebDivider.setBackgroundColor(dockGraphite)
+        }
+        dockIcons.forEachIndexed { index, (button, reference) ->
+            val padding = defaultPaddings[index]
+            button.setPaddingRelative(padding.left, padding.top, padding.right, padding.bottom)
+            button.fitDockIcon(reference)
         }
         binding.search.filters = binding.search.filters + android.text.InputFilter { source, start, end, dest, from, to ->
             if (thunderCommitted) {
@@ -969,9 +1004,6 @@ class AppDrawerFragment : BaseFragment() {
         binding.searchPanel.setDockAppearance(dockColor, progress)
         binding.search.updateDockCursor(thunder = progress >= 0.5f, dockColor = dockColor)
         val lightDock = androidx.core.graphics.ColorUtils.calculateLuminance(dockColor) > 0.18
-        if (cozyQuest) {
-            bolt.scaleX = 1f - 0.22f * (1f - kotlin.math.abs(2f * progress - 1f))
-        }
         if (eInk || cozyQuest) {
             if (dockUsesDarkText != lightDock) {
                 dockUsesDarkText = lightDock
@@ -983,6 +1015,7 @@ class AppDrawerFragment : BaseFragment() {
                 if (cozyQuest) {
                     bolt.setImageResource(if (lightDock) R.drawable.bolt_cozy_lightning
                         else R.drawable.bolt_cozy_lightning_active)
+                    bolt.fitDockIcon(R.drawable.bolt_search_lightning)
                 } else {
                     bolt.imageTintList = ColorStateList.valueOf(ink)
                     binding.dockWeb.imageTintList = ColorStateList.valueOf(ink)
@@ -1311,11 +1344,14 @@ class AppDrawerFragment : BaseFragment() {
             cozyQuest -> R.drawable.bolt_cozy_web
             else -> R.drawable.dock_web
         }
+        val padding = Rect(web.paddingStart, web.paddingTop, web.paddingEnd, web.paddingBottom)
         when {
             liquidGlass || usesThemeTileIcons -> web.setThemeTileIcon(icon, compact = true)
             windowsXpTheme -> web.setXpIcon(icon, compact = true)
             else -> web.setImageResource(icon)
         }
+        web.setPaddingRelative(padding.left, padding.top, padding.right, padding.bottom)
+        web.fitDockIcon(R.drawable.dock_web)
     }
 
     private fun openWebSearch(query: String, searchTerms: String = query.trim()) {
@@ -1813,6 +1849,10 @@ class AppDrawerFragment : BaseFragment() {
         menu.homeOptions.isVisible = !showAppearance
         menu.appearanceOptions.isVisible = showAppearance
         if (showAppearance) dialog.setOnCancelListener { showHomeSettings() }
+        val menuRows = with(menu) {
+            listOf(appearance, launcherSettings, systemSettings, launcherTheme, setWallpaper, scanWallpaper, powerMenu)
+        }
+        val defaultMenuIcons = menuRows.map { it.compoundDrawablesRelative.copyOf() }
 
         if (cozyQuest) {
             menu.appearance.setCompoundDrawablesRelativeWithIntrinsicBounds(
@@ -1867,6 +1907,16 @@ class AppDrawerFragment : BaseFragment() {
             listOf(menu.appearance, menu.launcherSettings, menu.systemSettings, menu.launcherTheme, menu.setWallpaper, menu.scanWallpaper, menu.powerMenu).forEach {
                 tintCompoundDrawables(it, iconTint)
             }
+        }
+        menuRows.forEachIndexed { index, row ->
+            val icons = row.compoundDrawablesRelative
+            val defaults = defaultMenuIcons[index]
+            val fitted = icons.mapIndexed { slot, icon ->
+                val reference = defaults[slot]
+                if (reference == null) null
+                else (icon ?: reference).fitLauncherIcon(reference.intrinsicWidth, reference.intrinsicHeight)
+            }
+            row.setCompoundDrawablesRelativeWithIntrinsicBounds(fitted[0], fitted[1], fitted[2], fitted[3])
         }
         menu.appearance.setOnClickListener {
             dialog.dismiss()
