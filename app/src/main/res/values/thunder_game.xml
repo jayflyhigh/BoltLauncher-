@@ -1,17 +1,12 @@
 <resources>
     <string name="thunder_game_title" translatable="false">Thunder Blocks</string>
-    <string name="thunder_game_hold" translatable="false">Thunder mode. Hold for Thunder Blocks.</string>
+    <string name="thunder_game_hold" translatable="false">Thunder mode. Hold to pick a handheld.</string>
     <string name="thunder_game_next" translatable="false">Next</string>
-    <string name="thunder_game_pause" translatable="false">Pause</string>
     <string name="thunder_game_resume" translatable="false">Resume</string>
     <string name="thunder_game_restart" translatable="false">Restart</string>
     <string name="thunder_game_exit" translatable="false">Exit</string>
     <string name="thunder_game_confirm_exit" translatable="false">Exit this run?</string>
-    <string name="thunder_game_dock_drop" translatable="false">Drop</string>
-    <string name="thunder_game_controls_hint" translatable="false">Tap to rotate. Drag sideways to move. Swipe down to lower. Tap Drop or ⚡ to hard-drop.</string>
     <string name="thunder_game_tetris" translatable="false">TETRIS!</string>
-    <string name="thunder_game_drop" translatable="false">Drop piece</string>
-    <string name="thunder_game_drop_icon" translatable="false">⚡↓</string>
     <string name="thunder_game_music_on" translatable="false">Music on</string>
     <string name="thunder_game_music_off" translatable="false">Music off</string>
     <string name="thunder_game_sound_on" translatable="false">Sound on</string>
@@ -19,4 +14,25 @@
     <string name="thunder_game_stats" translatable="false">Level %1$d\nScore %2$d\nLines %3$d\nBest %4$d</string>
     <string name="thunder_game_over" translatable="false">Game over</string>
     <string name="thunder_game_paused" translatable="false">Paused</string>
+    <string name="arcade_picker_title">Pick your Handheld</string>
+    <string name="arcade_start">Start or pause</string>
+    <string name="arcade_down">Soft drop</string>
+    <string name="arcade_left">Left</string>
+    <string name="arcade_right">Right</string>
+    <string name="arcade_drop">Hard drop</string>
+    <string name="arcade_rotate">Rotate</string>
+    <string name="arcade_save_one">Save slot 1</string>
+    <string name="arcade_save_two">Save slot 2</string>
+    <string name="arcade_load">Load saved game</string>
+    <string name="arcade_options">Game options</string>
+    <string name="arcade_return">Return to game selection</string>
+    <string name="arcade_empty_slot">Empty slot</string>
+    <string name="arcade_power">Return to handheld grid</string>
+    <string name="arcade_exit">Exit</string>
+    <string name="arcade_start_label">START/PAUSE</string>
+    <string name="arcade_reset">RESET</string>
+    <string name="arcade_drop_label">Drop</string>
+    <string name="arcade_power_label">ON/OFF</string>
+    <string name="arcade_rotate_label">ROTATE</string>
+    <string name="arcade_confirm_reset">Restart this run?</string>
 </resources>
