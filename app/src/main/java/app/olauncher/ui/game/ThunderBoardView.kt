@@ -12,15 +12,12 @@ import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.core.graphics.ColorUtils
 import app.olauncher.R
-import app.olauncher.helper.getColorFromAttr
-import app.olauncher.ui.WallpaperThemeColors
 import app.olauncher.ui.LauncherMotion
 import kotlin.math.min
 
 internal class ThunderBoardView(
     context: Context,
     surfaceColor: Int,
-    wallpaperColors: WallpaperThemeColors?,
     private val preview: Boolean = false,
 ) : View(context) {
     private companion object {
@@ -49,9 +46,9 @@ internal class ThunderBoardView(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val bounds = RectF()
     private val dock = ColorUtils.setAlphaComponent(surfaceColor, 255)
-    private val edge = wallpaperColors?.outline ?: context.getColorFromAttr(R.attr.boltPanelOutlineColor)
-    private val reflection = context.getColorFromAttr(R.attr.boltGlassReflectionColor)
-    private val accent = wallpaperColors?.accent ?: context.getColorFromAttr(R.attr.boltSearchCursorColor)
+    private val edge = 0xFF47534A.toInt()
+    private val reflection = 0xFFCCD3C1.toInt()
+    private val accent = 0xFF28352E.toInt()
     private val celebrationOutline = if (ColorUtils.calculateLuminance(accent) > 0.18) {
         Color.BLACK
     } else Color.WHITE
@@ -60,7 +57,7 @@ internal class ThunderBoardView(
     ) Color.BLACK else Color.WHITE
     private val palette = makePiecePalette(
         accent,
-        wallpaperColors?.row ?: context.getColorFromAttr(R.attr.boltSelectedRowColor),
+        0xFF435047.toInt(),
     )
     private val cellOutlines = palette.map { ColorUtils.calculateContrast(it, dock) < 3.0 }
     private val spacing = resources.displayMetrics.density
@@ -71,7 +68,7 @@ internal class ThunderBoardView(
             // Keep each piece in the theme's color family and give it its own tone.
             val mix = (index % 3) * 0.2f
             ColorUtils.colorToHSL(ColorUtils.blendARGB(primary, secondary, mix), hsl)
-            hsl[2] = if (inputInk == Color.WHITE) 0.88f - 0.065f * index else 0.14f + 0.065f * index
+            hsl[2] = if (inputInk == Color.WHITE) 0.88f - 0.065f * index else 0.19f + 0.027f * index
             ColorUtils.HSLToColor(hsl)
         }
     }

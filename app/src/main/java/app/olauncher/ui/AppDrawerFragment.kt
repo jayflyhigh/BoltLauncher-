@@ -64,7 +64,7 @@ import app.olauncher.BuildConfig
 import app.olauncher.MainViewModel
 import app.olauncher.R
 import app.olauncher.ui.game.ThunderBlocks
-import app.olauncher.ui.game.ThunderGameView
+import app.olauncher.ui.game.KeychainArcadeView
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
@@ -165,7 +165,8 @@ class AppDrawerFragment : BaseFragment() {
     private val destinationsOnly get() = homeDestinations || activeAlias != null
     private val supportsDestinations get() = flag == Constants.FLAG_LAUNCH_APP && !thunderMode && searchRename == null
 
-    private var thunderGame: ThunderGameView? = null
+    private var keychainArcade: KeychainArcadeView? = null
+    private var pendingArcadeMenu = false
     private var pendingThunderRun: ThunderBlocks.State? = null
     private var expanded = false
     private var thunderMode = false
@@ -225,6 +226,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private companion object {
+        const val ARCADE_MENU_KEY = "keychain_arcade_menu"
         const val THUNDER_RUN_KEY = "thunder_run"
         const val SEARCH_RETURN_WINDOW_MS = 5_000L
         const val THUNDER_LIFT_MS = 90L
@@ -282,9 +284,9 @@ class AppDrawerFragment : BaseFragment() {
         binding.root.viewTreeObserver.addOnWindowFocusChangeListener(searchWindowFocusListener)
         binding.root.onBackBeforeIme = {
             cancelAutoLaunch()
-            handleThunderBack() || exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection()
+            handleArcadeBack() || exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection()
         }
-        binding.root.onTap = { x, y -> thunderGame == null && dismissSearchActionsOutside(x, y) }
+        binding.root.onTap = { x, y -> keychainArcade == null && dismissSearchActionsOutside(x, y) }
         initObservers()
         initClickListeners()
         initHomeSwipe()
@@ -295,12 +297,14 @@ class AppDrawerFragment : BaseFragment() {
                 BundleCompat.getSerializable(it, THUNDER_RUN_KEY, ThunderBlocks.State::class.java)
             }
             pendingThunderRun = null
-            if (run != null) openThunderGame(run)
+            val menuOpen = pendingArcadeMenu || savedInstanceState?.getBoolean(ARCADE_MENU_KEY) == true
+            pendingArcadeMenu = false
+            if (run != null || menuOpen) openKeychainArcade(run)
         }
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (handleThunderBack()) return
+                    if (handleArcadeBack()) return
                     if (exitMoveMode() || clearActiveAlias() || dismissSearchEdit() || dismissContactSelection() || collapseSearch()) return
                     if (!isHomePage) closeDrawer()
                 }
@@ -365,7 +369,7 @@ class AppDrawerFragment : BaseFragment() {
     }
 
     private fun initHomeSwipe() {
-        binding.root.canSwipeSearch = { isHomePage && !expanded && thunderGame == null }
+        binding.root.canSwipeSearch = { isHomePage && !expanded && keychainArcade == null }
         binding.root.onSwipeUp = { openSearch(thunder = false) }
         val threshold = 64f * resources.displayMetrics.density
         var notificationsOpened = false
@@ -377,7 +381,7 @@ class AppDrawerFragment : BaseFragment() {
                 }
 
                 override fun onLongPress(event: android.view.MotionEvent) {
-                    if (isHomePage && !expanded && thunderGame == null) showHomeSettings()
+                    if (isHomePage && !expanded && keychainArcade == null) showHomeSettings()
                 }
 
                 override fun onScroll(
@@ -398,7 +402,7 @@ class AppDrawerFragment : BaseFragment() {
             })
         detector.setOnDoubleTapListener(null)
         binding.root.setOnTouchListener { _, event ->
-            isHomePage && !expanded && thunderGame == null && detector.onTouchEvent(event)
+            isHomePage && !expanded && keychainArcade == null && detector.onTouchEvent(event)
         }
     }
 
@@ -532,8 +536,8 @@ class AppDrawerFragment : BaseFragment() {
             if (!thunderCommitted) openSearch(thunder = !thunderMode)
         }
         binding.dockBolt.setOnLongClickListener {
-            if (!isHomePage || expanded || thunderGame != null) return@setOnLongClickListener false
-            openThunderGame()
+            if (!isHomePage || expanded || keychainArcade != null) return@setOnLongClickListener false
+            openKeychainArcade()
             true
         }
         binding.dockSearchDestinations.setOnClickListener {
@@ -1613,10 +1617,11 @@ class AppDrawerFragment : BaseFragment() {
         if (!launch()) searchActionReturn = null
     }
 
-    private fun openThunderGame(state: ThunderBlocks.State? = null) {
+    private fun openKeychainArcade(state: ThunderBlocks.State? = null) {
+        cancelAutoLaunch()
         binding.search.hideKeyboard()
-        val game = ThunderGameView(requireContext(), state, ::closeThunderGame)
-        thunderGame = game
+        val game = KeychainArcadeView(requireContext(), state, ::closeKeychainArcade)
+        keychainArcade = game
         binding.searchPanel.isVisible = false
         binding.root.addView(game, android.widget.LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1624,22 +1629,22 @@ class AppDrawerFragment : BaseFragment() {
         game.requestFocus()
     }
 
-    private fun closeThunderGame() {
-        val game = thunderGame ?: return
-        thunderGame = null
+    private fun closeKeychainArcade() {
+        val game = keychainArcade ?: return
+        keychainArcade = null
         binding.root.removeView(game)
         binding.searchPanel.isVisible = true
         binding.root.requestFocus()
     }
 
-    private fun handleThunderBack(): Boolean {
-        val game = thunderGame ?: return false
+    private fun handleArcadeBack(): Boolean {
+        val game = keychainArcade ?: return false
         game.handleBack()
         return true
     }
 
     fun collapseSearch(): Boolean {
-        if (handleThunderBack()) return true
+        if (handleArcadeBack()) return true
         if (_binding == null || !expanded || !isHomePage) return false
         if (exitMoveMode()) return true
         cancelAutoLaunch()
@@ -2502,7 +2507,7 @@ class AppDrawerFragment : BaseFragment() {
     override fun onPause() {
         stopWatchingWallpaper()
         if (!choosingWallpaperImage && !scanningHomeExplicitly) wallpaperScan?.cancel()
-        thunderGame?.pauseGame()
+        keychainArcade?.pauseGame()
         restoreSearchKeyboard = false
         dismissSearchEdit()
         cancelAutoLaunch()
@@ -2518,8 +2523,9 @@ class AppDrawerFragment : BaseFragment() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        val run = thunderGame?.snapshot() ?: pendingThunderRun
+        val run = keychainArcade?.snapshot() ?: pendingThunderRun
         if (run != null) outState.putSerializable(THUNDER_RUN_KEY, run)
+        else if (keychainArcade != null || pendingArcadeMenu) outState.putBoolean(ARCADE_MENU_KEY, true)
     }
 
     override fun onDestroyView() {
@@ -2530,8 +2536,9 @@ class AppDrawerFragment : BaseFragment() {
         cropDialog?.dismiss()
         choosingWallpaperImage = false
         scanningHomeExplicitly = false
-        pendingThunderRun = thunderGame?.snapshot()
-        closeThunderGame()
+        pendingThunderRun = keychainArcade?.snapshot()
+        pendingArcadeMenu = keychainArcade != null && pendingThunderRun == null
+        closeKeychainArcade()
         clearThunderEmpty()
         binding.root.viewTreeObserver.removeOnWindowFocusChangeListener(searchWindowFocusListener)
         restoreSearchKeyboard = false
