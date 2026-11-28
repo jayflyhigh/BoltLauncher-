@@ -154,7 +154,9 @@ class AppDrawerAdapter(
 
     private fun showSearchActions(app: AppModel): Boolean {
         if (!canShowSearchActions()) return false
-        if (committedQuery == null || app !in currentList) return true
+        // The visible row may still be valid while a new filter is in flight.
+        // Shortcut actions themselves still require a committed query.
+        if (app !in currentList) return true
         if (app != actionApp) {
             closeSearchActions()
             actionApp = app
@@ -457,14 +459,7 @@ class AppDrawerAdapter(
         private val allowsTwoLineNames = paperNotebook || eInk || cozyQuest
 
         init {
-            if (cozyQuest) {
-                binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
-                // Match the app icon's centerline even when a two-line row changes height.
-                (binding.searchAppActions.layoutParams as android.widget.FrameLayout.LayoutParams).apply {
-                    height = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
-                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                }
-            }
+            if (cozyQuest) binding.root.setBackgroundResource(R.drawable.bolt_cozy_selected)
             if (allowsTwoLineNames) {
                 binding.root.minimumHeight = binding.root.resources.getDimensionPixelSize(R.dimen.bolt_search_result_height)
                 binding.root.layoutParams.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -661,7 +656,12 @@ class AppDrawerAdapter(
             } else {
                 return@with
             }
-            appTitle.isVisible = !show && !renameLayout.isVisible
+            appTitle.visibility = when {
+                renameLayout.isVisible -> View.GONE
+                !show -> View.VISIBLE
+                allowsTwoLineNames -> View.INVISIBLE
+                else -> View.GONE
+            }
             appIcon.isVisible = app.appPackage.isNotEmpty()
             otherProfileIndicator.isVisible = !show && app.user != android.os.Process.myUserHandle()
         }
