@@ -3,6 +3,7 @@ package app.olauncher.ui
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import androidx.annotation.DrawableRes
@@ -48,7 +49,7 @@ private fun Context.themeTileIcon(
     val density = resources.displayMetrics.density
     val size = (sizeDp * density).roundToInt()
     val glyph = AppCompatResources.getDrawable(this, icon)?.mutate() ?: return null
-    val inset = ((if (appAction) 3f else sizeDp / 8f) * density).roundToInt()
+    val inset = if (appAction) 3f / sizeDp else 0.125f
     val glassFrame = if (prefs.launcherTheme == Prefs.LauncherTheme.LIQUID_GLASS) {
         val frame = if (glassShortcut) R.drawable.liquid_glass_shortcut_frame else R.drawable.liquid_glass_icon_frame
         AppCompatResources.getDrawable(this, frame)?.mutate() as? GradientDrawable
@@ -65,9 +66,10 @@ private fun Context.themeTileIcon(
     }).apply { setSize(size, size) }
     // Glyph tint stays on the vector when AppCompat clears the image's color filter.
     DrawableCompat.setTint(glyph, getColorFromAttr(R.attr.boltIconTileGlyphColor))
-    return LayerDrawable(arrayOf(tile, glyph)).apply {
-        setLayerInset(1, inset, inset, inset, inset)
-        setLayerSize(1, size - 2 * inset, size - 2 * inset)
-        if (appAction) setLayerGravity(1, Gravity.CENTER)
+    // Share the frame's bounds so a resized tile also scales its glyph inset.
+    return LayerDrawable(arrayOf(tile, InsetDrawable(glyph, inset))).apply {
+        paddingMode = LayerDrawable.PADDING_MODE_STACK
+        setLayerSize(1, 0, 0)
+        setLayerGravity(1, Gravity.FILL)
     }
 }
