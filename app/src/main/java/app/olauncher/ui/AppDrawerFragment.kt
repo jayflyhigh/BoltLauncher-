@@ -554,7 +554,11 @@ class AppDrawerFragment : BaseFragment() {
         binding.dock.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateSearchStartInset() }
         binding.dockActiveAlias.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateSearchStartInset() }
         binding.search.onEmptyBackspace = ::clearActiveAlias
-        binding.dockWeb.setOnClickListener { openWebSearch(currentResultsQuery()) }
+        binding.dockWeb.setOnClickListener {
+            val query = currentResultsQuery()
+            val zip = weatherZipCode(query)
+            openWebSearch(query, searchTerms = zip?.let { "$it weather" } ?: query.trim())
+        }
         binding.contactCall.setOnClickListener { runContactAction(Intent.ACTION_DIAL, "tel") }
         binding.contactMessage.setOnClickListener { runContactAction(Intent.ACTION_SENDTO, "smsto") }
         binding.contactWhatsapp.setOnClickListener { runContactAction(Intent.ACTION_VIEW, "https") }
@@ -633,6 +637,7 @@ class AppDrawerFragment : BaseFragment() {
             dismissedShortcutsQuery = null
             binding.root.removeCallbacks(clearFeedback)
             clearFeedback.run()
+            updateWebIcon(query)
             if (hadContactShortcuts || binding.dockWeb.isVisible != (destinationsOnly || canOpenWebSearch(query))) {
                 updateDockButtons(query, waitingForResults = true)
             }
@@ -1195,10 +1200,36 @@ class AppDrawerFragment : BaseFragment() {
         }
     }
 
-    private fun openWebSearch(query: String) {
+    private fun weatherZipCode(query: String): String? =
+        query.trim().takeIf { zip ->
+            homeDestinations && canOpenWebSearch(query) && zip.length == 5 &&
+                zip.all { it in '0'..'9' }
+        }
+
+    private fun updateWebIcon(query: String) {
+        val weather = weatherZipCode(query) != null
+        val description = getString(if (weather) R.string.bolt_search_weather else R.string.bolt_search_web)
+        val web = binding.dockWeb
+        if (web.contentDescription == description) return
+        web.contentDescription = description
+        val icon = when {
+            weather -> R.drawable.dock_weather
+            liquidGlass -> R.drawable.liquid_glass_web
+            windowsXpTheme -> R.drawable.xp_web
+            cozyQuest -> R.drawable.bolt_cozy_web
+            else -> R.drawable.dock_web
+        }
+        when {
+            liquidGlass || usesThemeTileIcons -> web.setThemeTileIcon(icon, compact = true)
+            windowsXpTheme -> web.setXpIcon(icon, compact = true)
+            else -> web.setImageResource(icon)
+        }
+    }
+
+    private fun openWebSearch(query: String, searchTerms: String = query.trim()) {
         if (query != currentResultsQuery() || !canOpenWebSearch(query)) return
         val url = Uri.parse("https://www.google.com/search").buildUpon()
-            .appendQueryParameter("q", query.trim())
+            .appendQueryParameter("q", searchTerms)
             .build()
         launchSearchAction(Intent(Intent.ACTION_VIEW, url), R.string.bolt_web_unavailable)
     }
@@ -1316,6 +1347,7 @@ class AppDrawerFragment : BaseFragment() {
         val actions = binding.dockActions
         actions.isVisible = showWeb
         web.isVisible = showWeb
+        updateWebIcon(query)
         val groupBackground = if (paperNotebook) R.drawable.bolt_notebook_contact_actions
             else R.drawable.bolt_contact_action_group
         if (!eInk && !cozyQuest && (actions.background != null) != slot.isVisible) {
